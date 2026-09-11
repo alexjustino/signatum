@@ -3,12 +3,18 @@
  * accessible names and the end-to-end suite — so that two readings of one fact agree.
  */
 
-import { describeLink } from './payload/link';
-
-/** The accessible name of the preview figure: "QR code that opens example.com". */
-export function describeCode(url: string): string {
-  const action = describeLink(url);
-  return `QR code that ${action.charAt(0).toLowerCase()}${action.slice(1)}`;
+/**
+ * The accessible name of the preview figure, from the payload's own summary:
+ * "Opens example.com" becomes "QR code that opens example.com", "Joins
+ * Office-5G" becomes "QR code that joins Office-5G".
+ *
+ * It takes the summary rather than the payload because only the builder of a
+ * kind knows how to say what scanning does — a `WIFI:T:WPA;S:...` string read
+ * out to somebody is not a name. One sentence, said once, worn by the figure,
+ * the helper line and the end-to-end suite alike.
+ */
+export function describeCode(summary: string): string {
+  return `QR code that ${summary.charAt(0).toLowerCase()}${summary.slice(1)}`;
 }
 
 /** What the scan gate knows about the code on screen. */
