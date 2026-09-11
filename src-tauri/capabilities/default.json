@@ -1,0 +1,19 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The capabilities the main window is granted. Every entry is here because a feature needs it. The dialog plugin may only open and save — it returns the path a person chose, and the host's own command writes that one file, after the code in it has been rendered, decoded and matched byte for byte. There is no filesystem plugin, so nothing can walk a directory, and no shell plugin, so nothing can run a program.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-is-maximized",
+    "core:window:allow-close",
+    "core:window:allow-set-theme",
+    "core:window:allow-theme",
+    "core:event:default",
+    "log:default",
+    "dialog:allow-save"
+  ]
+}

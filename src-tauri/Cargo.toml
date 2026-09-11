@@ -1,0 +1,82 @@
+[package]
+name = "signatum"
+version = "0.1.0"
+description = "A code you can hold up to a phone, proven readable before it is saved"
+authors = ["Alex Justino"]
+license = "Apache-2.0"
+repository = "https://github.com/alexjustino/signatum"
+edition = "2021"
+rust-version = "1.80"
+
+[lib]
+# The `_lib` suffix keeps the library name distinct from the binary on Windows.
+name = "signatum_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-log = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+rusqlite = { version = "0.32", features = ["bundled"] }
+log = "0.4"
+uuid = { version = "1", features = ["v7"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+# The scan gate (ADR-010): render, decode, compare.
+#
+# `resvg` re-exports the exact `usvg` and `tiny_skia` it was built against
+# (`resvg::usvg`, `resvg::tiny_skia`), so neither is declared here: a second
+# copy of `tiny-skia` at a different version would be two incompatible `Pixmap`
+# types, and the compiler would be right to say so.
+#
+# Default features off on purpose. They are text (fontdb, rustybuzz), system
+# fonts, memory-mapped fonts and raster images (gif, jpeg, webp) — none of which
+# a code we drew ourselves needs, and every one of which is a decoder that would
+# be reachable from a file. The SVG this host renders is one background rect and
+# one path (spec §3).
+resvg = { version = "0.45", default-features = false }
+# The decoder. Independent of the encoder by design: nothing on this side of the
+# gate shares a line of code with what drew the code (ADR-011).
+rqrr = "0.10"
+# Only to turn the PNG the host just encoded back into the grey pixels `rqrr`
+# reads. No other format is compiled in.
+image = { version = "0.25", default-features = false, features = ["png"] }
+sha2 = "0.10"
+hex = "0.4"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = ["UI_ViewManagement", "Foundation"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
+
+# Licences of the direct dependencies, for NOTICE. Every one is a permissive
+# licence compatible with this product's Apache-2.0; none is copyleft.
+#
+#   tauri, tauri-build            Apache-2.0 OR MIT
+#   tauri-plugin-dialog           Apache-2.0 OR MIT
+#   tauri-plugin-log              Apache-2.0 OR MIT
+#   serde, serde_json             MIT OR Apache-2.0
+#   thiserror                     MIT OR Apache-2.0
+#   rusqlite                      MIT  (bundled SQLite itself is public domain)
+#   log                           MIT OR Apache-2.0
+#   uuid                          Apache-2.0 OR MIT
+#   chrono                        MIT OR Apache-2.0
+#   resvg                         Apache-2.0 OR MIT
+#     └ usvg                      Apache-2.0 OR MIT   (re-exported as resvg::usvg)
+#     └ tiny-skia                 BSD-3-Clause        (re-exported as resvg::tiny_skia)
+#   rqrr                          (MIT OR Apache-2.0) AND ISC
+#   image                         MIT OR Apache-2.0
+#   sha2                          MIT OR Apache-2.0
+#   hex                           MIT OR Apache-2.0
+#   windows                       MIT OR Apache-2.0
