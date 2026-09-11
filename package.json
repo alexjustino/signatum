@@ -21,7 +21,9 @@
     "e2e:only": "tsc -p tsconfig.e2e.json --noEmit && vitest run --config vitest.e2e.config.ts",
     "check:version": "node scripts/check-version.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",
-    "release:check": "npm run gates && npm run tauri build && npm run check:bundle"
+    "release:check": "npm run gates && npm run tauri build && npm run check:bundle",
+    "corpus:generate": "vite build --config vite.corpus.config.ts && node scripts/corpus.mjs",
+    "corpus": "npm run corpus:generate && cargo test --manifest-path src-tauri/Cargo.toml --release --test corpus -- --ignored --nocapture"
   },
   "dependencies": {
     "@fluentui/react-icons": "^2.0.339",
