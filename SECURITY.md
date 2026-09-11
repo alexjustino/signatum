@@ -49,11 +49,15 @@ seriously.
   before the @ is percent-encoded exactly as the subject and the body are, so a `?` inside an
   address cannot open a field nobody typed; in a Wi-Fi payload the backslash is escaped before
   anything else, so a network name ending in one escapes itself rather than the separator that
-  follows it. Escaping is a rule of the pure domain, with the negative case tested for every kind.
+  follows it. In a vCard the same rule governs the shape of the line as well as its content: a
+  logical line is folded at 75 octets with a CRLF and a space, counted in UTF-8 octets and never
+  inside a multi-byte sequence, so a fold cannot split a character into a byte an importer will
+  read as something else. Escaping is a rule of the pure domain, with the negative case tested for
+  every kind.
 - **Links are shown as they will resolve.** Only `http` and `https`, plus the payload kinds' own
   schemes (`mailto`, `tel`, `SMSTO`, `geo`, `WIFI`); anything else is refused. An
   internationalised domain is shown as it will resolve — in punycode today, with the Unicode form
-  beside it from F3 — so a look-alike domain is
+  beside it when the Read screen arrives (F10) — so a look-alike domain is
   visible before it is printed rather than after.
 - **Batch files stay in the folder chosen.** File names built from CSV cells are sanitised: no
   path separator, no `..` and no reserved Windows name reaches the filesystem. The batch

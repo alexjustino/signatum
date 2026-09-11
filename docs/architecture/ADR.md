@@ -27,6 +27,7 @@ part that matters most later — the cost we accepted.
 | [019](#adr-019) | The library picks, confirmed                                                     | Accepted                      |
 | [020](#adr-020) | The matrix is proven against the standard, and the corpus is a proof, not a gate | Accepted                      |
 | [021](#adr-021) | One builder per payload kind, and the summary comes from the builder             | Accepted                      |
+| [022](#adr-022) | Three card formats, and a density warning at a nominal size                      | Accepted                      |
 
 ---
 
@@ -656,3 +657,85 @@ needs its file, its tests and its form. That is the point — the dispatch and t
 exhaustive over the union the domain declares, so a kind added without a form is a type error rather
 than an empty panel — but it does mean the cheapest-looking change, adding a field to an existing
 kind, is the one to watch: a field that the builder ignores is a field the person will believe in.
+
+## ADR-022 — Three card formats, and a density warning at a nominal size {#adr-022}
+
+**Status: Accepted.**
+
+**Context.** A contact card is the payload people print on paper and hand to strangers, and it is
+the payload with the most ways to go quietly wrong. It is long — a filled-in vCard is several
+hundred bytes where a link is forty — and bytes are modules, so the same card that scans from an A4
+poster can be unreadable on a business card. It is also structured: `;` separates the components of
+a value and `,` separates the values of a multi-valued one, so a family name written `O'Brien; Jr`
+is not punctuation, it is a name and a suffix, and the address book files a different person. And
+unlike a link, nothing on the screen shows whether it worked; the person who finds out is the one
+who scanned it.
+
+**Decision.** One kind, three formats, chosen on the form and decided before any byte is written.
+
+| Format        | What it is                                          | Why it is offered                                                              |
+| ------------- | --------------------------------------------------- | ------------------------------------------------------------------------------ |
+| **vCard 3.0** | [RFC 2426](https://www.rfc-editor.org/rfc/rfc2426)  | the default: the form the widest range of phones and mail clients import today |
+| vCard 4.0     | [RFC 6350](https://www.rfc-editor.org/rfc/rfc6350)  | the current standard — `KIND:individual` and `tel:` URIs, for what reads it    |
+| MECARD        | the convention phone cameras have read for a decade | density: roughly half the bytes, for a code that has to be printed small       |
+
+3.0 is the default because the test a format has to pass here is the one [ADR-021](#adr-021) set —
+what the two mobile platforms and the desktop address books actually act on — and not which
+document is newest. 4.0 exists because it is where the standard is, and the difference is written
+where the standard writes it: the `KIND` property it added, the `TYPE=INTERNET` parameter it
+dropped, and telephone numbers as `tel:` URIs rather than bare text. MECARD exists because a code
+that does not scan at the size it is printed carries nothing at all.
+
+**Escaping, and the two places it deliberately stops.** Every text value is escaped by RFC 6350
+§3.4 — the backslash first, then `;` and `,`, and a line break as the two characters `\n` — with
+the components of `N` and `ADR` escaped one by one and only then joined, because in a structured
+value position is meaning. Two exceptions are decisions rather than omissions:
+
+- **A web address is written raw in a vCard.** `URL` is a URI value, not a text value (RFC 6350
+  §6.7.8), and a URI is not backslash-escaped; escaping it would put a backslash into an address
+  that some clients then open literally. It is safe to write raw only because the link parser has
+  already refused anything with whitespace or a line break in it — the same parser the Link kind
+  uses.
+- **A line break inside MECARD is passed through.** MECARD has no escape for one. Writing `\n` as
+  two characters would not encode the break, it would put a backslash and an `n` into the note, and
+  a reader that does unescape would produce a value nobody typed. Passing it through is the only
+  choice that cannot corrupt the value, and in a single-line format it is visible rather than
+  silent.
+
+Long lines are folded at 75 octets with CRLF and a space (RFC 6350 §3.2), counted in UTF-8 octets
+and never inside a multi-byte sequence: a card folded through the middle of an `ü` imports as
+mojibake. UTF-8 is the charset in both versions, so no `CHARSET` parameter is written.
+
+**A number on a card carries its country code.** The Phone kind accepts a national number, because
+a code taped to a shop counter is scanned in that country. A card is not taped to anything — it
+travels, and it is stored — so a number without its country code becomes a local number on whatever
+phone reads it later. The card refuses it with a sentence instead, and every other field is read by
+the parser its own kind already owns, so what is refused on the Phone or Link tab is refused here in
+the same words.
+
+**A density warning, not a refusal, at a nominal size.** How small a module comes out is a function
+of the payload's length, and the person who could act on it is the one typing. So the number is
+computed from the code on screen and shown beside the preview: at 25 mm, this code's modules are
+0.24 mm, and below half a millimetre most cameras fail at arm's length. It is **a warning and never
+a refusal** — the printed size is the person's to choose, and what decides whether a code leaves is
+the scan gate ([ADR-010](#adr-010)), which reads the bytes that will actually be exported. The
+warning is decided on the two-decimal number the sentence shows, not the exact one, so the screen
+never claims that 0.50 mm is below half a millimetre; a person reading a warning that contradicts
+itself stops believing the next one. Until the export screen makes the physical size an input
+([ADR-015](#adr-015), F7), 25 mm is assumed, and the sentence says so — so it is read as the
+assumption it is.
+
+**Cost accepted: a card written for one address book's parser may read differently in another.**
+Three formats, two of them with implementations older than their specification, and no test in this
+repository can settle what a phone will do with a `;` after it has been unescaped. The bytes are
+pinned — every format's exact output is asserted, the escaping negative cases included — and the
+decoder proves those bytes come back off the printed drawing; neither proves the import. That proof
+is the phone matrix and the host proof in `docs/SPEC.md` §7: the card imports into Outlook and
+Google Contacts intact, checked on a real machine by a person, per release. A defect that only the
+address book can see is found there or not at all.
+
+**Second cost: the warning is generic where the builder is specific.** The density sentence ends
+with the same advice for every code, including one already written as a MECARD, while the
+over-length refusal in the builder is careful not to suggest MECARD to somebody who is writing one.
+Recorded as the smaller of two evils — a warning shown late is worse than a warning worded loosely
+— and to be narrowed when the export screen takes over the size.

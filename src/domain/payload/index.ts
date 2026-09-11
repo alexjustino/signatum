@@ -16,6 +16,7 @@
  * form is the normal state of a form, not an error.
  */
 
+import { buildContact } from './contact';
 import { buildEmail } from './email';
 import { buildGeo } from './geo';
 import { describeLink, parseLink } from './link';
@@ -24,6 +25,7 @@ import { buildSms } from './sms';
 import { buildText } from './text';
 import { buildWifi } from './wifi';
 
+import type { ContactForm } from './contact';
 import type { EmailForm } from './email';
 import type { GeoForm } from './geo';
 import type { PhoneForm } from './phone';
@@ -31,7 +33,7 @@ import type { SmsForm } from './sms';
 import type { TextForm } from './text';
 import type { WifiForm } from './wifi';
 
-export type PayloadKind = 'link' | 'text' | 'email' | 'phone' | 'sms' | 'wifi' | 'geo';
+export type PayloadKind = 'link' | 'text' | 'email' | 'phone' | 'sms' | 'wifi' | 'geo' | 'contact';
 
 /** The order the kinds are offered in, from the most common to the most specific. */
 export const PAYLOAD_KINDS: readonly PayloadKind[] = [
@@ -42,6 +44,7 @@ export const PAYLOAD_KINDS: readonly PayloadKind[] = [
   'sms',
   'wifi',
   'geo',
+  'contact',
 ] as const;
 
 /** What each kind is called on screen. */
@@ -53,6 +56,7 @@ export const PAYLOAD_LABELS: Record<PayloadKind, string> = {
   sms: 'SMS',
   wifi: 'Wi-Fi',
   geo: 'Location',
+  contact: 'Contact',
 };
 
 /**
@@ -61,7 +65,19 @@ export const PAYLOAD_LABELS: Record<PayloadKind, string> = {
  * without a second map from reason to input.
  */
 export type PayloadResult =
-  { ok: true; payload: string; summary: string } | { ok: false; reason: string; field?: string };
+  | {
+      ok: true;
+      payload: string;
+      summary: string;
+      /**
+       * What the accepted payload could not carry, when the kind's chosen format has nowhere to
+       * put something that was typed — MECARD and a job title. It is not a refusal: the code is
+       * built, and the screen says what was left out rather than letting a person find out from
+       * the phone that imported it.
+       */
+      note?: string;
+    }
+  | { ok: false; reason: string; field?: string };
 
 /** The link form. Its rules live in `link.ts`, where F0 left them. */
 export interface LinkForm {
@@ -70,7 +86,7 @@ export interface LinkForm {
 }
 
 export type PayloadForm =
-  LinkForm | TextForm | EmailForm | PhoneForm | SmsForm | WifiForm | GeoForm;
+  LinkForm | TextForm | EmailForm | PhoneForm | SmsForm | WifiForm | GeoForm | ContactForm;
 
 /** The F0 parser, dressed as a builder so the dispatch has one shape. */
 function buildLink(form: LinkForm): PayloadResult {
@@ -98,6 +114,8 @@ export function buildPayload(form: PayloadForm): PayloadResult {
       return buildWifi(form);
     case 'geo':
       return buildGeo(form);
+    case 'contact':
+      return buildContact(form);
   }
 }
 
@@ -121,6 +139,25 @@ export function emptyForm(kind: PayloadKind): PayloadForm {
       return { kind: 'wifi', ssid: '', password: '', security: 'WPA', hidden: false };
     case 'geo':
       return { kind: 'geo', latitude: '', longitude: '' };
+    case 'contact':
+      return {
+        kind: 'contact',
+        format: 'vcard3',
+        givenName: '',
+        familyName: '',
+        organisation: '',
+        title: '',
+        phone: '',
+        mobile: '',
+        email: '',
+        url: '',
+        street: '',
+        city: '',
+        region: '',
+        postcode: '',
+        country: '',
+        note: '',
+      };
   }
 }
 

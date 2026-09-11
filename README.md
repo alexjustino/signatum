@@ -60,9 +60,18 @@ and each with one line under the form saying what scanning it will do. The kind 
 top of the screen, and every kind keeps its own draft, so trying one does not cost what was typed
 in another.
 
-What it does not do yet: no contact card (vCard and MECARD arrive with F3), no logo, no colours or
-shapes to choose, a fixed 1024-pixel square rather than a physical size, PNG and nothing else, and
-nothing is saved — close the window and the code is gone. Those are the slices that follow.
+F3 has added the eighth kind, and the one that is most often printed on paper: a contact card. The
+eight kinds now include it, in whichever of three forms the address book on the other side reads —
+vCard 3.0 by default, vCard 4.0, or MECARD when the code has to be small — with every field escaped
+to its format and long lines wrapped where the standard wraps them. A number on a card must carry
+its country code, because a card travels. And beside the preview, the screen now says when a code
+would be printed too dense to scan: how small its modules would be at a nominal 25 mm, and a
+warning below half a millimetre. That is a warning and never a refusal; the decoder still decides
+whether a code may leave.
+
+What it does not do yet: no logo, no colours or shapes to choose, a fixed 1024-pixel square rather
+than a physical size, PNG and nothing else, and nothing is saved — close the window and the code is
+gone. Those are the slices that follow.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 

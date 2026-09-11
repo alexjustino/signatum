@@ -17,4 +17,10 @@ export interface FieldsProps<K extends PayloadKind> {
   onChange: (form: PayloadForm) => void;
   /** The field the builder refused, if any. It is the one marked invalid. */
   invalid: string | undefined;
+  /**
+   * A remark the builder attached to an accepted payload — what the chosen
+   * format cannot carry, in the domain's words. Only the kinds whose format is
+   * a choice can have one; the rest never see it.
+   */
+  note?: string | undefined;
 }

@@ -2,6 +2,7 @@ import {
   ArrowDownload20Regular,
   Call20Regular,
   Chat20Regular,
+  ContactCard20Regular,
   Link20Regular,
   Location20Regular,
   Mail20Regular,
@@ -15,6 +16,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { VerificationReport } from '@/data/codes';
 import { describeError, errorKind } from '@/data/errors';
 import { useExportPng, useVerifyCode } from '@/data/hooks';
+import { NOMINAL_PRINT_MM, densityAdvice, densityWarning } from '@/domain/density';
 import { describeCode, gateState } from '@/domain/describe';
 import {
   buildPayload,
@@ -78,6 +80,7 @@ const KIND_ICON: Record<PayloadKind, ReactNode> = {
   sms: <Chat20Regular />,
   wifi: <Wifi120Regular />,
   geo: <Location20Regular />,
+  contact: <ContactCard20Regular />,
 };
 
 /** What a phone does with this kind, in one line, above the fields. */
@@ -89,6 +92,17 @@ const KIND_NOTE: Record<PayloadKind, string> = {
   sms: 'Opens a new text message to this number, already written.',
   wifi: 'Joins the network when a phone reads the code.',
   geo: 'Opens the map at these coordinates, in decimal degrees.',
+  contact: "Adds the person to the phone's contacts when it reads the code.",
+};
+
+/**
+ * What to type, for the kinds where "the form" is not the word for it. A prompt
+ * for a form nobody has filled in yet is the first thing read on the right-hand
+ * side, and it names the thing on the left in the same words that side uses.
+ */
+const EMPTY_PROMPT: Partial<Record<PayloadKind, string>> = {
+  link: 'Type a link to see its code',
+  contact: 'Fill in the card to see its code',
 };
 
 /**
@@ -143,24 +157,32 @@ export function CreatePage({ kind, onKind, form, onForm }: CreatePageProps) {
   // once. A preview rendered from anything else would be a picture of a
   // different code.
   const scene = useMemo(() => {
-    if (!result.ok) return { svg: null, failure: null };
+    if (!result.ok) return { svg: null, side: null, failure: null };
     try {
-      return {
-        svg: renderScene(
-          encodeText(result.payload, ECL),
-          DEFAULT_STYLE,
-          describeCode(result.summary),
-        ).svg,
-        failure: null,
-      };
+      const rendered = renderScene(
+        encodeText(result.payload, ECL),
+        DEFAULT_STYLE,
+        describeCode(result.summary),
+      );
+      return { svg: rendered.svg, side: rendered.side, failure: null };
     } catch (error) {
       return {
         svg: null,
+        side: null,
         failure: error instanceof Error ? error.message : 'This could not be made into a code.',
       };
     }
   }, [result]);
   const svg = scene.svg;
+
+  // How small the modules come out at the size this version prints at. It is
+  // about the code on screen, not about the kind or the payload length, so it
+  // is asked of the scene — and it is a warning, never a refusal: it says the
+  // card may not scan at 25 mm, and the export button never hears about it.
+  const density =
+    scene.side === null
+      ? null
+      : densityWarning({ side: scene.side }, NOMINAL_PRINT_MM, densityAdvice(form));
 
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [written, setWritten] = useState<Written | null>(null);
@@ -228,6 +250,11 @@ export function CreatePage({ kind, onKind, form, onForm }: CreatePageProps) {
   const pristine = untouched(form);
   const helper = result.ok ? result.summary : result.reason;
   const invalid = result.ok ? undefined : result.field;
+  // What the accepted payload could not carry — MECARD has nowhere to put a
+  // title. The builder words it; the form only shows it, beside the control
+  // that caused it.
+  const note =
+    result.ok && 'note' in result && typeof result.note === 'string' ? result.note : undefined;
 
   const tabs = PAYLOAD_KINDS.map((candidate) => ({
     id: candidate,
@@ -246,7 +273,7 @@ export function CreatePage({ kind, onKind, form, onForm }: CreatePageProps) {
       </header>
 
       {/* The kind applies to the whole editor, so the strip spans both panes: inside the
-          left pane, seven tabs run under the preview and the last one disappears. */}
+          left pane, the tabs ran under the preview and the last one disappeared. */}
       <TabStrip
         label="What the code does"
         tabs={tabs}
@@ -262,7 +289,7 @@ export function CreatePage({ kind, onKind, form, onForm }: CreatePageProps) {
         <div className="flex flex-col gap-4">
           <Card title={PAYLOAD_LABELS[kind]} description={KIND_NOTE[kind]}>
             <div className="flex flex-col gap-3">
-              <PayloadFields form={form} onChange={onForm} invalid={invalid} />
+              <PayloadFields form={form} onChange={onForm} invalid={invalid} note={note} />
             </div>
             <p
               aria-live="polite"
@@ -293,15 +320,17 @@ export function CreatePage({ kind, onKind, form, onForm }: CreatePageProps) {
             placeholder={
               <EmptyState
                 icon={<QrCode24Regular />}
-                title={
-                  kind === 'link'
-                    ? 'Type a link to see its code'
-                    : 'Fill in the form to see its code'
-                }
+                title={EMPTY_PROMPT[kind] ?? 'Fill in the form to see its code'}
                 description="The code appears as you type, in the colours it will be printed in."
               />
             }
           />
+
+          {density !== null && (
+            <InfoBar severity="caution" title="Dense code">
+              {density}
+            </InfoBar>
+          )}
 
           <ScanGateStatus report={report} inFlight={inFlight} />
 

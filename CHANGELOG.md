@@ -36,6 +36,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   window is open. A form that is not a code yet says which field is wrong and why, and that field
   is marked invalid for a screen reader as well as coloured for the eye — until something is
   typed, the line is a prompt rather than a telling-off.
+- **The eighth kind: a contact card.** The list of kinds now ends with Contact, and a card is
+  written in whichever of three forms the address book on the other side reads: **vCard 3.0** by
+  default, because it is the form the widest range of phones, mail clients and address books
+  import; **vCard 4.0**, the current version of the standard; and **MECARD**, which says the same
+  things in roughly half the space, for a code that has to be printed small. Thirteen fields —
+  name, organisation, title, two numbers, e-mail, website, a five-part address and a note — and
+  the line under the form says what scanning does: "Adds Ana Souza to contacts". MECARD has
+  nowhere to put a job title, so a card with one is still built and the screen says what was left
+  out, rather than letting a person find that out from the phone that imported it.
+- **Every field escaped, and long lines wrapped where the format wraps them.** In a card, `;` and
+  `,` are what separate one field from the next, so a family name written `O'Brien; Jr` is escaped
+  rather than filed as a name and a suffix — the backslash first, so the escaping cannot itself be
+  escaped, and a line break in a note written the way the format writes one. A line longer than 75
+  bytes is wrapped exactly as the standard prescribes, and never through the middle of an accented
+  letter, so a card with a long address arrives as text rather than as mojibake. The
+  website is written as the address it is: it is a web address, not a piece of text with
+  separators in it, and escaping it would put a backslash into the link.
+- **A number on a card carries its country code.** A card travels and is kept: a number without
+  its country code is a local number on whatever phone reads it, months later and possibly in
+  another country, so both number fields ask for the leading `+` and say so when it is missing.
+  Numbers, e-mail addresses and websites on a card are read by the same rules the Phone, E-mail
+  and Link kinds already use, so what one tab refuses the other refuses, in the same words.
+- **A warning when the code would be printed too dense to scan.** A QR code does not fail
+  gracefully at a small size — it either reads or it does not, and which one it is depends on a
+  number nobody looks at: the size of one module. Beside the preview, the screen now says how
+  small the modules would be at a nominal 25 mm and warns below half a millimetre, where most
+  phone cameras stop resolving them at arm's length. It is a warning and never a refusal: the
+  printed size is the person's to choose, and what decides whether a code may leave is still the
+  decoder that reads it back. Until the export screen makes the physical size something to choose,
+  25 mm is the size assumed, and the sentence says so.
 - **The Wi-Fi password is carried in the clear, and the screen says so where it is typed.**
   Beneath the password field, in plain words: a saved code keeps this password in the clear on
   this machine. Choose an open network and the field is disabled, and says the code will not carry

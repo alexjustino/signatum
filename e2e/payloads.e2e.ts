@@ -121,11 +121,20 @@ describe('payload kinds', () => {
     await tab.click();
   }
 
-  it('lists the seven kinds, link first', async () => {
+  it('lists the eight kinds, link first', async () => {
     const { driver } = session;
     const tabs = await driver.findAll('[role="tab"]');
     const labels = await Promise.all(tabs.map((t) => t.text()));
-    expect(labels).toEqual(['Link', 'Text', 'E-mail', 'Phone', 'SMS', 'Wi-Fi', 'Location']);
+    expect(labels).toEqual([
+      'Link',
+      'Text',
+      'E-mail',
+      'Phone',
+      'SMS',
+      'Wi-Fi',
+      'Location',
+      'Contact',
+    ]);
   });
 
   for (const c of CASES) {
