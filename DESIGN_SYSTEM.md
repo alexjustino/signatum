@@ -224,14 +224,26 @@ F11).
 Everything lives in `src/ui/`. If a screen needs something that is not here, it is built here
 first — not inline in the feature.
 
-`Button` · `IconButton` · `SplitButton` · `Input` · `SearchBox` · `Select` · `Combobox` ·
-`DatePicker` · `TimePicker` · `Checkbox` · `Radio` · `Toggle` · `Slider` · `Badge` · `Chip` ·
-`Avatar` · `Card` · `Modal` · `ConfirmDialog` · `Drawer` · `Flyout` · `Tooltip` · `Menu` ·
-`ContextMenu` · `CommandBar` · `TabStrip` · `Breadcrumb` · `ProgressBar` · `ProgressRing` ·
-`Skeleton` · `EmptyState` · `Toast` · `InfoBar` · `Kbd` · `Resizer` · `VirtualList`
+`Button` · `IconButton` · `SplitButton` · `Input` · `TextArea` · `SearchBox` · `Select` ·
+`Combobox` · `DatePicker` · `TimePicker` · `Checkbox` · `Radio` · `Toggle` · `Slider` ·
+`Badge` · `Chip` · `Avatar` · `Card` · `Modal` · `ConfirmDialog` · `Drawer` · `Flyout` ·
+`Tooltip` · `Menu` · `ContextMenu` · `CommandBar` · `TabStrip` · `Breadcrumb` ·
+`ProgressBar` · `ProgressRing` · `Skeleton` · `EmptyState` · `Toast` · `InfoBar` · `Kbd` ·
+`Resizer` · `VirtualList`
 
-Present today: none — F0 brings the first of them. Each of the rest arrives with the slice that
-first needs it, and arrives _here_, never inline in a feature.
+Present today, because a screen uses them: `Button`, `Input`, `TextArea`, `Select`, `Checkbox`,
+`Card`, `TabStrip`, `InfoBar` and `EmptyState`, beside this product's own `CodePreview` and
+`ScanGateStatus`. Each of the rest arrives with the slice that first needs it, and arrives
+_here_, never inline in a feature.
+
+`TextArea` arrived with F2, for the fields that hold more than one line — a message, a body, plain
+text. It is an `Input` that grew: both take their surface from `fieldSurface.ts`, so a single-line
+and a multi-line field cannot drift into two different-looking controls, and it resizes vertically
+only, because a field that can be dragged wider than its column breaks the layout it sits in.
+
+`TabStrip` takes a `label`, and it is **required**: a strip with no accessible name is a row of
+words to anybody who is not looking at it. On Create, the strip of payload kinds is named for the
+question it answers — _"What the code does"_.
 
 A shortcut shown beside the thing it triggers is a `Kbd`, everywhere, so a person learns to
 read it once.

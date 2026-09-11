@@ -13,6 +13,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   type. Beside the code, one line says what scanning it will do — "Opens example.com" — with
   the host shown as it will actually resolve, so a look-alike domain is visible before it is
   printed. Only `http` and `https` are accepted as links.
+- **Seven kinds of code, not one.** The Create screen asks what the code should do before it asks
+  what it should say: a link, plain text, an e-mail, a phone number, a text message, a Wi-Fi
+  network, or a place on a map. The kind is chosen at the top and the form below follows it. The
+  line under the form says in one sentence what a phone will do with the code — "Opens
+  example.com", "Joins Office-5G", "Calls (11) 91234-5678" — and the preview carries the same
+  sentence as its name, so what is read aloud and what is printed are two readings of one fact.
+- **Each kind is written in the form phones actually read.** An e-mail becomes a `mailto:` with
+  the subject, the body **and** the name before the @ percent-encoded, so a `?` typed into a
+  subject stays a character instead of becoming a second field that sends the message somewhere
+  nobody saw. A phone number becomes `tel:` with the digits and at most a leading `+` — brackets,
+  dots and dashes are what people write, not what a phone dials. A text message becomes
+  `SMSTO:number:message`, the form both mobile platforms have read for a decade. A network becomes
+  the `WIFI:` form, with `\`, `;`, `,`, `:` and `"` escaped in the name and in the password — the
+  backslash first, so the escaping cannot itself be escaped — with no password field at all for an
+  open network and the hidden flag only when the network is hidden. A place becomes `geo:` in
+  decimal degrees, normalised, and a decimal comma is refused with a sentence rather than quietly
+  becoming a different place. Plain text is the one kind with nothing to escape: it carries what
+  was typed, byte for byte, line breaks and emoji included.
+- **A draft for each kind, so looking costs nothing.** Trying the Wi-Fi form and going back to the
+  link does not cost the link: every kind keeps its own half-finished form for as long as the
+  window is open. A form that is not a code yet says which field is wrong and why, and that field
+  is marked invalid for a screen reader as well as coloured for the eye — until something is
+  typed, the line is a prompt rather than a telling-off.
+- **The Wi-Fi password is carried in the clear, and the screen says so where it is typed.**
+  Beneath the password field, in plain words: a saved code keeps this password in the clear on
+  this machine. Choose an open network and the field is disabled, and says the code will not carry
+  a password at all.
 - **The scan gate, which is the product's whole claim.** Before a code can leave, the Rust host
   rasterises the exact drawing that is on screen, hands the pixels to a decoder that shares no
   code with the encoder that drew them, and compares what came back with what was asked for,

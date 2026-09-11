@@ -26,6 +26,7 @@ part that matters most later — the cost we accepted.
 | [018](#adr-018) | Wi-Fi passwords are stored in the clear unless the person opts out               | Accepted                      |
 | [019](#adr-019) | The library picks, confirmed                                                     | Accepted                      |
 | [020](#adr-020) | The matrix is proven against the standard, and the corpus is a proof, not a gate | Accepted                      |
+| [021](#adr-021) | One builder per payload kind, and the summary comes from the builder             | Accepted                      |
 
 ---
 
@@ -596,3 +597,62 @@ in the unit suite as well as the end-to-end one; [ADR-019](#adr-019)'s binding p
 it is a development dependency and is never linked into the product. And the corpus carries its
 payloads and module bits as base64, which nothing the product ships reads, so the crate that decodes
 it is a `dev-dependency`, absent from a release build.
+
+## ADR-021 — One builder per payload kind, and the summary comes from the builder {#adr-021}
+
+**Status: Accepted.**
+
+**Context.** A code carries bytes, and a person reads a sentence. F0 had one kind, a link, and the
+two lived in one file without effort. F2 brings seven, and each of them is a different answer to the
+same two questions: what exactly does the code carry, and what does a phone do when it reads it?
+The failure this product exists to prevent is the gap between those two answers — a preview that
+says _"Joins Office-5G"_ over a payload that joins a network called `Office-5G;P:`. That gap is not
+found by testing harder; it is opened by writing the payload in one place and the sentence in
+another.
+
+**Decision.** A payload kind is **one pure builder**, in its own file under `src/domain/payload/`,
+which takes that kind's form and returns either the exact bytes **and** the sentence together, or
+one reason and the name of the field that earned it. Never two functions that could disagree:
+`buildEmail` is the only thing that knows both what a `mailto:` looks like and that it _"writes to
+ana@example.com"_. The screen dispatches, shows and refuses; it knows the format of nothing. The
+preview's accessible name, the helper line under the form and the end-to-end suite all read that
+same sentence, so there is nothing left for two readings to disagree about.
+
+Every builder is **total**: it throws nothing, because a half-typed form is the normal state of a
+form and not an error, and the empty form of every kind is refused — which is what keeps an export
+from being offered before anything has been typed.
+
+**The formats, and why these.** The test a format has to pass here is not elegance, it is what the
+two mobile platforms' built-in cameras actually act on:
+
+| Kind     | Format                         | Why                                                                                 |
+| -------- | ------------------------------ | ----------------------------------------------------------------------------------- |
+| Link     | WHATWG URL, `http`/`https`     | what a browser would resolve, punycode included (`SECURITY.md`)                     |
+| Text     | the text, byte for byte        | the one kind with no format: a trailing space in a serial number is part of it      |
+| E-mail   | `mailto:` (RFC 6068)           | the only mail URI phones open; subject and body are its query, so both are encoded  |
+| Phone    | `tel:` (RFC 3966)              | digits and at most a leading `+` — what a dialler acts on, not what a person writes |
+| SMS      | `SMSTO:<number>:<message>`     | read by both platforms for a decade; see the cost below                             |
+| Wi-Fi    | ZXing `WIFI:T:…;S:…;P:…;H:…;;` | the de-facto network-join format both platforms implement; there is no standard one |
+| Location | `geo:` (RFC 5870)              | opens the map application rather than a maps vendor's website                       |
+
+Escaping is part of the format, not a tidy-up after it: the reserved characters of `WIFI:` are
+escaped in the name and the password with the backslash handled first, and in `mailto:` the local
+part is percent-encoded exactly as the subject and the body are — a `?` inside an address is a
+character, never a second field.
+
+**Cost accepted: two of the seven are not standards, and one of them is chosen _over_ a standard.**
+`SMSTO:` has no RFC. `sms:` does ([RFC 5724](https://www.rfc-editor.org/rfc/rfc5724)), and the two
+mobile platforms disagree about where the message body goes in it, so a `sms:` code that pre-fills
+the message on one platform opens an empty message on the other. The product ships the form that
+works on the phone rather than the one that reads best in a specification, and the same reasoning
+gives `WIFI:`, which is ZXing's convention and nobody's standard. The cost is real: these two
+formats are defined by what implementations do, so they can drift, and no specification will settle
+an argument about them. It is paid deliberately, because the alternative is a code that scans
+correctly and does nothing useful. Both are pinned by tests that assert the exact bytes, so a drift
+is a failed test rather than a surprise on a printed sheet.
+
+**Second cost: seven builders is seven files.** A kind cannot be added by editing one switch; it
+needs its file, its tests and its form. That is the point — the dispatch and the form switch are
+exhaustive over the union the domain declares, so a kind added without a form is a type error rather
+than an empty panel — but it does mean the cheapest-looking change, adding a field to an existing
+kind, is the one to watch: a field that the builder ignores is a field the person will believe in.

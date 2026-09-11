@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { applyAccent, applyTheme, readStoredTheme, storeTheme } from '@/app/theme';
 import { fetchAccentRamp } from '@/data/system';
+import { emptyForm, PAYLOAD_KINDS, type PayloadForm, type PayloadKind } from '@/domain/payload';
 import type { ThemeChoice } from '@/domain/settings';
 import { AboutPage } from '@/features/about/AboutPage';
 import { CreatePage } from '@/features/create/CreatePage';
@@ -27,8 +28,18 @@ export function App() {
   // because the shade that reads on white does not read on near-black.
   const [theme, setTheme] = useState<ThemeChoice>(readStoredTheme);
   // The Create draft survives a trip to another screen: a person who goes to
-  // Settings to switch the theme comes back to the link they typed.
-  const [draft, setDraft] = useState('');
+  // Settings to switch the theme comes back to what they typed. There is one
+  // draft per kind rather than one draft, so trying the Wi-Fi form and coming
+  // back to the link does not cost the link — switching kinds is a look, not a
+  // decision, and a look must never destroy work.
+  const [kind, setKind] = useState<PayloadKind>('link');
+  const [drafts, setDrafts] = useState<Record<PayloadKind, PayloadForm>>(
+    () =>
+      Object.fromEntries(PAYLOAD_KINDS.map((each) => [each, emptyForm(each)])) as Record<
+        PayloadKind,
+        PayloadForm
+      >,
+  );
   useEffect(() => {
     applyTheme(theme);
     void fetchAccentRamp()
@@ -40,6 +51,12 @@ export function App() {
     storeTheme(next);
     setTheme(next);
   }, []);
+
+  // A form knows its own kind, so the draft it replaces is the one it is.
+  const editDraft = useCallback(
+    (next: PayloadForm) => setDrafts((all) => ({ ...all, [next.kind]: next })),
+    [],
+  );
 
   const go = useCallback((next: Destination) => setDestination(next), []);
 
@@ -53,7 +70,9 @@ export function App() {
           aria-label={DESTINATION_LABELS[destination]}
           className="min-w-0 flex-1 overflow-y-auto bg-layer focus-visible:outline-none"
         >
-          {destination === 'create' && <CreatePage draft={draft} onDraft={setDraft} />}
+          {destination === 'create' && (
+            <CreatePage kind={kind} onKind={setKind} form={drafts[kind]} onForm={editDraft} />
+          )}
           {destination === 'diagnostics' && <DiagnosticsPage />}
           {destination === 'settings' && <SettingsPage theme={theme} onChoose={chooseTheme} />}
           {destination === 'about' && <AboutPage />}

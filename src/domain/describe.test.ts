@@ -6,8 +6,9 @@ const verified = { verified: true, reason: null, decoder: 'rqrr 0.9.0' };
 const refused = { verified: false, reason: 'The decoder found no code.', decoder: 'rqrr 0.9.0' };
 
 describe('describeCode', () => {
-  it('is the accessible name of the preview', () => {
-    expect(describeCode('https://example.com/menu')).toBe('QR code that opens example.com');
+  it('is the accessible name of the preview, from the payload summary', () => {
+    expect(describeCode('Opens example.com')).toBe('QR code that opens example.com');
+    expect(describeCode('Joins Office-5G')).toBe('QR code that joins Office-5G');
   });
 });
 
