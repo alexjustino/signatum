@@ -50,7 +50,9 @@ placed by an engine that knows which modules the code cannot lose.
    plain text, e-mail, phone, SMS, Wi-Fi network, geographic location, and **contact card**
    (vCard 3.0 and 4.0, MECARD for density). Each kind validates and escapes to its format, and
    the preview says in one line what scanning it will do: _"Opens example.com"_, _"Joins
-   Office-5G"_, _"Adds Ana Souza to contacts"_.
+   Office-5G"_, _"Adds Ana Souza to contacts"_. A number on a card carries its country code —
+   a card travels, and a national number is a local number on whatever phone reads it
+   ([ADR-022](architecture/ADR.md#adr-022)).
 2. **The logo** — import PNG, JPEG, GIF (first frame, and it says so), WebP and SVG. Centred on
    a plate (none, square, rounded, circle) with its own padding and colour. Sized automatically
    to the largest the code can carry, or smaller by choice — never larger.
@@ -179,7 +181,7 @@ opened, and holds:
   address cannot become a second field either.
 - **Links are shown as they will resolve.** Only `http` and `https` (and the payload kinds' own
   schemes: `mailto`, `tel`, `SMSTO`, `geo`, `WIFI`); an internationalised domain is shown in
-  Unicode **and** punycode (the punycode form since F2, the Unicode form beside it from F3), so a
+  Unicode **and** punycode (the punycode form since F2, the Unicode form beside it with the Read screen, F10), so a
   look-alike domain is visible before it is printed.
 - **Batch files stay in the folder chosen.** File names built from CSV cells are sanitised; no path
   separator, no `..`, no reserved Windows name reaches the filesystem. The batch **report** is
