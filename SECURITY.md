@@ -45,11 +45,15 @@ seriously.
   decoded**, which is what stops a decompression bomb; the frame count is capped for GIF; and a
   truncated or mislabelled file is a sentence on screen, not a panic and not a hang.
 - **Payloads are escaped to their format.** vCard, MECARD and Wi-Fi each have reserved
-  characters, and a name with a semicolon must not become a second field. Escaping is a rule of
-  the pure domain, with the negative case tested for every kind.
+  characters, and a name with a semicolon must not become a second field. In a `mailto:` the name
+  before the @ is percent-encoded exactly as the subject and the body are, so a `?` inside an
+  address cannot open a field nobody typed; in a Wi-Fi payload the backslash is escaped before
+  anything else, so a network name ending in one escapes itself rather than the separator that
+  follows it. Escaping is a rule of the pure domain, with the negative case tested for every kind.
 - **Links are shown as they will resolve.** Only `http` and `https`, plus the payload kinds' own
-  schemes (`mailto`, `tel`, `sms`, `geo`, `WIFI`); anything else is refused. An
-  internationalised domain is shown in Unicode **and** in punycode, so a look-alike domain is
+  schemes (`mailto`, `tel`, `SMSTO`, `geo`, `WIFI`); anything else is refused. An
+  internationalised domain is shown as it will resolve — in punycode today, with the Unicode form
+  beside it from F3 — so a look-alike domain is
   visible before it is printed rather than after.
 - **Batch files stay in the folder chosen.** File names built from CSV cells are sanitised: no
   path separator, no `..` and no reserved Windows name reaches the filesystem. The batch

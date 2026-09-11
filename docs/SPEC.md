@@ -174,10 +174,13 @@ opened, and holds:
 - **Raster is hostile.** Dimensions read from the header and capped before a pixel is decoded
   (decompression bombs); frame count capped for GIF; a truncated or mislabelled file is a sentence.
 - **Payloads are escaped to their format** — vCard, MECARD and Wi-Fi each have reserved
-  characters, and a name with a semicolon must not become a second field.
+  characters, and a name with a semicolon must not become a second field; in a `mailto:`, the name
+  before the @ is percent-encoded exactly as the subject and the body are, so a `?` inside an
+  address cannot become a second field either.
 - **Links are shown as they will resolve.** Only `http` and `https` (and the payload kinds' own
-  schemes: `mailto`, `tel`, `sms`, `geo`, `WIFI`); an internationalised domain is shown in Unicode
-  **and** punycode, so a look-alike domain is visible before it is printed.
+  schemes: `mailto`, `tel`, `SMSTO`, `geo`, `WIFI`); an internationalised domain is shown in
+  Unicode **and** punycode (the punycode form since F2, the Unicode form beside it from F3), so a
+  look-alike domain is visible before it is printed.
 - **Batch files stay in the folder chosen.** File names built from CSV cells are sanitised; no path
   separator, no `..`, no reserved Windows name reaches the filesystem. The batch **report** is
   itself a CSV and is written with formula injection neutralised (`=`, `+`, `-`, `@`).

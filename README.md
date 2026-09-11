@@ -54,9 +54,15 @@ levels of error correction, under each of the eight mask patterns, checked again
 own tables — and ten thousand randomised codes read back, byte for byte, by the same decoder that
 ships inside the product.
 
-What it does not do yet: one payload kind (a web link), no logo, no colours or shapes to choose,
-a fixed 1024-pixel square rather than a physical size, PNG and nothing else, and nothing is
-saved — close the window and the code is gone. Those are the slices that follow.
+F2 has widened what a code can carry: seven kinds — link, plain text, e-mail, phone, SMS, Wi-Fi
+network and location — each written in the exact form phones read, each escaped to its own format,
+and each with one line under the form saying what scanning it will do. The kind is chosen at the
+top of the screen, and every kind keeps its own draft, so trying one does not cost what was typed
+in another.
+
+What it does not do yet: no contact card (vCard and MECARD arrive with F3), no logo, no colours or
+shapes to choose, a fixed 1024-pixel square rather than a physical size, PNG and nothing else, and
+nothing is saved — close the window and the code is gone. Those are the slices that follow.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 
