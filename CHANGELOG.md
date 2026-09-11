@@ -35,6 +35,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The QR encoder, vendored rather than depended upon.** Project Nayuki's reference TypeScript
   generator lives in the repository, pinned by hash, with each local change recorded beside it —
   because later slices have to reach inside the matrix to place a logo without breaking it.
+- **The matrix itself, proven against the standard rather than against the encoder.** The domain
+  now carries the reading half of the QR standard as well as the writing half: the format and
+  version information a symbol is required to carry, the table of alignment-pattern positions, and
+  the finders, separators, timing patterns and dark module every code must draw. A code is checked
+  against the published tables — the ones anybody can look up — instead of against whatever the
+  encoder believed it had drawn.
+- **Every version, every level, every mode, every mask.** All 3,840 combinations the standard
+  allows — forty sizes, four levels of error correction, numeric, alphanumeric and byte content,
+  eight mask patterns — are built and read back on every run of the test suite, beside known
+  answers copied from the standard's own tables and a decode by a foreign decoder at every size
+  and every level.
+- **Ten thousand codes, read back by the decoder the product ships with.** A generated corpus of
+  ten thousand randomised payloads — reaching every one of the forty sizes, from a single
+  character to the largest a code can hold, text in several scripts, and one payload that is not
+  text at all — is handed to the Rust decoder as pixels. Each has to come back as the same bytes
+  and to report the same version, level and mask the encoder claimed. Bytes, because a payload
+  that is not valid text would hide a defect if it were compared as text. The corpus is generated
+  from a fixed seed, so a failure can be reproduced by its number, and it is never committed.
+- **The corpus runs on demand and once a week, not on every change.** Ten thousand codes take
+  minutes and need the host built in release, so they are asked for by name — `npm run corpus` —
+  and by a workflow of their own, while the sweep of every version, level, mode and mask stays in
+  the battery that runs on every push.
 - **A test suite that drives the real product.** The end-to-end suite starts the built binary,
   types a link, exports a file, and decodes that file from disk with a _third_ decoder — one
   that shares its lineage with neither the encoder nor the host's. Three independent readings of

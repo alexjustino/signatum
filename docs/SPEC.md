@@ -217,6 +217,11 @@ tsc --noEmit · eslint (react-hooks/rules-of-hooks = ERROR) · prettier --check 
 
 One script, `npm run gates`, run identically by a developer and by CI.
 
+The host's randomised round-trips are the ten-thousand-code corpus, and they sit outside that script
+on purpose: `npm run corpus` generates the corpus and decodes it in a release build, on demand and
+once a week, because minutes per run do not belong in a gate (ADR-020). The sweep of every version,
+level, mode and mask stays in `vitest`, where every push meets it.
+
 ## 7. Vertical slices
 
 Depth before breadth. F0 crosses Rust → SQLite → commands → domain → UI in a single feature: a

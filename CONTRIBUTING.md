@@ -120,6 +120,12 @@ runs, and all of them must pass:
 > A hook placed after an early return type-checks cleanly and crashes the screen at runtime.
 > That is why the lint gate is mandatory and not advisory.
 
+`npm run corpus` is not in that list and is not meant to be. It generates ten thousand randomised
+codes and decodes every one of them with the host's decoder in a release build, which takes minutes
+([ADR-020](docs/architecture/ADR.md#adr-020)). Run it yourself whenever you touch the encoder, the
+decoder or the code between them, and say in the pull request that you did; otherwise the workflow
+of the same name runs it on demand and once a week.
+
 ## Tests
 
 The pyramid: rules in Vitest over `domain/` at **90% coverage** — every payload kind and its
