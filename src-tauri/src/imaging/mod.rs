@@ -1,0 +1,17 @@
+//! The scan gate: pixels, and what an independent decoder reads in them.
+//!
+//! Pure by construction — no Tauri types, no database, no window. It takes the
+//! drawing the interface produced and answers one question: would a phone read
+//! this back as what was asked for? Everything in here can therefore be tested
+//! without an application running, which is the only way a gate stays honest
+//! (ADR-010, ADR-011).
+//!
+//! The split: `render` turns the SVG into PNG bytes, `decode` reads a code out
+//! of those bytes, `verify` puts the two together and says so in a sentence.
+
+pub mod decode;
+pub mod render;
+pub mod verify;
+
+#[cfg(test)]
+pub mod fixtures;
