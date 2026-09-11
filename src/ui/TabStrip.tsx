@@ -14,11 +14,14 @@ export interface Tab {
 }
 
 export function TabStrip({
+  label,
   tabs,
   active,
   onSelect,
   actions,
 }: {
+  /** The accessible name of the strip. Required — a strip with no name is a list of words. */
+  label: string;
   tabs: Tab[];
   active: string;
   onSelect: (id: string) => void;
@@ -31,7 +34,7 @@ export function TabStrip({
 
   return (
     <div className="flex items-end justify-between gap-4 border-b border-stroke-subtle">
-      <div role="tablist" className="flex gap-0.5">
+      <div role="tablist" aria-label={label} className="flex gap-0.5">
         {tabs.map((tab, index) => {
           const selected = tab.id === active;
           return (

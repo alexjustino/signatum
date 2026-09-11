@@ -1,25 +1,17 @@
 import type { InputHTMLAttributes } from 'react';
 
+import { FIELD_SURFACE } from './fieldSurface';
+
 /**
  * The canonical text field.
  *
  * The Fluent shape: a filled surface with a heavier bottom stroke that takes the
- * accent colour on focus, rather than a ring drawn around the whole control.
+ * accent colour on focus, rather than a ring drawn around the whole control. The
+ * surface itself is shared with `TextArea`, which is the same field with more
+ * than one line in it.
  */
 export function Input({ className = '', ...rest }: InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <input
-      className={[
-        'h-(--density-control) w-full rounded-md border border-stroke bg-card px-3',
-        'text-body text-fg placeholder:text-fg-tertiary',
-        'border-b-2 border-b-stroke-strong',
-        'transition-colors duration-100 ease-easy',
-        'hover:bg-card-hover',
-        'focus:border-b-accent focus:bg-card focus:outline-none',
-        'disabled:cursor-not-allowed disabled:text-fg-disabled',
-        className,
-      ].join(' ')}
-      {...rest}
-    />
+    <input className={['h-(--density-control)', FIELD_SURFACE, className].join(' ')} {...rest} />
   );
 }
