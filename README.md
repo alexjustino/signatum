@@ -42,7 +42,16 @@ placed by an engine that knows which modules the code cannot lose.
 
 ## What exists today
 
-Nothing runs yet. The specification, the decisions and the threat model are written; F0 is next.
+F0 has landed, and it is the whole promise on one screen: type a web link, watch it become a QR
+code, and export it as a PNG — but only after an independent decoder has rasterised that exact
+drawing, read it back, and matched it against the link byte for byte. A code that does not read
+back is refused, with the reason in a sentence, and no file is written. The end-to-end suite
+proves it against the real binary, decoding the exported file from disk with a third decoder that
+shares no code with either of the other two.
+
+What it does not do yet: one payload kind (a web link), no logo, no colours or shapes to choose,
+a fixed 1024-pixel square rather than a physical size, PNG and nothing else, and nothing is
+saved — close the window and the code is gone. Those are the slices that follow.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 
@@ -150,10 +159,6 @@ Run the full validation battery exactly as CI does:
 ```bash
 npm run gates
 ```
-
-Neither command works yet: F0 has not landed, so there is no application to start and no gate
-script to run. Until it does, this repository holds the specification, the decisions and the
-contracts.
 
 ## Roadmap
 

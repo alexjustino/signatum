@@ -4,26 +4,27 @@ Binding decisions. A record here is not a suggestion: changing one requires a ne
 supersedes it, not an edit in passing. Each entry states the context, the decision, and — the
 part that matters most later — the cost we accepted.
 
-| #               | Decision                                                           | Status   |
-| --------------- | ------------------------------------------------------------------ | -------- |
-| [001](#adr-001) | Tauri 2 with a deliberately thin Rust host                         | Accepted |
-| [002](#adr-002) | SQLite, one file, WAL                                              | Accepted |
-| [003](#adr-003) | The domain layer is pure TypeScript                                | Accepted |
-| [004](#adr-004) | Fluent is the visual language, with one icon set                   | Accepted |
-| [005](#adr-005) | Apache-2.0, and two trademark statements                           | Accepted |
-| [006](#adr-006) | No network, no telemetry                                           | Accepted |
-| [007](#adr-007) | Installers are not code-signed in 1.0.0                            | Accepted |
-| [008](#adr-008) | End-to-end tests drive the real binary                             | Accepted |
-| [009](#adr-009) | Accessibility is gated, not reviewed                               | Accepted |
-| [010](#adr-010) | The scan gate: nothing leaves that a decoder did not read back     | Accepted |
-| [011](#adr-011) | The decoder is of a different lineage from the encoder             | Accepted |
-| [012](#adr-012) | The library picks for encoder, decoders, imaging and PDF           | Proposed |
-| [013](#adr-013) | The logo is a region of the matrix, placed by an engine            | Accepted |
-| [014](#adr-014) | Dynamic codes are refused on principle                             | Accepted |
-| [015](#adr-015) | Size is an input, not a pixel count                                | Accepted |
-| [016](#adr-016) | Hostile input is normalised, never passed through                  | Accepted |
-| [017](#adr-017) | Error correction is automatic with a logo, overridable upward only | Accepted |
-| [018](#adr-018) | Wi-Fi passwords are stored in the clear unless the person opts out | Accepted |
+| #               | Decision                                                           | Status                        |
+| --------------- | ------------------------------------------------------------------ | ----------------------------- |
+| [001](#adr-001) | Tauri 2 with a deliberately thin Rust host                         | Accepted                      |
+| [002](#adr-002) | SQLite, one file, WAL                                              | Accepted                      |
+| [003](#adr-003) | The domain layer is pure TypeScript                                | Accepted                      |
+| [004](#adr-004) | Fluent is the visual language, with one icon set                   | Accepted                      |
+| [005](#adr-005) | Apache-2.0, and two trademark statements                           | Accepted                      |
+| [006](#adr-006) | No network, no telemetry                                           | Accepted                      |
+| [007](#adr-007) | Installers are not code-signed in 1.0.0                            | Accepted                      |
+| [008](#adr-008) | End-to-end tests drive the real binary                             | Accepted                      |
+| [009](#adr-009) | Accessibility is gated, not reviewed                               | Accepted                      |
+| [010](#adr-010) | The scan gate: nothing leaves that a decoder did not read back     | Accepted                      |
+| [011](#adr-011) | The decoder is of a different lineage from the encoder             | Accepted                      |
+| [012](#adr-012) | The library picks for encoder, decoders, imaging and PDF           | Superseded by [019](#adr-019) |
+| [013](#adr-013) | The logo is a region of the matrix, placed by an engine            | Accepted                      |
+| [014](#adr-014) | Dynamic codes are refused on principle                             | Accepted                      |
+| [015](#adr-015) | Size is an input, not a pixel count                                | Accepted                      |
+| [016](#adr-016) | Hostile input is normalised, never passed through                  | Accepted                      |
+| [017](#adr-017) | Error correction is automatic with a logo, overridable upward only | Accepted                      |
+| [018](#adr-018) | Wi-Fi passwords are stored in the clear unless the person opts out | Accepted                      |
+| [019](#adr-019) | The library picks, confirmed                                       | Accepted                      |
 
 ---
 
@@ -285,10 +286,12 @@ it failed.
 
 ## ADR-012 — The library picks for encoder, decoders, imaging and PDF {#adr-012}
 
-**Status: Proposed.** These are candidates, not adoptions. Each is confirmed by licence,
-maintenance and the dependency audit in F0 and F1, recorded in `NOTICE`, and this record is then
-superseded by an Accepted one naming what was actually taken. ADR-011's independence rule is
-Accepted and depends on none of these names.
+**Status: Superseded by [ADR-019](#adr-019).** These were candidates, not adoptions, and the
+record stayed Proposed so that the audit was allowed to say no. F0 built with them and ADR-019
+names what was actually taken, at which version and under which licence. The table below is kept
+as it was written — it is the reasoning the picks were made against, and the PDF row is still a
+candidate, because F7 has not happened. ADR-011's independence rule was Accepted throughout and
+depends on none of these names.
 
 | Role               | Candidate                                        | Why it is the candidate                                                 |
 | ------------------ | ------------------------------------------------ | ----------------------------------------------------------------------- |
@@ -470,3 +473,65 @@ stated export path, and it will be its own record.
 to the Windows user account can read the Wi-Fi passwords in the library, along with everything
 else in it; the database is not encrypted at rest. The opt-out is the mitigation the product
 offers today, and saying so plainly, where the password is typed, is the rest of it.
+
+## ADR-019 — The library picks, confirmed {#adr-019}
+
+**Status: Accepted.** Supersedes [ADR-012](#adr-012).
+
+**Context.** ADR-012 named candidates and said plainly that they were candidates. F0 had to build
+with something: encode a code, rasterise it, decode it with a different lineage, and prove the
+whole path from a test process. What follows is what was taken, at the versions in `Cargo.lock`
+and `package-lock.json` on the day F0 landed. Versions are named because "we use resvg" is not a
+fact anybody can check a year later.
+
+**Decision.**
+
+| Role                     | Taken                                                                                                           | Version                 | Licence                                   |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------- | ----------------------- | ----------------------------------------- |
+| Encoder                  | Project Nayuki's QR Code generator, **vendored**                                                                | upstream `8329a7108fc2` | MIT                                       |
+| Decoder, in the host     | `rqrr`                                                                                                          | 0.10.1                  | (MIT OR Apache-2.0) AND ISC               |
+| Decoder, third, in tests | `jsQR` (with `pngjs` to read the file)                                                                          | 1.4.0, 7.0.0            | Apache-2.0; MIT (`pngjs`)                 |
+| SVG rasteriser           | `resvg`, default features **off**                                                                               | 0.45.1                  | Apache-2.0 OR MIT                         |
+| └ SVG parser             | `usvg`, re-exported by `resvg`                                                                                  | 0.45.1                  | Apache-2.0 OR MIT                         |
+| └ Rasteriser backend     | `tiny-skia`, re-exported by `resvg`                                                                             | 0.11.4                  | BSD-3-Clause                              |
+| PNG in and out           | `image`, `png` feature only                                                                                     | 0.25.10                 | MIT OR Apache-2.0                         |
+| Hashing                  | `sha2`, `hex`                                                                                                   | 0.10.9, 0.4.3           | MIT OR Apache-2.0                         |
+| Host, storage, platform  | `tauri` (+ `dialog`, `log` plugins), `rusqlite` (bundled SQLite), `windows` (`UI_ViewManagement`, `Foundation`) | 2.11.5, 0.32.1, 0.58    | Apache-2.0 OR MIT; MIT; MIT OR Apache-2.0 |
+
+Every licence is permissive and compatible with this product's Apache-2.0; none is copyleft. The
+list a person sees is `NOTICE`, and the About screen reads it from that file rather than from a
+second list somebody would have to remember to update.
+
+**The encoder is vendored, and pinned.** `src/domain/qr/vendor/qrcodegen.ts` is upstream
+byte-for-byte apart from two lines — a `@ts-nocheck` and lint pragma, and an `export` to give a
+script a module boundary — both recorded in `VENDORED.md` beside it, both re-checked by a test
+that fails on any third difference, against the upstream file's SHA-256. It is vendored rather
+than depended upon for the reason ADR-012 gave: from F5 the placement engine has to reach inside
+the matrix, which no packaged encoder exposes. The cost is unchanged and now real — an upstream
+fix is a manual merge, not a version bump.
+
+**`resvg` is compiled with its default features off**, which is a security decision before it is a
+size one. The defaults are text layout, system fonts, memory-mapped fonts and GIF/JPEG/WebP
+decoding: every one of them a parser that would be reachable from a file this product was handed,
+and not one of them needed to draw a background rectangle and a path. `usvg` and `tiny-skia` are
+not declared as dependencies at all — `resvg` re-exports the exact versions it was built against,
+and a second copy of `tiny-skia` at another version would be two incompatible `Pixmap` types.
+
+**`jsQR` is the third decoder**, in the end-to-end suite only, never in the product. It runs in
+the Node process that drives the binary, reads the PNG from disk after the product wrote it, and
+shares its lineage with neither the encoder (Nayuki) nor the host's decoder (`rqrr`, a port of
+quirc). Three readings of one code by three unrelated implementations is the strongest statement
+this product can make without a camera. `zxing-cpp`, ADR-012's fallback verifier, was **not**
+taken: it would put a C++ toolchain on every machine that builds this, and two decoders in the
+host would raise a question — which one wins — that the product has no good answer to.
+
+**PDF is not decided here.** `pdf-writer` and `svg2pdf` remain candidates; F7 is where export
+formats are built, and the choice belongs to the record that follows it.
+
+**Cost accepted: the MSRV holds the versions down.** `rust-version = "1.80"` is kept, the same
+value the sibling products use, so one toolchain builds the whole family and a contributor is
+never asked which Rust today's repository wants. Newer `resvg` and `rqrr` releases require a
+newer compiler, so 0.45 and 0.10 are what F0 takes rather than the latest published. That is a
+real cost, and it comes due the day one of these crates fixes something that matters upstream:
+the answer then is to raise the MSRV across the family deliberately, in its own record, not to
+raise it quietly here for one crate.
