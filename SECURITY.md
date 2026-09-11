@@ -87,6 +87,12 @@ unlocked machine, can edit the database and the logos in it — because they can
 can. The database is not encrypted at rest. Full-disk encryption (BitLocker) protects the file at
 rest; nothing protects it from a process running as you.
 
+A compromised interface — a poisoned front-end dependency, say — could ask the host to write a
+verified code over any `.png` on a local drive, because the host trusts the path the interface
+hands it after the save dialog. It cannot make the host write anywhere else: the path has to be
+a local `.png`, never a network path, and the bytes are always a code that read back. The
+dialog plugin may only save; nothing in the interface can read a file or walk a directory.
+
 ## Distribution integrity
 
 Every release, from the first one, is built by the release workflow on GitHub-hosted runners,

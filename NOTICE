@@ -30,9 +30,9 @@ describe what this product makes, never as part of its name.
 THIRD-PARTY COMPONENTS
 
 This product bundles or depends on third-party components distributed under
-their own licenses. The list below is the intended stack; each component is
-confirmed by licence, maintenance and the dependency audit before it is
-adopted (docs/architecture/ADR.md, ADR-012), and the authoritative list is
+their own licenses. The list below is what is adopted today; each component was
+confirmed by licence, maintenance and the dependency audit before it was
+adopted (docs/architecture/ADR.md, ADR-019), and the authoritative list is
 the one generated from the dependency manifests (Cargo.toml, package.json).
 
   Tauri .......................... Apache-2.0 OR MIT
@@ -44,6 +44,16 @@ the one generated from the dependency manifests (Cargo.toml, package.json).
   Fluent UI System Icons ......... MIT
   rusqlite / SQLite .............. MIT / Public Domain
   serde, serde_json .............. Apache-2.0 OR MIT
+  QR Code generator (Project Nayuki, vendored) ... MIT
+  resvg / usvg ................... Apache-2.0 OR MIT
+  tiny-skia ...................... BSD-3-Clause
+  rqrr ........................... MIT OR Apache-2.0, and ISC
+  image .......................... MIT OR Apache-2.0
+  sha2, hex ...................... MIT OR Apache-2.0
+
+The vendored encoder carries its licence in the header of the file itself
+(src/domain/qr/vendor/), together with the upstream commit it was taken from
+and every local change made to it.
 
 Components specific to this product are added to this list as they are adopted,
 after the dependency audit (see docs/SPEC.md §3).

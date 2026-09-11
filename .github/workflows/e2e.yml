@@ -1,0 +1,71 @@
+name: End-to-end
+
+# The real binary, driven through WebDriver (ADR-016). Not a pull-request gate:
+# it needs a debug build and a driver that matches the runner's WebView2, and
+# it takes minutes. Run it by hand before a release, or let the weekly run
+# catch a seam that the unit suites cannot see.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: WebDriver suite
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+
+      - name: Build the debug binary
+        run: npm run e2e:build
+
+      - name: Run the suite
+        # The runner image ships Microsoft Edge WebDriver in a directory named
+        # by the machine's own `EdgeWebDriver` variable. That is a variable of
+        # the runner, not of the workflow, so `${{ env.EdgeWebDriver }}` is
+        # empty and `tauri-driver` gets a driver path of `\msedgedriver.exe` —
+        # it exits at once and every file fails with "tauri-driver did not come
+        # up on port 4444". Read it in the shell, where it exists.
+        shell: pwsh
+        run: |
+          if (-not $env:EdgeWebDriver) { throw 'the runner has no EdgeWebDriver directory' }
+          $driver = Join-Path $env:EdgeWebDriver 'msedgedriver.exe'
+          if (-not (Test-Path $driver)) { throw "no msedgedriver at $driver" }
+          & $driver --version
+          # Known: this suite does not yet run on a hosted runner. With the
+          # driver path fixed every session fails at "DevToolsActivePort file
+          # doesn't exist" — WebView2 not starting there — and telling it there
+          # is no GPU did not change that. It is dispatched, not a gate, and the
+          # suite's verdict comes from a real desktop until this is understood.
+          $env:SIGNATUM_E2E_EDGEDRIVER = $driver
+          npm run e2e
+
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: e2e/artefacts
+          if-no-files-found: ignore

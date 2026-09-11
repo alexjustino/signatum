@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!--
+    The Signatum mark.
+
+    A ring — the signet, the seal pressed into wax to prove who sent a thing — and, inside it,
+    the check: the proof that the code scans. The ring is a circle on purpose: a square ring with
+    a square inside would read as a QR finder pattern, and the mark of a code product must never
+    look like a piece of a code.
+
+    Drawn to survive sixteen pixels in a taskbar: two shapes, one accent, no stroke thinner than
+    the gap it sits beside. The blue is the Windows 11 default accent, the same value the token
+    layer starts from. The same file is the window icon, the installer icon and the title-bar mark.
+  -->
+  <defs>
+    <linearGradient id="ground" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a8ae0"/>
+      <stop offset="1" stop-color="#0060b0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- The ground: Windows 11 corner radius, at this scale. -->
+  <rect x="0" y="0" width="256" height="256" rx="56" fill="url(#ground)"/>
+
+  <!-- The seal. -->
+  <circle cx="128" cy="128" r="72" fill="none" stroke="#ffffff" stroke-width="22"/>
+
+  <!-- The proof. -->
+  <path d="M 96 130 L 118 152 L 162 106" fill="none" stroke="#a6dcff" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

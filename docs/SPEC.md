@@ -133,12 +133,14 @@ modules so no half-module shows at the edge of the plate, re-evaluates the mask 
 in place, and raises the error-correction level if the logo needs it. A logo that cannot fit is
 refused with the reason, not squeezed.
 
-**Candidate libraries** (ADR-012, Proposed — each confirmed by licence, maintenance and the dependency audit
-before adoption, and recorded in `NOTICE`): encoder — Project Nayuki's QR Code generator (MIT, a
-reference-quality implementation) vendored into `domain/`; decoder in the host — `rqrr` (pure
-Rust, a port of quirc) or `zxing-cpp`; SVG — `usvg`/`resvg`; raster — `image`; PDF — `pdf-writer`
-or `svg2pdf`. The end-to-end suite decodes exported files with **a third** decoder (`jsQR` or
-`zxing-wasm`) in the test process.
+**Libraries** (ADR-019, Accepted — versions, licences and the reasoning are in that record, and
+the list a person sees is `NOTICE`): the encoder is Project Nayuki's QR Code generator (MIT),
+vendored into `domain/` and pinned to an upstream commit by hash; the decoder in the host is
+`rqrr` (pure Rust, a port of quirc); SVG is rasterised by `resvg`/`usvg` with default features
+off, so no font or raster decoder is compiled in; PNG in and out is `image` with only the `png`
+feature. The end-to-end suite decodes exported files with **a third** decoder, `jsQR`, in the test
+process — a lineage shared with neither of the other two. PDF is not chosen yet: it belongs to
+F7.
 
 The schema is in [`DATA_MODEL.md`](DATA_MODEL.md).
 
