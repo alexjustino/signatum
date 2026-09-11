@@ -8,8 +8,11 @@
 //!
 //! The split: `render` turns the SVG into PNG bytes, `decode` reads a code out
 //! of those bytes, `verify` puts the two together and says so in a sentence.
+//! `matrix` sits beside them for the case where the modules are already known
+//! and only the decoder's reading of them is in question.
 
 pub mod decode;
+pub mod matrix;
 pub mod render;
 pub mod verify;
 

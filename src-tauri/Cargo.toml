@@ -50,6 +50,11 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 sha2 = "0.10"
 hex = "0.4"
 
+# Only the corpus test needs these: the generated corpus carries payload and
+# module bits as base64, and nothing the product ships reads base64.
+[dev-dependencies]
+base64 = "0.22"
+
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = ["UI_ViewManagement", "Foundation"] }
 
@@ -80,3 +85,7 @@ strip = true
 #   sha2                          MIT OR Apache-2.0
 #   hex                           MIT OR Apache-2.0
 #   windows                       MIT OR Apache-2.0
+#
+# Development only, never linked into a release build:
+#
+#   base64                        MIT OR Apache-2.0
