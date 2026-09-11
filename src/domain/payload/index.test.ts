@@ -47,17 +47,57 @@ const VALID: ReadonlyArray<{ form: PayloadForm; payload: string; summary: string
     payload: 'geo:-23.5505,-46.6333',
     summary: 'Opens the map at -23.5505, -46.6333',
   },
+  {
+    form: {
+      kind: 'contact',
+      format: 'vcard3',
+      givenName: 'Ana',
+      familyName: 'Souza',
+      organisation: '',
+      title: '',
+      phone: '',
+      mobile: '',
+      email: '',
+      url: '',
+      street: '',
+      city: '',
+      region: '',
+      postcode: '',
+      country: '',
+      note: '',
+    },
+    payload: 'BEGIN:VCARD\r\nVERSION:3.0\r\nN:Souza;Ana;;;\r\nFN:Ana Souza\r\nEND:VCARD\r\n',
+    summary: 'Adds Ana Souza to contacts',
+  },
 ];
 
 describe('the payload kinds', () => {
   it('are offered in one order, from the most common to the most specific', () => {
-    expect(PAYLOAD_KINDS).toEqual(['link', 'text', 'email', 'phone', 'sms', 'wifi', 'geo']);
+    expect(PAYLOAD_KINDS).toEqual([
+      'link',
+      'text',
+      'email',
+      'phone',
+      'sms',
+      'wifi',
+      'geo',
+      'contact',
+    ]);
   });
 
   it('each have a name on screen, and no name is used twice', () => {
     expect(Object.keys(PAYLOAD_LABELS).sort()).toEqual([...PAYLOAD_KINDS].sort());
     const labels = PAYLOAD_KINDS.map((kind) => PAYLOAD_LABELS[kind]);
-    expect(labels).toEqual(['Link', 'Text', 'E-mail', 'Phone', 'SMS', 'Wi-Fi', 'Location']);
+    expect(labels).toEqual([
+      'Link',
+      'Text',
+      'E-mail',
+      'Phone',
+      'SMS',
+      'Wi-Fi',
+      'Location',
+      'Contact',
+    ]);
     expect(new Set(labels).size).toBe(PAYLOAD_KINDS.length);
   });
 
@@ -79,9 +119,28 @@ describe('emptyForm', () => {
   });
 });
 
+/** The blank contact, typed, so the dispatch test can fill in one field at a time. */
+const emptyContact = emptyForm('contact') as Extract<PayloadForm, { kind: 'contact' }>;
+
 describe('buildPayload', () => {
   it.each(VALID)('builds the $form.kind payload byte for byte', ({ form, payload, summary }) => {
     expect(buildPayload(form)).toEqual({ ok: true, payload, summary });
+  });
+
+  it('carries the remark a builder attaches to an accepted payload', () => {
+    const mecard = {
+      ...emptyContact,
+      format: 'mecard' as const,
+      givenName: 'Ana',
+      title: 'Engineer',
+    };
+    expect(buildPayload(mecard)).toMatchObject({
+      ok: true,
+      note: 'MECARD has no field for a title; it was left out.',
+    });
+    // The kinds with nothing to leave out never carry one.
+    expect(buildPayload({ ...mecard, title: '' })).not.toHaveProperty('note');
+    expect(buildPayload({ kind: 'text', text: 'Lote 42' })).not.toHaveProperty('note');
   });
 
   it('names the field that is wrong, in the form the screen is showing', () => {
@@ -105,6 +164,9 @@ describe('buildPayload', () => {
     ).toMatchObject({ field: 'password' });
     expect(buildPayload({ kind: 'geo', latitude: '', longitude: '' })).toMatchObject({
       field: 'latitude',
+    });
+    expect(buildPayload({ ...emptyContact, familyName: 'Souza', email: 'ana' })).toMatchObject({
+      field: 'email',
     });
   });
 });

@@ -6,7 +6,7 @@
  * phone should open, and a `mailto:` is the e-mail kind, not this one. The URL is normalised by
  * the WHATWG parser, so what the code carries is what a browser would resolve — including the
  * punycode form of an internationalised host, which is what the "Opens …" line names, so that a
- * look-alike domain is visible before it is printed. The Unicode form beside it arrives in F3.
+ * look-alike domain is visible before it is printed. The Unicode form beside it arrives with the Read screen (F10).
  */
 
 export type LinkResult =
