@@ -1,5 +1,6 @@
 import type { PayloadForm } from '@/domain/payload';
 
+import { ContactForm } from './ContactForm';
 import { EmailForm } from './EmailForm';
 import { GeoForm } from './GeoForm';
 import { LinkForm } from './LinkForm';
@@ -18,10 +19,13 @@ export function PayloadFields({
   form,
   onChange,
   invalid,
+  note,
 }: {
   form: PayloadForm;
   onChange: (form: PayloadForm) => void;
   invalid: string | undefined;
+  /** What the accepted payload could not carry, in the builder's words. */
+  note: string | undefined;
 }) {
   switch (form.kind) {
     case 'link':
@@ -38,5 +42,7 @@ export function PayloadFields({
       return <WifiForm form={form} onChange={onChange} invalid={invalid} />;
     case 'geo':
       return <GeoForm form={form} onChange={onChange} invalid={invalid} />;
+    case 'contact':
+      return <ContactForm form={form} onChange={onChange} invalid={invalid} note={note} />;
   }
 }
