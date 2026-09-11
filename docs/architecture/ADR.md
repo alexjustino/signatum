@@ -4,27 +4,28 @@ Binding decisions. A record here is not a suggestion: changing one requires a ne
 supersedes it, not an edit in passing. Each entry states the context, the decision, and — the
 part that matters most later — the cost we accepted.
 
-| #               | Decision                                                           | Status                        |
-| --------------- | ------------------------------------------------------------------ | ----------------------------- |
-| [001](#adr-001) | Tauri 2 with a deliberately thin Rust host                         | Accepted                      |
-| [002](#adr-002) | SQLite, one file, WAL                                              | Accepted                      |
-| [003](#adr-003) | The domain layer is pure TypeScript                                | Accepted                      |
-| [004](#adr-004) | Fluent is the visual language, with one icon set                   | Accepted                      |
-| [005](#adr-005) | Apache-2.0, and two trademark statements                           | Accepted                      |
-| [006](#adr-006) | No network, no telemetry                                           | Accepted                      |
-| [007](#adr-007) | Installers are not code-signed in 1.0.0                            | Accepted                      |
-| [008](#adr-008) | End-to-end tests drive the real binary                             | Accepted                      |
-| [009](#adr-009) | Accessibility is gated, not reviewed                               | Accepted                      |
-| [010](#adr-010) | The scan gate: nothing leaves that a decoder did not read back     | Accepted                      |
-| [011](#adr-011) | The decoder is of a different lineage from the encoder             | Accepted                      |
-| [012](#adr-012) | The library picks for encoder, decoders, imaging and PDF           | Superseded by [019](#adr-019) |
-| [013](#adr-013) | The logo is a region of the matrix, placed by an engine            | Accepted                      |
-| [014](#adr-014) | Dynamic codes are refused on principle                             | Accepted                      |
-| [015](#adr-015) | Size is an input, not a pixel count                                | Accepted                      |
-| [016](#adr-016) | Hostile input is normalised, never passed through                  | Accepted                      |
-| [017](#adr-017) | Error correction is automatic with a logo, overridable upward only | Accepted                      |
-| [018](#adr-018) | Wi-Fi passwords are stored in the clear unless the person opts out | Accepted                      |
-| [019](#adr-019) | The library picks, confirmed                                       | Accepted                      |
+| #               | Decision                                                                         | Status                        |
+| --------------- | -------------------------------------------------------------------------------- | ----------------------------- |
+| [001](#adr-001) | Tauri 2 with a deliberately thin Rust host                                       | Accepted                      |
+| [002](#adr-002) | SQLite, one file, WAL                                                            | Accepted                      |
+| [003](#adr-003) | The domain layer is pure TypeScript                                              | Accepted                      |
+| [004](#adr-004) | Fluent is the visual language, with one icon set                                 | Accepted                      |
+| [005](#adr-005) | Apache-2.0, and two trademark statements                                         | Accepted                      |
+| [006](#adr-006) | No network, no telemetry                                                         | Accepted                      |
+| [007](#adr-007) | Installers are not code-signed in 1.0.0                                          | Accepted                      |
+| [008](#adr-008) | End-to-end tests drive the real binary                                           | Accepted                      |
+| [009](#adr-009) | Accessibility is gated, not reviewed                                             | Accepted                      |
+| [010](#adr-010) | The scan gate: nothing leaves that a decoder did not read back                   | Accepted                      |
+| [011](#adr-011) | The decoder is of a different lineage from the encoder                           | Accepted                      |
+| [012](#adr-012) | The library picks for encoder, decoders, imaging and PDF                         | Superseded by [019](#adr-019) |
+| [013](#adr-013) | The logo is a region of the matrix, placed by an engine                          | Accepted                      |
+| [014](#adr-014) | Dynamic codes are refused on principle                                           | Accepted                      |
+| [015](#adr-015) | Size is an input, not a pixel count                                              | Accepted                      |
+| [016](#adr-016) | Hostile input is normalised, never passed through                                | Accepted                      |
+| [017](#adr-017) | Error correction is automatic with a logo, overridable upward only               | Accepted                      |
+| [018](#adr-018) | Wi-Fi passwords are stored in the clear unless the person opts out               | Accepted                      |
+| [019](#adr-019) | The library picks, confirmed                                                     | Accepted                      |
+| [020](#adr-020) | The matrix is proven against the standard, and the corpus is a proof, not a gate | Accepted                      |
 
 ---
 
@@ -535,3 +536,63 @@ newer compiler, so 0.45 and 0.10 are what F0 takes rather than the latest publis
 real cost, and it comes due the day one of these crates fixes something that matters upstream:
 the answer then is to raise the MSRV across the family deliberately, in its own record, not to
 raise it quietly here for one crate.
+
+## ADR-020 — The matrix is proven against the standard, and the corpus is a proof, not a gate {#adr-020}
+
+**Status: Accepted.**
+
+**Context.** F0 proved the path: a link becomes a code, the code becomes a file, and a decoder of a
+different lineage reads the file back ([ADR-010](#adr-010), [ADR-011](#adr-011)). What F0 did not
+prove is the _matrix_. One link, at one version, at one level, with whatever mask the encoder chose,
+says nothing about version 37 at H under mask 5. The encoder is vendored and mature
+([ADR-019](#adr-019)), but "the encoder we vendored agrees with itself" is not a proof, and the logo
+engine that will reach inside the matrix from F5 onwards needs a matrix somebody has checked against
+the published tables first.
+
+**Decision, in two halves.**
+
+**The domain carries the reading half of ISO/IEC 18004.** `src/domain/qr/structure.ts` computes,
+from the standard and nothing else, the 15-bit format information (BCH(15, 5) over the generator
+10100110111, XORed with 101010000010010 — Annex C), the 18-bit version information for versions 7
+and above (BCH(18, 6), Annex D), the alignment-pattern centres of every version (Annex E), and the
+position of every function pattern: three finders, their separators, both timing patterns, the dark
+module. It also reads those fields back out of a matrix, from both of the copies the standard
+requires, so a caller can insist the two agree. Nothing in it writes a module. A matrix is therefore
+judged against the standard's tables — with known answers for format, version and alignment copied
+into the test straight from those tables — rather than against the encoder's idea of itself.
+
+**The sweep is in the gate.** Every combination the standard allows is built and read back by
+`vitest`: forty versions × four levels × numeric, alphanumeric and byte modes × eight masks =
+3,840 matrices, each one required to have the size its version fixes, to draw every function
+pattern, and to carry the version, level and mask it claims in both copies of its format and
+version information.
+Beside it, a decoder of a different lineage decodes a symbol at every version and every level, and
+byte-mode input that is not valid text comes back as the same bytes. That runs on every push.
+
+**The corpus is a proof, and deliberately not a gate.** `npm run corpus` builds the domain's encoder
+as a plain module, generates ten thousand randomised payloads from a fixed seed — every version
+reached, lengths skewed the way real codes are but touching version 40, several scripts, and one
+payload that is not UTF-8 at all — and hands each matrix to the host's decoder in a release build
+(`src-tauri/tests/corpus.rs`, `#[ignore]`d so that it is never run by accident). Each symbol must
+come back as the same _bytes_, with the version, level and mask the encoder claimed: a code that
+decodes to the right payload from the wrong matrix is a coincidence, not a correct encoder. The host
+rasterises the modules directly, without going through the SVG renderer, so the proof of the matrix
+does not depend on how the product happens to draw. The corpus is generated, never committed, and
+reproducible from its seed, so a failure is named by the id of its line. It runs from the command
+line and from a workflow of its own — on dispatch and weekly — and it is **not** part of
+`npm run gates`.
+
+**Cost accepted: a regression that only the corpus would catch can reach `develop` between two
+runs.** Ten thousand symbols take minutes, the release build takes longer, and a battery a
+contributor is tempted to skip protects nothing. So the corpus buys its runtime with a real gap, and
+the gap is narrowed rather than denied: the 3,840-cell sweep and the per-version decode by a foreign
+decoder _are_ in the `vitest` gate, and the corpus is asked for by hand whenever the encoder, the
+decoder or the code between them is touched, with the weekly run as the backstop. That convention is
+written into `CONTRIBUTING.md`, which is the only thing that makes "run it when you touch the
+encoder" more than a hope.
+
+**Two smaller consequences, recorded so that they are not rediscovered.** The third decoder now runs
+in the unit suite as well as the end-to-end one; [ADR-019](#adr-019)'s binding part is unchanged —
+it is a development dependency and is never linked into the product. And the corpus carries its
+payloads and module bits as base64, which nothing the product ships reads, so the crate that decodes
+it is a `dev-dependency`, absent from a release build.

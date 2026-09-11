@@ -1,0 +1,40 @@
+name: Corpus
+
+# The matrix, proven: ten thousand randomised payloads encoded by the domain and read back,
+# byte for byte, by the host's decoder — with the version, level and mask it claims (SPEC §7,
+# F1). Not a pull-request gate: it builds the host in release and takes minutes. Run it by hand
+# when the encoder or the decoder changes, or let the weekly run catch a drift.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 3'
+
+permissions:
+  contents: read
+
+jobs:
+  corpus:
+    name: Ten thousand codes
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate the corpus and read it back
+        run: npm run corpus
+        shell: pwsh

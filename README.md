@@ -49,6 +49,11 @@ back is refused, with the reason in a sentence, and no file is written. The end-
 proves it against the real binary, decoding the exported file from disk with a third decoder that
 shares no code with either of the other two.
 
+Behind it, F1 has proven the matrix itself: every one of the forty versions, at each of the four
+levels of error correction, under each of the eight mask patterns, checked against the standard's
+own tables — and ten thousand randomised codes read back, byte for byte, by the same decoder that
+ships inside the product.
+
 What it does not do yet: one payload kind (a web link), no logo, no colours or shapes to choose,
 a fixed 1024-pixel square rather than a physical size, PNG and nothing else, and nothing is
 saved — close the window and the code is gone. Those are the slices that follow.
