@@ -19,6 +19,10 @@
 //!   and a PNG written only after an independent decoder read it back as what
 //!   was typed. Closing the window ends the product: there is nothing here that
 //!   has to outlive it.
+//! - F4: logos. A file a person was sent is normalised before it is stored —
+//!   never passed through (ADR-016) — and is drawn onto the code *before* the
+//!   PNG is encoded, so the artefact the decoder read is the artefact with the
+//!   logo on it.
 
 pub mod commands;
 pub mod db;
@@ -66,6 +70,10 @@ pub fn run() {
             commands::system::accent_ramp,
             commands::codes::verify_code,
             commands::codes::export_png,
+            commands::logos::import_logo,
+            commands::logos::list_logos,
+            commands::logos::logo_data_url,
+            commands::logos::delete_logo,
         ])
         .run(tauri::generate_context!())
         .expect("Signatum failed to start");

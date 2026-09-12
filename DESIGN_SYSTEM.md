@@ -232,9 +232,9 @@ first — not inline in the feature.
 `Resizer` · `VirtualList`
 
 Present today, because a screen uses them: `Button`, `Input`, `TextArea`, `Select`, `Checkbox`,
-`Card`, `TabStrip`, `InfoBar` and `EmptyState`, beside this product's own `CodePreview` and
-`ScanGateStatus`. Each of the rest arrives with the slice that first needs it, and arrives
-_here_, never inline in a feature.
+`Card`, `TabStrip`, `InfoBar` and `EmptyState`, beside this product's own `CodePreview`,
+`ScanGateStatus` and `LogoPlatePicker`. Each of the rest arrives with the slice that first needs
+it, and arrives _here_, never inline in a feature.
 
 `TextArea` arrived with F2, for the fields that hold more than one line — a message, a body, plain
 text. It is an `Input` that grew: both take their surface from `fieldSurface.ts`, so a single-line
@@ -268,8 +268,17 @@ before** — a primitive built ahead of the screen that needs it is a guess with
   **module size read out** beneath it in the same unit. It takes the caution state when the
   modules fall under the readable threshold, and names the threshold when it does.
 - **The logo plate picker** (`LogoPlatePicker`, F4) — the plate shape (none, square, rounded,
-  circle) with its padding and its colour, as one control. Every option is reachable and named
-  by keyboard, and the shape is never carried by the swatch alone.
+  circle), as one control. Every option is reachable and named by keyboard, and the shape is
+  never carried by the swatch alone: "Circle" is a word before it is a picture. **Present today
+  with the shape alone**; the padding is one module and the colour is the background, because
+  until the placement engine (F5) there is nothing for a person to decide about either, and a
+  control invented ahead of that decision is a guess with a type signature.
+- **The logo itself is an overlay, never markup inside the code.** The scene SVG carries the
+  plate — it is part of the code and is rasterised with the modules — but never the logo image.
+  The logo is an `<img>` positioned over the figure, decorative (`alt=""`), not a pointer target,
+  and placed by percentages of the code's own `viewBox` so that the screen and the host draw it
+  in the same box (ADR-023). Nothing a file brought in is ever injected into the SVG this product
+  renders.
 - **The batch report table** (`BatchReportTable`, F9) — a summary that **opens onto its rows**:
   the figure is a button, pressing it lists the rows it counted, and a row that could not be
   made shows its line number and its reason. A batch total nobody can decompose is a claim.

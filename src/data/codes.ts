@@ -14,6 +14,8 @@
 
 import { invoke } from '@tauri-apps/api/core';
 
+import { placementArg, type LogoPlacement } from './logos';
+
 export interface VerificationReport {
   /** True only when the decoded bytes are the payload bytes. */
   verified: boolean;
@@ -41,6 +43,13 @@ export interface VerifyRequest {
   svg: string;
   payload: string;
   pixelSize: number;
+  /**
+   * Where the logo goes, in scene modules, when there is one. The scene SVG
+   * carries the plate but not the logo, so the host draws the logo into the
+   * pixmap before it decodes: what gets verified is the whole picture, logo
+   * included, which is the only reading worth having.
+   */
+  logo?: LogoPlacement | null;
 }
 
 export interface ExportRequest extends VerifyRequest {
@@ -87,11 +96,13 @@ export async function verifyCode({
   svg,
   payload,
   pixelSize,
+  logo = null,
 }: VerifyRequest): Promise<VerificationReport> {
   const raw = await invoke<RawVerificationReport>('verify_code', {
     svg,
     payload,
     pixel_size: pixelSize,
+    logo: placementArg(logo),
   });
   return report(raw);
 }
@@ -102,12 +113,14 @@ export async function exportPng({
   payload,
   pixelSize,
   path,
+  logo = null,
 }: ExportRequest): Promise<ExportReport> {
   const raw = await invoke<RawExportReport>('export_png', {
     svg,
     payload,
     pixel_size: pixelSize,
     path,
+    logo: placementArg(logo),
   });
   return { ...report(raw), path: raw.path, bytesWritten: raw.bytes_written };
 }

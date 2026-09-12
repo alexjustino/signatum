@@ -8,6 +8,7 @@
  * "Colour and the code"): they are not theme tokens and they render identically in both themes.
  */
 
+import type { LogoBox, Plate } from './logo';
 import type { Matrix } from './qr/encode';
 
 export interface Style {
@@ -59,10 +60,45 @@ function escapeXml(text: string): string {
  *   example.com". It becomes the SVG's `<title>`, which is what a screen reader announces on
  *   screen and what the exported file carries.
  */
+/** The plate a logo sits on: the box the logo fills, the margin around it, and its colour. */
+export interface LogoPlate {
+  box: LogoBox;
+  plate: Plate;
+  /** Modules of plate around the box on every side. */
+  padding: number;
+  /** A six-digit hex colour, normally the background. */
+  colour: string;
+}
+
+function plateMarkup(logo: LogoPlate): string {
+  if (logo.plate === 'none') return '';
+  if (!isColour(logo.colour)) {
+    throw new Error('a plate colour has to be a six-digit hex value like #ffffff');
+  }
+  const pad = logo.padding;
+  const x = logo.box.x - pad;
+  const y = logo.box.y - pad;
+  const w = logo.box.width + 2 * pad;
+  const h = logo.box.height + 2 * pad;
+  const fill = logo.colour.toLowerCase();
+  if (logo.plate === 'circle') {
+    const r = Math.max(w, h) / 2;
+    return `<circle cx="${x + w / 2}" cy="${y + h / 2}" r="${r}" fill="${fill}"/>`;
+  }
+  const rx = logo.plate === 'rounded' ? ` rx="${Math.max(1, Math.round(w / 8))}"` : '';
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}"${rx} fill="${fill}"/>`;
+}
+
+/**
+ * @param logo When a logo will sit on the code: its plate is drawn over the modules, as part of
+ *   the same SVG, so that what the gate verifies is what is shown. The logo image itself is not
+ *   in the SVG — the host composes it and the screen overlays it.
+ */
 export function renderScene(
   matrix: Matrix,
   style: Style = DEFAULT_STYLE,
   title = 'QR code',
+  logo?: LogoPlate,
 ): Scene {
   if (!isColour(style.foreground) || !isColour(style.background)) {
     throw new Error('a colour has to be a six-digit hex value like #1a2b3c');
@@ -90,6 +126,7 @@ export function renderScene(
     `<title>${escapeXml(title)}</title>` +
     `<rect width="${side}" height="${side}" fill="${style.background.toLowerCase()}"/>` +
     `<path d="${segments.join('')}" fill="${style.foreground.toLowerCase()}"/>` +
+    (logo === undefined ? '' : plateMarkup(logo)) +
     `</svg>`;
   return { svg, side, darkModules };
 }

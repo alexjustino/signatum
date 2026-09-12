@@ -6,6 +6,7 @@ import { emptyForm, PAYLOAD_KINDS, type PayloadForm, type PayloadKind } from '@/
 import type { ThemeChoice } from '@/domain/settings';
 import { AboutPage } from '@/features/about/AboutPage';
 import { CreatePage } from '@/features/create/CreatePage';
+import type { ChosenLogo } from '@/features/create/LogoCard';
 import { DiagnosticsPage } from '@/features/diagnostics/DiagnosticsPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { DESTINATION_LABELS, type Destination } from '@/features/shell/destinations';
@@ -40,6 +41,10 @@ export function App() {
         PayloadForm
       >,
   );
+  // One logo for the editor, not one per kind: a person who chose their mark
+  // chose it for their codes, so it survives a change of kind the way the theme
+  // survives a change of screen.
+  const [logo, setLogo] = useState<ChosenLogo | null>(null);
   useEffect(() => {
     applyTheme(theme);
     void fetchAccentRamp()
@@ -71,7 +76,14 @@ export function App() {
           className="min-w-0 flex-1 overflow-y-auto bg-layer focus-visible:outline-none"
         >
           {destination === 'create' && (
-            <CreatePage kind={kind} onKind={setKind} form={drafts[kind]} onForm={editDraft} />
+            <CreatePage
+              kind={kind}
+              onKind={setKind}
+              form={drafts[kind]}
+              onForm={editDraft}
+              logo={logo}
+              onLogo={setLogo}
+            />
           )}
           {destination === 'diagnostics' && <DiagnosticsPage />}
           {destination === 'settings' && <SettingsPage theme={theme} onChoose={chooseTheme} />}

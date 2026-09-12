@@ -9,16 +9,22 @@
 //!
 //! - F0: `verify_code` and `export_png`, the `verifications` record, and the
 //!   refusal that keeps an unreadable code off the disk.
+//! - F4: both commands take an optional `logo` — an identifier and a box in the
+//!   scene's own units. The host draws it onto the pixels before they are
+//!   encoded, so the artefact that was decoded is the artefact that carries it.
 
 use std::path::Path;
 
 use rusqlite::Connection;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
+use crate::db::logos;
 use crate::db::verifications::{self, VerificationRow};
 use crate::db::Db;
 use crate::error::{Error, Result};
+use crate::imaging::compose::LogoBox;
+use crate::imaging::logo::NormalisedLogo;
 use crate::imaging::render::{MAX_PIXEL_SIZE, MAX_SVG_BYTES, MIN_PIXEL_SIZE};
 use crate::imaging::verify::{decoder, verify, VerificationReport};
 
@@ -26,6 +32,28 @@ use crate::imaging::verify::{decoder, verify, VerificationReport};
 /// near this; anything approaching it stops being a code a phone reads across a
 /// room, which is the only kind worth making.
 pub const MAX_PAYLOAD_BYTES: usize = 4096;
+
+/// Which logo to draw, and where — the box in the scene's own units, exactly
+/// as the domain computed it from the matrix and the error-correction budget.
+///
+/// The host is told where to draw, never how large a logo may be: that decision
+/// belongs to the placement engine, which knows the function patterns and the
+/// budget (ADR-013). What the host does is refuse to pretend it worked — a logo
+/// that swallows the code is a report with `verified: false`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct LogoRef {
+    /// The identifier `import_logo` returned.
+    pub id: String,
+    /// Left edge, in scene units.
+    pub x: f32,
+    /// Top edge, in scene units.
+    pub y: f32,
+    /// Width, in scene units.
+    pub width: f32,
+    /// Height, in scene units.
+    pub height: f32,
+}
 
 /// What an export answers with: the verdict, plus where the bytes went.
 #[derive(Debug, Clone, Serialize)]
@@ -49,9 +77,10 @@ pub fn verify_code(
     svg: String,
     payload: String,
     pixel_size: u32,
+    logo: Option<LogoRef>,
 ) -> Result<VerificationReport> {
     let conn = db.0.lock().expect("the database lock was poisoned");
-    verify_code_with(&conn, &svg, &payload, pixel_size)
+    verify_code_with(&conn, &svg, &payload, pixel_size, logo.as_ref())
 }
 
 /// Render, decode, compare — and write the file only if the decoder agreed.
@@ -74,9 +103,10 @@ pub fn export_png(
     payload: String,
     pixel_size: u32,
     path: String,
+    logo: Option<LogoRef>,
 ) -> Result<ExportReport> {
     let conn = db.0.lock().expect("the database lock was poisoned");
-    export_png_with(&conn, &svg, &payload, pixel_size, &path)
+    export_png_with(&conn, &svg, &payload, pixel_size, &path, logo.as_ref())
 }
 
 /// What [`verify_code`] does once the database is in hand.
@@ -85,10 +115,18 @@ fn verify_code_with(
     svg: &str,
     payload: &str,
     pixel_size: u32,
+    logo: Option<&LogoRef>,
 ) -> Result<VerificationReport> {
     check_inputs(svg, payload, pixel_size)?;
+    let logo = load_logo(conn, logo)?;
 
-    let verification = verify(svg.as_bytes(), payload.as_bytes(), pixel_size, &decoder())?;
+    let verification = verify(
+        svg.as_bytes(),
+        payload.as_bytes(),
+        pixel_size,
+        &decoder(),
+        logo.as_ref().map(|(logo, area)| (logo, *area)),
+    )?;
     let report = verification.report;
     record(conn, "verify", &report, None)?;
 
@@ -102,11 +140,19 @@ fn export_png_with(
     payload: &str,
     pixel_size: u32,
     path: &str,
+    logo: Option<&LogoRef>,
 ) -> Result<ExportReport> {
     check_inputs(svg, payload, pixel_size)?;
     check_destination(path)?;
+    let logo = load_logo(conn, logo)?;
 
-    let verification = verify(svg.as_bytes(), payload.as_bytes(), pixel_size, &decoder())?;
+    let verification = verify(
+        svg.as_bytes(),
+        payload.as_bytes(),
+        pixel_size,
+        &decoder(),
+        logo.as_ref().map(|(logo, area)| (logo, *area)),
+    )?;
     let report = verification.report;
 
     if !report.verified {
@@ -133,6 +179,37 @@ fn export_png_with(
         path: path.to_string(),
         bytes_written,
     })
+}
+
+/// Fetch the logo a request named, and the box it asked for.
+///
+/// A logo that is not in the workspace is a refusal rather than a silently
+/// logo-less code: the person asked for one, and a code that quietly comes back
+/// without it is a code they will print.
+fn load_logo(
+    conn: &Connection,
+    logo: Option<&LogoRef>,
+) -> Result<Option<(NormalisedLogo, LogoBox)>> {
+    let Some(asked) = logo else {
+        return Ok(None);
+    };
+
+    let area = LogoBox {
+        x: asked.x,
+        y: asked.y,
+        width: asked.width,
+        height: asked.height,
+    };
+    if !area.is_usable() {
+        return Err(Error::InvalidInput(
+            "A logo needs a box with a positive width and height.".to_string(),
+        ));
+    }
+
+    let (_, stored) = logos::get(conn, &asked.id)?.ok_or_else(|| {
+        Error::InvalidInput("That logo is no longer in this workspace.".to_string())
+    })?;
+    Ok(Some((stored, area)))
 }
 
 /// Everything the host refuses before it renders anything.
@@ -281,6 +358,30 @@ mod tests {
         }
     }
 
+    /// The scene the fixture draws: 21 modules plus a quiet zone of 4 a side.
+    const SCENE: f32 = 29.0;
+
+    /// A logo in the workspace, the way an import leaves one there.
+    fn a_stored_logo(conn: &Connection) -> String {
+        let document = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+             <rect width="32" height="32" fill="#1a1a1a"/></svg>"##;
+        let logo = crate::imaging::logo::normalise(document.as_bytes()).expect("normalise");
+        logos::insert(conn, "brand", &logo).expect("insert").id
+    }
+
+    /// A square of `fraction` of the symbol, centred — what the domain hands
+    /// the host.
+    fn centred_logo(id: &str, fraction: f32) -> LogoRef {
+        let side = (SCENE - 8.0) * fraction;
+        LogoRef {
+            id: id.to_string(),
+            x: (SCENE - side) / 2.0,
+            y: (SCENE - side) / 2.0,
+            width: side,
+            height: side,
+        }
+    }
+
     fn kind_of(error: &Error) -> String {
         serde_json::to_value(error)
             .expect("serialise")
@@ -305,7 +406,8 @@ mod tests {
     #[test]
     fn a_code_that_reads_back_is_verified_and_recorded() {
         let conn = workspace();
-        let report = verify_code_with(&conn, &hello_world_svg(), HELLO_WORLD, 512).expect("verify");
+        let report =
+            verify_code_with(&conn, &hello_world_svg(), HELLO_WORLD, 512, None).expect("verify");
 
         assert!(report.verified, "reason: {:?}", report.reason);
         assert_eq!(rows(&conn), vec![("verify".to_string(), 1, None)]);
@@ -317,7 +419,7 @@ mod tests {
         let scratch = Scratch::new();
         let path = scratch.file("signatum.png");
 
-        let refused = export_png_with(&conn, &blank_svg(), HELLO_WORLD, 512, &path)
+        let refused = export_png_with(&conn, &blank_svg(), HELLO_WORLD, 512, &path, None)
             .expect_err("an unreadable code must be refused");
 
         assert_eq!(kind_of(&refused), "refused");
@@ -344,8 +446,8 @@ mod tests {
         let scratch = Scratch::new();
         let path = scratch.file("signatum.png");
 
-        let export =
-            export_png_with(&conn, &hello_world_svg(), HELLO_WORLD, 512, &path).expect("export");
+        let export = export_png_with(&conn, &hello_world_svg(), HELLO_WORLD, 512, &path, None)
+            .expect("export");
 
         let written = std::fs::read(&path).expect("the file exists");
         assert_eq!(export.bytes_written, written.len() as u64);
@@ -371,8 +473,8 @@ mod tests {
         let path = scratch.file("signatum.png");
         std::fs::write(&path, b"an older export").expect("seed");
 
-        let export =
-            export_png_with(&conn, &hello_world_svg(), HELLO_WORLD, 512, &path).expect("export");
+        let export = export_png_with(&conn, &hello_world_svg(), HELLO_WORLD, 512, &path, None)
+            .expect("export");
 
         let written = std::fs::read(&path).expect("the file exists");
         assert_eq!(sha256_hex(&written), export.report.artefact_sha256);
@@ -383,14 +485,21 @@ mod tests {
         let conn = workspace();
         let svg = hello_world_svg();
 
-        let too_small = verify_code_with(&conn, &svg, HELLO_WORLD, 32).expect_err("too small");
-        let too_large = verify_code_with(&conn, &svg, HELLO_WORLD, 8192).expect_err("too large");
-        let nothing = verify_code_with(&conn, &svg, "", 512).expect_err("nothing to encode");
-        let too_much = verify_code_with(&conn, &svg, &"x".repeat(MAX_PAYLOAD_BYTES + 1), 512)
+        let too_small =
+            verify_code_with(&conn, &svg, HELLO_WORLD, 32, None).expect_err("too small");
+        let too_large =
+            verify_code_with(&conn, &svg, HELLO_WORLD, 8192, None).expect_err("too large");
+        let nothing = verify_code_with(&conn, &svg, "", 512, None).expect_err("nothing to encode");
+        let too_much = verify_code_with(&conn, &svg, &"x".repeat(MAX_PAYLOAD_BYTES + 1), 512, None)
             .expect_err("too much");
-        let huge_drawing =
-            verify_code_with(&conn, &"x".repeat(MAX_SVG_BYTES + 1), HELLO_WORLD, 512)
-                .expect_err("drawing too large");
+        let huge_drawing = verify_code_with(
+            &conn,
+            &"x".repeat(MAX_SVG_BYTES + 1),
+            HELLO_WORLD,
+            512,
+            None,
+        )
+        .expect_err("drawing too large");
 
         for error in [too_small, too_large, nothing, too_much, huge_drawing] {
             assert_eq!(kind_of(&error), "invalid_input");
@@ -407,7 +516,7 @@ mod tests {
         let svg = hello_world_svg();
 
         for path in ["signatum.png", "code.jpg", "C:/somewhere/code.jpeg", ""] {
-            let error = export_png_with(&conn, &svg, HELLO_WORLD, 512, path)
+            let error = export_png_with(&conn, &svg, HELLO_WORLD, 512, path, None)
                 .expect_err("this destination must be refused");
             assert_eq!(kind_of(&error), "invalid_input", "path: {path}");
         }
@@ -426,14 +535,112 @@ mod tests {
         }
     }
 
+    /// A logo the placement engine would allow goes onto the artefact, and the
+    /// code still reads back — which is the only sense in which a logo is ever
+    /// "allowed" here.
+    #[test]
+    fn a_code_with_a_logo_is_verified_on_the_artefact_that_carries_it() {
+        let conn = workspace();
+        let logo = a_stored_logo(&conn);
+
+        let plain = verify_code_with(&conn, &hello_world_svg(), HELLO_WORLD, 512, None)
+            .expect("verify without a logo");
+        let with_logo = verify_code_with(
+            &conn,
+            &hello_world_svg(),
+            HELLO_WORLD,
+            512,
+            Some(&centred_logo(&logo, 0.2)),
+        )
+        .expect("verify with a logo");
+
+        assert!(with_logo.verified, "reason: {:?}", with_logo.reason);
+        assert_ne!(
+            with_logo.artefact_sha256, plain.artefact_sha256,
+            "the logo has to be in the bytes that were decoded"
+        );
+    }
+
+    #[test]
+    fn an_export_with_a_logo_writes_the_bytes_that_carry_it() {
+        let conn = workspace();
+        let scratch = Scratch::new();
+        let path = scratch.file("signatum.png");
+        let logo = a_stored_logo(&conn);
+
+        let export = export_png_with(
+            &conn,
+            &hello_world_svg(),
+            HELLO_WORLD,
+            512,
+            &path,
+            Some(&centred_logo(&logo, 0.2)),
+        )
+        .expect("export");
+
+        let written = std::fs::read(&path).expect("the file exists");
+        assert_eq!(sha256_hex(&written), export.report.artefact_sha256);
+    }
+
+    #[test]
+    fn a_logo_that_swallows_the_code_refuses_the_export() {
+        let conn = workspace();
+        let scratch = Scratch::new();
+        let path = scratch.file("signatum.png");
+        let logo = a_stored_logo(&conn);
+
+        let refused = export_png_with(
+            &conn,
+            &hello_world_svg(),
+            HELLO_WORLD,
+            512,
+            &path,
+            Some(&centred_logo(&logo, 0.6)),
+        )
+        .expect_err("a code nobody can read must not be written");
+
+        assert_eq!(kind_of(&refused), "refused");
+        assert!(!Path::new(&path).exists(), "nothing was written");
+    }
+
+    #[test]
+    fn a_logo_the_workspace_does_not_have_is_refused() {
+        let conn = workspace();
+
+        let refused = verify_code_with(
+            &conn,
+            &hello_world_svg(),
+            HELLO_WORLD,
+            512,
+            Some(&LogoRef {
+                id: "not-a-logo".to_string(),
+                x: 1.0,
+                y: 1.0,
+                width: 4.0,
+                height: 4.0,
+            }),
+        )
+        .expect_err("a logo nobody imported must be refused");
+
+        assert_eq!(kind_of(&refused), "invalid_input");
+        assert_eq!(
+            refused.to_string(),
+            "That logo is no longer in this workspace."
+        );
+        assert!(
+            rows(&conn).is_empty(),
+            "nothing was rendered, so there is nothing to record"
+        );
+    }
+
     #[test]
     fn an_export_report_reaches_the_interface_flat_and_in_snake_case() {
         let conn = workspace();
         let scratch = Scratch::new();
         let path = scratch.file("signatum.png");
 
-        let export =
-            export_png_with(&conn, &hello_world_svg(), HELLO_WORLD, 512, &path).expect("export");
+        let export = export_png_with(&conn, &hello_world_svg(), HELLO_WORLD, 512, &path, None)
+            .expect("export");
         let json = serde_json::to_value(&export).expect("serialise");
 
         for key in [

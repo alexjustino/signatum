@@ -16,8 +16,10 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { VerificationReport } from '@/data/codes';
 import { describeError, errorKind } from '@/data/errors';
 import { useExportPng, useVerifyCode } from '@/data/hooks';
+import type { LogoPlacement } from '@/data/logos';
 import { NOMINAL_PRINT_MM, densityAdvice, densityWarning } from '@/domain/density';
 import { describeCode, gateState } from '@/domain/describe';
+import { centredLogoBox } from '@/domain/logo';
 import {
   buildPayload,
   emptyForm,
@@ -38,6 +40,7 @@ import { ScanGateStatus } from '@/ui/ScanGateStatus';
 import { TabStrip } from '@/ui/TabStrip';
 
 import { PayloadFields } from './forms/PayloadFields';
+import { LogoCard, type ChosenLogo } from './LogoCard';
 
 /**
  * Create: what a person wants the code to do becomes a code, and the code is
@@ -60,10 +63,14 @@ const PIXEL_SIZE = 1024;
 
 /**
  * The error-correction level. `M` is the ordinary choice for a code with
- * nothing in the middle of it; from F4 the level is chosen from the logo's
- * budget, and only upward.
+ * nothing in the middle of it; a code with a logo in the middle of it is
+ * encoded at `H`, the highest, because something is about to cover modules that
+ * the decoder still has to be able to do without (spec §2.4). The choice is
+ * automatic and only upward — a person is never asked to trade away the thing
+ * that makes their code survive the logo.
  */
 const ECL: Ecl = 'M';
+const ECL_WITH_LOGO: Ecl = 'H';
 
 /**
  * Long enough that a decoder is not asked about every keystroke, short enough
@@ -116,7 +123,7 @@ const EMPTY_PROMPT: Partial<Record<PayloadKind, string>> = {
  * by remembering to check.
  */
 interface Answer {
-  svg: string;
+  key: string;
   report: VerificationReport | null;
   /** Set when the decoder could not be asked at all — not a verdict. */
   failure: string | null;
@@ -124,9 +131,26 @@ interface Answer {
 
 /** The outcome of an export, and the code it wrote. */
 interface Written {
-  svg: string;
+  key: string;
   tone: 'success' | 'danger';
   text: string;
+}
+
+/**
+ * What was verified, as one string.
+ *
+ * The SVG alone is not the artefact any more: the scene carries the plate but
+ * not the logo, so two different logos in the same place produce the same SVG
+ * and would make a verdict about one of them look like a verdict about the
+ * other. The identity the window compares is therefore the code *and* what is
+ * being drawn into the middle of it.
+ */
+function artefactKey(svg: string, placement: LogoPlacement | null): string {
+  const logo =
+    placement === null
+      ? 'no logo'
+      : `${placement.id}@${placement.x},${placement.y},${placement.width}x${placement.height}`;
+  return `${logo}\n${svg}`;
 }
 
 /**
@@ -146,9 +170,16 @@ interface CreatePageProps {
   onKind: (kind: PayloadKind) => void;
   form: PayloadForm;
   onForm: (form: PayloadForm) => void;
+  /**
+   * The logo, which belongs to the editor rather than to a kind: it lives in
+   * the shell and survives a change of kind, because a person choosing their
+   * mark chose it for their codes, not for the link.
+   */
+  logo: ChosenLogo | null;
+  onLogo: (logo: ChosenLogo | null) => void;
 }
 
-export function CreatePage({ kind, onKind, form, onForm }: CreatePageProps) {
+export function CreatePage({ kind, onKind, form, onForm, logo, onLogo }: CreatePageProps) {
   const result = useMemo(() => buildPayload(form), [form]);
   const payload = result.ok ? result.payload : null;
 
@@ -157,23 +188,41 @@ export function CreatePage({ kind, onKind, form, onForm }: CreatePageProps) {
   // once. A preview rendered from anything else would be a picture of a
   // different code.
   const scene = useMemo(() => {
-    if (!result.ok) return { svg: null, side: null, failure: null };
+    if (!result.ok) return { svg: null, side: null, box: null, failure: null };
     try {
+      const matrix = encodeText(result.payload, logo === null ? ECL : ECL_WITH_LOGO);
+      // The domain decides where the logo goes; the screen and the host both
+      // read those same module coordinates, so the picture on the glass and the
+      // pixels the decoder is given are one thing rendered twice.
+      const box = logo === null ? null : centredLogoBox(matrix, DEFAULT_STYLE.quietZone);
       const rendered = renderScene(
-        encodeText(result.payload, ECL),
+        matrix,
         DEFAULT_STYLE,
         describeCode(result.summary),
+        logo !== null && box !== null
+          ? { box, plate: logo.plate, padding: 1, colour: DEFAULT_STYLE.background }
+          : undefined,
       );
-      return { svg: rendered.svg, side: rendered.side, failure: null };
+      return { svg: rendered.svg, side: rendered.side, box, failure: null };
     } catch (error) {
       return {
         svg: null,
         side: null,
+        box: null,
         failure: error instanceof Error ? error.message : 'This could not be made into a code.',
       };
     }
-  }, [result]);
+  }, [result, logo]);
   const svg = scene.svg;
+  const box = scene.box;
+
+  // The placement, in the shape the host takes. It is derived from the scene,
+  // so it changes exactly when the code does and never between.
+  const placement = useMemo<LogoPlacement | null>(
+    () => (logo === null || box === null ? null : { id: logo.info.id, ...box }),
+    [logo, box],
+  );
+  const artefact = svg === null ? null : artefactKey(svg, placement);
 
   // How small the modules come out at the size this version prints at. It is
   // about the code on screen, not about the kind or the payload length, so it
@@ -193,35 +242,35 @@ export function CreatePage({ kind, onKind, form, onForm }: CreatePageProps) {
   // Only an answer about the code on screen is an answer at all; everything
   // else is derived from that, so nothing has to be reset when the payload
   // changes and nothing can be left over from the payload before it.
-  const current = answer !== null && answer.svg === svg ? answer : null;
+  const current = answer !== null && answer.key === artefact ? answer : null;
   const report = current?.report ?? null;
   const hostFailure = current?.failure ?? null;
   const inFlight = svg !== null && current === null;
-  const message = written !== null && written.svg === svg ? written : null;
+  const message = written !== null && written.key === artefact ? written : null;
 
   /** Every accepted payload is verified, once the typing stops. */
   useEffect(() => {
-    if (svg === null || payload === null) return;
+    if (svg === null || payload === null || artefact === null) return;
 
     const timer = window.setTimeout(() => {
-      verify({ svg, payload, pixelSize: PIXEL_SIZE })
-        .then((next) => setAnswer({ svg, report: next, failure: null }))
+      verify({ svg, payload, pixelSize: PIXEL_SIZE, logo: placement })
+        .then((next) => setAnswer({ key: artefact, report: next, failure: null }))
         .catch((error: unknown) =>
           // Not a verdict: the decoder never answered. The gate stays at "not
           // verified yet" and the reason is said separately, because the status
           // must never show a state that did not come back from a decoder.
-          setAnswer({ svg, report: null, failure: describeError(error) }),
+          setAnswer({ key: artefact, report: null, failure: describeError(error) }),
         );
     }, DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [svg, payload, verify]);
+  }, [artefact, svg, payload, placement, verify]);
 
   // The gate owns the export button. Nothing else is allowed to enable it.
   const gate = gateState(report, inFlight);
 
   const exportPng = async () => {
-    if (svg === null || payload === null) return;
+    if (svg === null || payload === null || artefact === null) return;
     try {
       const path = await save({
         defaultPath: 'signatum.png',
@@ -229,9 +278,9 @@ export function CreatePage({ kind, onKind, form, onForm }: CreatePageProps) {
       });
       if (path === null) return;
 
-      const done = await writePng({ svg, payload, pixelSize: PIXEL_SIZE, path });
+      const done = await writePng({ svg, payload, pixelSize: PIXEL_SIZE, path, logo: placement });
       setWritten({
-        svg,
+        key: artefact,
         tone: 'success',
         text: `Written to ${path} — verified by ${done.decoder}`,
       });
@@ -240,7 +289,7 @@ export function CreatePage({ kind, onKind, form, onForm }: CreatePageProps) {
       // `refused` is not a failure of the export: it is the gate doing its job,
       // and the host's message is already the reason.
       const text = describeError(error);
-      setWritten({ svg, tone: 'danger', text });
+      setWritten({ key: artefact, tone: 'danger', text });
       if (errorKind(error) === 'refused') announce(`Nothing was written. ${text}`);
     }
   };
@@ -304,12 +353,19 @@ export function CreatePage({ kind, onKind, form, onForm }: CreatePageProps) {
               {scene.failure}
             </InfoBar>
           )}
+
+          <LogoCard logo={logo} onLogo={onLogo} />
         </div>
 
         <div className="flex flex-col gap-4">
           <CodePreview
             name={result.ok ? describeCode(result.summary) : 'No code yet'}
             svg={svg}
+            overlay={
+              logo !== null && logo.info.dataUrl !== null && box !== null && scene.side !== null
+                ? { dataUrl: logo.info.dataUrl, box, side: scene.side }
+                : undefined
+            }
             caption={
               payload !== null ? (
                 <span data-selectable className="font-mono break-all">
