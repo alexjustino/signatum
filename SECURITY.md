@@ -37,13 +37,23 @@ seriously.
   shortener. **The product never contacts the address a code opens** — not to validate it, not to
   resolve it, not to render a thumbnail of it. The Tauri content security policy blocks external
   origins.
-- **SVG is hostile.** An imported SVG is parsed into a normalised tree that has no scripts, no
-  event handlers, no external references, no `foreignObject` and no entities, with limits on size
-  and node count. What is exported is **re-serialised from that tree**, never the bytes that came
-  in — so nothing that arrived in a file can leave in one.
-- **Raster is hostile.** Dimensions are read from the header and capped **before a pixel is
-  decoded**, which is what stops a decompression bomb; the frame count is capped for GIF; and a
-  truncated or mislabelled file is a sentence on screen, not a panic and not a hang.
+- **SVG is hostile.** Scripts, event handlers, entities, `foreignObject` and any reference to
+  something outside the document are found by a text scan **before a parser is given the file**,
+  and each is a refusal. Then the caps: at most 20,000 elements, at most 1 MiB. Only after all of
+  that is the document parsed, with no resources directory, so the parser cannot reach the disk.
+  What is stored and what is exported are **re-serialised from the parsed drawing**, never the
+  bytes that came in — so nothing that arrived in a file can leave in one.
+- **Raster is hostile.** The file is refused above 20 MiB before it is read. Dimensions come from
+  the header and are capped **before a pixel is decoded** — at most 8192 pixels a side and at most
+  25 million in total — which is what stops a decompression bomb at kilobytes. A decoder may
+  allocate at most 256 MiB. A GIF is read to its first frame and stops, so ten thousand frames
+  cost what one costs. A JPEG whose scan never ends is refused as truncated, because half a logo
+  is a logo somebody prints. A fully transparent image is refused. What is stored is the decoded,
+  capped image re-encoded as our own PNG, at most 1024 pixels on its longest side.
+- **The format is the bytes, never the extension.** A PNG named `.svg` is imported as a PNG, and
+  the screen says so; the name decides nothing and is used for that sentence alone. A file's name
+  is also never a path: it is reduced to a label before it is stored, and a name Windows reserves
+  is refused.
 - **Payloads are escaped to their format.** vCard, MECARD and Wi-Fi each have reserved
   characters, and a name with a semicolon must not become a second field. In a `mailto:` the name
   before the @ is percent-encoded exactly as the subject and the body are, so a `?` inside an
@@ -87,6 +97,7 @@ neutralised with a sentence, in under a second, never as a crash and never as a 
 - a GIF with ten thousand frames
 - a zero-byte file
 - a PNG named `.svg`
+- a fully transparent image
 
 ### Out of the threat model, stated plainly
 
@@ -98,8 +109,12 @@ rest; nothing protects it from a process running as you.
 A compromised interface — a poisoned front-end dependency, say — could ask the host to write a
 verified code over any `.png` on a local drive, because the host trusts the path the interface
 hands it after the save dialog. It cannot make the host write anywhere else: the path has to be
-a local `.png`, never a network path, and the bytes are always a code that read back. The
-dialog plugin may only save; nothing in the interface can read a file or walk a directory.
+a local `.png`, never a network path, and the bytes are always a code that read back. The same
+interface could ask the host to read any one file on a local drive as a logo, because the open
+dialog hands it a path and the host reads the path it is given: it is read once, under the size
+cap, normalised, and what comes back is an image or a sentence. A network path is refused on
+both doors. The dialog plugin may only open and save; the interface itself never reads a file,
+and nothing in the product walks a directory.
 
 ## Distribution integrity
 

@@ -69,9 +69,21 @@ would be printed too dense to scan: how small its modules would be at a nominal 
 warning below half a millimetre. That is a warning and never a refusal; the decoder still decides
 whether a code may leave.
 
-What it does not do yet: no logo, no colours or shapes to choose, a fixed 1024-pixel square rather
-than a physical size, PNG and nothing else, and nothing is saved — close the window and the code is
-gone. Those are the slices that follow.
+F4 has put the brand in the middle. A logo is imported from a PNG, JPEG, GIF, WebP or SVG — what
+the file is comes from its bytes, never from its name — and nothing that arrives is kept as it
+arrived: a photograph is decoded, capped and written out again as a PNG this product made, and an
+SVG is parsed into a drawing and re-serialised from it. A file that cannot be used is refused with
+a sentence about that file, and nothing is stored from it. The logo is then drawn onto the pixels
+**before** the decoder is asked, so the code that read back is the code that carries it, and the
+exported file is those same bytes. A plate — none, square, rounded or circle — is part of the code
+itself rather than a decoration over it, and a code with a logo is encoded at the strongest error
+correction the standard offers.
+
+What it does not do yet: the logo is a fixed fifth of the code, centred, until the placement engine
+lands and works out how large it may really be; no colours or shapes to choose; a fixed 1024-pixel
+square rather than a physical size; PNG and nothing else; and no code is saved — close the window
+and the code is gone, though the logos imported stay in the workspace. Those are the slices that
+follow.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 

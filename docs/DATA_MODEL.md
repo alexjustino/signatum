@@ -1,10 +1,10 @@
 # Data model
 
-> **Status: `001_init` landed with F0; the SQL wins over this text.** What F0 ships —
-> `workspace` and `verifications` — is reproduced below from the migration itself, and the
-> migration is the authority. Everything else named here belongs to a later slice: it is a
-> plan, not a promise, and each table and column is confirmed, or changed, by the migration
-> that introduces it.
+> **Status: `001_init` landed with F0 and `002_logos` with F4 — schema version 2; the SQL wins
+> over this text.** What has shipped — `workspace`, `verifications` and `logos` — is reproduced
+> below from the migrations themselves, and the migrations are the authority. Everything else
+> named here belongs to a later slice: it is a plan, not a promise, and each table and column is
+> confirmed, or changed, by the migration that introduces it.
 
 The authoritative schema is `src-tauri/migrations/`. This document explains _why_ it is shaped
 the way it is; the SQL explains what it is.
@@ -33,7 +33,7 @@ the way it is; the SQL explains what it is.
 | --------------- | ----------------------------------------------------------------- | ------------ |
 | `workspace`     | one row: which migration this file is at, and when it was made    | F0, shipped  |
 | `verifications` | what a decoder read back from which bytes, and whether it matched | F0, shipped  |
-| `logos`         | the normalised logo, its hash and what normalisation changed      | F4, proposal |
+| `logos`         | the normalised logo, its hash and what normalisation changed      | F4, shipped  |
 | `codes`         | a payload, a style and a size — one row per saved code            | F8, proposal |
 | `brand_kits`    | a logo, colours and a style, named                                | F8, proposal |
 | `batches`       | one run over one CSV                                              | F9, proposal |
@@ -167,6 +167,73 @@ From F8 the code's verification is the **latest row whose `scene_sha256` equals 
 scene**, and its `id` is the token the export command must be given; in F0 there is nothing to go
 stale between the check and the export, because the two happen in one call on one artefact.
 
+## `002_logos`, as shipped
+
+This is the migration, copied from `src-tauri/migrations/002_logos.sql`. Where the two disagree,
+the file is right.
+
+```sql
+-- Signatum — migration 002: the logos that were let in, as they were normalised.
+--
+-- What is stored is never what arrived (ADR-016). For a raster, `bytes` is the
+-- decoded, capped image re-encoded as our own PNG; for an SVG it is the
+-- serialisation of the normalised tree. The file that came in is not kept — not
+-- "just in case", not anywhere — because the moment two byte strings exist for
+-- one logo, something eventually writes the wrong one, and the wrong one is the
+-- one with the script in it. The cost is stated in ADR-016 and in DATA_MODEL.md:
+-- the only way back to the original is the original file.
+--
+-- `sha256` is the hash of `bytes` — of what will be drawn and exported, never of
+-- what was opened.
+--
+-- `kind` is how the bytes are drawn: a pixmap, or a tree. `format` is what the
+-- bytes *were* when they arrived, which is a fact about the file and not about
+-- its name: a PNG called `logo.svg` is stored here as `png`.
+
+CREATE TABLE logos (
+    id         TEXT    PRIMARY KEY,
+    created_at TEXT    NOT NULL,
+    name       TEXT    NOT NULL,                                   -- sanitised file name
+    kind       TEXT    NOT NULL CHECK (kind IN ('raster', 'vector')),
+    format     TEXT    NOT NULL,                                   -- png|jpeg|gif|webp|svg
+    bytes      BLOB    NOT NULL,                                   -- normalised, never the input
+    sha256     TEXT    NOT NULL,                                   -- of `bytes`
+    width      INTEGER NOT NULL,                                   -- pixels, or the SVG viewBox
+    height     INTEGER NOT NULL,
+    note       TEXT                                                -- what normalisation changed
+);
+
+CREATE INDEX idx_logos_created ON logos (created_at DESC);
+```
+
+## `logos`
+
+One row per logo that was let in, holding what normalisation produced and never what arrived
+(ADR-016, ADR-023). For an SVG that is the serialisation of the parsed drawing; for a raster it is
+the decoded image, capped at 1024 pixels on its longest side and re-encoded as PNG. The rules the
+row is the result of live in `src-tauri/src/imaging/logo.rs`.
+
+**As shipped in F4:**
+
+| Column            | Type    | Meaning                                                                                        |
+| ----------------- | ------- | ---------------------------------------------------------------------------------------------- |
+| `id`              | TEXT    | UUID v7                                                                                        |
+| `created_at`      | TEXT    | when the file was imported                                                                     |
+| `name`            | TEXT    | the file's name reduced to a label — no separator, no `..`, no reserved Windows name, 80 chars |
+| `kind`            | TEXT    | how the bytes are drawn: `raster` (a pixmap) or `vector` (a tree)                              |
+| `format`          | TEXT    | what the **bytes** were: `png`, `jpeg`, `gif`, `webp` or `svg`. Not what the extension said    |
+| `bytes`           | BLOB    | the stored form. The bytes that arrived are not here, and are nowhere else either              |
+| `sha256`          | TEXT    | of `bytes` — of what will be drawn and exported, never of what was opened                      |
+| `width`, `height` | INTEGER | pixels for a raster; the `viewBox`, rounded up, for an SVG                                     |
+| `note`            | TEXT    | what normalisation changed, in one sentence — "Animated GIF: the first frame is used."         |
+
+The plan this replaces asked for `storage_kind`, `byte_size`, `view_box` and `imported_at`. Three
+of them were dropped rather than deferred: `kind` says how the bytes are drawn and `format` says
+what they were, which is the pair the screen and the composer actually read; `byte_size` is
+`length(bytes)`, and a stored copy of it is a second fact that can disagree with the first; and the
+normalised `viewBox` is always the origin plus `width` and `height`, so a column for it would
+restate them. `imported_at` is here under the name every other table uses, `created_at`.
+
 ## `codes` — F8, proposal
 
 The library's table. Not in `001_init`; the columns below are a plan.
@@ -188,26 +255,6 @@ The library's table. Not in `001_init`; the columns below are a plan.
 `payload_json`, `style_json` and `size_json` are shapes the domain validates (ADR-003); SQLite is
 not asked to understand them. The host stores them verbatim and parses only what it must to
 render.
-
-## `logos`
-
-What is stored is what normalisation produced (ADR-016). For SVG that is the serialisation of the
-normalised tree; for raster it is the decoded, capped image re-encoded as PNG.
-
-| Column         | Type    | Meaning                                                                                                      |
-| -------------- | ------- | ------------------------------------------------------------------------------------------------------------ |
-| `id`           | TEXT    | UUID v7                                                                                                      |
-| `name`         | TEXT    | the original file name, sanitised — no separator, no `..`, no reserved Windows name                          |
-| `format`       | TEXT    | what the **bytes** were: `png`, `jpeg`, `gif`, `webp` or `svg`. Not what the extension said                  |
-| `storage_kind` | TEXT    | `svg` (the normalised tree, re-serialised) or `png` (decoded and capped)                                     |
-| `bytes`        | BLOB    | the stored form. The bytes that arrived are not here and are nowhere else either                             |
-| `byte_size`    | INTEGER | of `bytes`, for the library to show and for the caps to be checked against                                   |
-| `sha256`       | TEXT    | of `bytes` — of what is stored, never of what arrived                                                        |
-| `width`        | REAL    | pixels for a raster, user units for an SVG                                                                   |
-| `height`       | REAL    | the same                                                                                                     |
-| `view_box`     | TEXT    | the normalised SVG's `viewBox`; `NULL` for a raster                                                          |
-| `note`         | TEXT    | what normalisation changed, in words — "first frame of 24", "colour profile dropped". Empty when nothing was |
-| `imported_at`  | TEXT    |                                                                                                              |
 
 ## `brand_kits`
 
@@ -290,8 +337,17 @@ references sitting in the database, one careless read away from being written in
 the moment two byte strings exist for one logo, something eventually writes the wrong one. The
 cost is stated in ADR-016 and here: the only way back to the original is the original file.
 
-**Logos are deleted with `RESTRICT`, never `CASCADE`.** Deleting a logo that a brand kit or a code
-points at is refused, and the refusal **names the kits and counts the codes**. `CASCADE` would
+Since F4 this is code rather than intention. `src-tauri/src/imaging/logo.rs` refuses a hostile
+document before a parser is handed it, then re-serialises whatever parsed, and
+`src-tauri/src/commands/logos.rs` writes only what came back from it — the buffer the file was read
+into is dropped with the function. A test asserts that what is stored would itself pass the refusals
+on the way back in, which is the property that matters: there is no stored logo this product would
+refuse to import.
+
+**Logos are deleted with `RESTRICT`, never `CASCADE`.** This is a rule about a relation that does
+not exist yet: in F4 nothing points at a logo, so removing one from the code removes the row, and
+the only copy of that image is the file it came from. From F8, deleting a logo that a brand kit or a
+code points at is refused, and the refusal **names the kits and counts the codes**. `CASCADE` would
 take the kits with it; `SET NULL` would leave a kit that quietly looks different the next time it
 is applied, which is the worst of the three because nobody sees it happen. A refusal that names
 what is in the way is a sentence a person can act on — remove it from those kits, then delete it.
@@ -316,7 +372,8 @@ ones.
 
 Numbered, forward-only, each applied inside a transaction that also raises
 `workspace.schema_version` to the version it produces. `001_init` is F0's: `workspace` and
-`verifications`, and nothing else.
+`verifications`, and nothing else. `002_logos` is F4's, and takes the schema to version 2 — the
+number Diagnostics shows, and the number the running build states.
 
 There is no down-migration. A mistake is corrected by a new migration, never by rewriting an
 applied one: an applied migration is history, and that history has already run on somebody's

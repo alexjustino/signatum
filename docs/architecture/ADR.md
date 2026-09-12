@@ -28,6 +28,7 @@ part that matters most later — the cost we accepted.
 | [020](#adr-020) | The matrix is proven against the standard, and the corpus is a proof, not a gate | Accepted                      |
 | [021](#adr-021) | One builder per payload kind, and the summary comes from the builder             | Accepted                      |
 | [022](#adr-022) | Three card formats, and a density warning at a nominal size                      | Accepted                      |
+| [023](#adr-023) | The logo is composed by the host into the bytes the gate decodes                 | Accepted                      |
 
 ---
 
@@ -739,3 +740,34 @@ with the same advice for every code, including one already written as a MECARD, 
 over-length refusal in the builder is careful not to suggest MECARD to somebody who is writing one.
 Recorded as the smaller of two evils — a warning shown late is worse than a warning worded loosely
 — and to be narrowed when the export screen takes over the size.
+
+## ADR-023 — The logo is composed by the host into the bytes the gate decodes {#adr-023}
+
+**Status: Accepted.**
+
+**Context.** The scene the domain draws is an SVG, and the obvious place to put the logo is inside
+it: one document, one renderer, nothing to keep in step. But the logo is a file somebody was sent.
+Putting it in the scene means either embedding a foreign SVG inside our own or carrying a raster as
+a data URI, and both put bytes this product did not write into the document it hands a renderer and
+injects into the window — the exact thing [ADR-016](#adr-016) exists to prevent.
+
+**Decision.** The scene carries the **plate** and nothing else of the logo. The plate is a plain
+`<rect>` or `<circle>` the domain emits, so it is rasterised with the modules, by the same renderer,
+in the same pass. The **logo image** is drawn by the Rust host into the pixmap, **before** the PNG
+is encoded — so the bytes the independent decoder reads, and the bytes that are written to disk, are
+the artefact with the logo on it ([ADR-010](#adr-010)). On screen the same normalised image is laid
+over the figure as an `<img>`, positioned at the same box.
+
+**Why.** A logo drawn after the verification is a logo nobody checked, and a verdict about a code
+without its logo is a verdict about a picture nobody will print. Composing before the encode makes
+the gate's claim cover the whole artefact, and it keeps a foreign document out of the SVG: the only
+markup this product injects remains the scene its own domain serialised.
+
+**Cost accepted: two renderers have to agree about one box.** The browser draws the overlay and the
+host draws the export, and neither can see the other's result. The box is therefore stated once, by
+the domain, in the scene's own units — modules with the quiet zone included — and both sides use it
+as a fraction of one `viewBox`: the screen turns it into percentages of the figure's square, the
+host turns it into pixels against the scale the renderer used. Nothing else converts. Held by the
+end-to-end test, which reads the box back off the screen's own geometry, exports with it, and then
+checks the **centre pixel of the exported file** is the logo's colour and that a third decoder still
+reads the link off it. If the two ever drift, that test fails on the artefact rather than on paper.

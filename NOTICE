@@ -49,7 +49,14 @@ the one generated from the dependency manifests (Cargo.toml, package.json).
   tiny-skia ...................... BSD-3-Clause
   rqrr ........................... MIT OR Apache-2.0, and ISC
   image .......................... MIT OR Apache-2.0
+    the decoders its features compile into the binary, one per format a logo
+    may arrive as:
+    zune-jpeg, zune-core ......... MIT OR Apache-2.0 OR Zlib   (JPEG)
+    gif, weezl ................... MIT OR Apache-2.0           (GIF)
+    color_quant .................. MIT                         (GIF)
+    image-webp, quick-error ...... MIT OR Apache-2.0           (WebP)
   sha2, hex ...................... MIT OR Apache-2.0
+  base64 ......................... MIT OR Apache-2.0
 
 The vendored encoder carries its licence in the header of the file itself
 (src/domain/qr/vendor/), together with the upstream commit it was taken from

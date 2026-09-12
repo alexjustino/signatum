@@ -83,6 +83,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   row to the workspace file: which decoder, at which version, read what, from which bytes, at
   what moment. Only hashes are kept — what a code carries is the person's business; whether a
   decoder read it back is the product's. A refusal is recorded as plainly as a success.
+- **A logo in the middle of the code.** Choose an image and it is set in the centre of the
+  code, over the modules themselves, and the code is then checked with it in place. A code with
+  a logo is encoded at the strongest error correction the standard offers, so that what the logo
+  covers is what the decoder can do without. In this slice the logo is a fixed fifth of the
+  code's width, centred; deciding how large it may really be is the placement engine that
+  follows.
+- **Five kinds of image, and the file decides which.** PNG, JPEG, GIF, WebP and SVG. What a file
+  is comes from its bytes and never from its name, so a PNG somebody called `logo.svg` is
+  imported as the PNG it is, and the screen says that is what happened. An animated GIF gives its
+  first frame, and says so. Nothing that arrives is kept as it arrived: a photograph is decoded,
+  reduced to at most 1024 pixels on its longest side and written out again as a PNG this product
+  made; an SVG is parsed into a drawing and written back out from that drawing. What is stored,
+  shown, printed and exported is always that one clean copy.
+- **A file that cannot be used says why, in one sentence, and leaves nothing behind.** Too large
+  a file (over 20 MB), an image too big to be a brand mark (over 8192 pixels a side, or more than
+  25 million pixels in total), an SVG over 1 MB or with more than 20,000 elements, an SVG that
+  carries a script, an event handler or a reference to something outside itself, an empty file, a
+  half-downloaded JPEG, an image that is entirely transparent, a name Windows will not give a
+  file, a file on a network drive: each is refused with a sentence about that file, in well under
+  a second, and nothing is written to the workspace.
+- **The logo is part of what is proven, not a sticker on top of it.** The host draws the logo
+  onto the pixels **before** the decoder is handed them, so the code that was read back is the
+  code that carries the logo — and the file that is written is those same bytes. A logo that
+  covered too much would make the code fail the gate and be refused like any other unreadable
+  code, rather than reaching paper.
+- **A plate under the logo.** None, square, rounded or circle — the shape the code clears behind
+  the logo so the mark does not sit straight on the modules. It is drawn into the code itself, in
+  the same pass as the modules, so what is checked is what is seen.
+- **Logos you have used.** Imported logos stay in the workspace and are offered as a row of
+  thumbnails, so the second code does not need the file again. Taking a logo out of a code
+  deletes it, because a logo nobody is using is a file this product has no reason to keep.
 - **The application shell.** Four destinations — Create, Diagnostics, Settings and About — in
   the Windows 11 visual language, following the accent colour chosen for the desktop, in light
   or dark by choice or by the system. The theme is remembered between sessions.
