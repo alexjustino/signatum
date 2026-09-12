@@ -29,6 +29,7 @@ part that matters most later — the cost we accepted.
 | [021](#adr-021) | One builder per payload kind, and the summary comes from the builder             | Accepted                      |
 | [022](#adr-022) | Three card formats, and a density warning at a nominal size                      | Accepted                      |
 | [023](#adr-023) | The logo is composed by the host into the bytes the gate decodes                 | Accepted                      |
+| [024](#adr-024) | The middle alignment pattern may sit under the plate                             | Proposed                      |
 
 ---
 
@@ -351,7 +352,9 @@ gate (ADR-010) then proves the arithmetic on the bytes rather than standing in f
 covers no function pattern — asserted on the matrix, not on a rendered image — and the result
 decodes. One module over the budget is refused with the reason. The negative battery in SPEC §6
 (version 1 with a logo, the first version with a centre alignment pattern, a transparent logo, a
-white logo on a white plate) belongs to the same suite.
+white logo on a white plate) belongs to the same suite. The engine is
+`src/domain/placement.ts` and the battery that holds it is `src/domain/placement.test.ts`; the one
+function pattern that may be covered, and only behind a constant, is [ADR-024](#adr-024).
 
 **Cost accepted.** The logo is smaller than a design tool would draw it, deliberately, and some
 people will want the bigger one; the product says why they cannot have it. The engine carries an
@@ -771,3 +774,63 @@ host turns it into pixels against the scale the renderer used. Nothing else conv
 end-to-end test, which reads the box back off the screen's own geometry, exports with it, and then
 checks the **centre pixel of the exported file** is the logo's colour and that a third decoder still
 reads the link off it. If the two ever drift, that test fails on the artefact rather than on paper.
+
+## ADR-024 — The middle alignment pattern may sit under the plate {#adr-024}
+
+**Status: Proposed.** Every other record here was settled by a table or by a test. This one
+cannot be: no decoder in this repository can say what a phone will do with a symbol whose middle
+alignment pattern is gone. So it is written as the proposal it is, the code carries it behind a
+constant that is on by default, and it is accepted or rejected by the host proof — Alex, with two
+phones, at the printed size (SPEC §6). **Accepting it** makes this the behaviour of every logo on
+those twenty versions and turns the strict mode into an option nobody has to find.
+**Rejecting it** means flipping the constant to `false`, which is one line and no interface at
+all: the engine already knows how to walk past those versions, and a superseding record says why.
+
+**Context.** Versions 7–13, 21–27 and 35–40 have an odd number of alignment centres, which puts
+one of them in the middle of the symbol — at the exact centre on most of them, up to four modules
+beside it on 22–27 and 36–40, where the standard's rounding shifts the row. A centred logo on
+those versions cannot avoid it. Every other function pattern is avoidable by making the logo
+smaller; this one is not, because the logo and the pattern want the same modules.
+[ADR-013](#adr-013) says none of them is ever covered, so the engine's only other move is to
+refuse the version and grow: from version 7 the next symbol with a free centre is version 14 — 45
+modules a side become 73, a symbol 62 % wider and more than two and a half times the area, or, at
+a fixed printed size, modules under two thirds of the size they were. That is a heavy price for
+the smallest pattern on the symbol, and it is paid by every code on twenty of the forty
+versions.
+
+**Decision, proposed.** The plate may cover the middle alignment pattern, and only that one. It
+is left out of the function-pattern map, so the modules under the plate are knocked out with the
+rest and nothing of it shows at the plate's edge; the finders, the separators, both timing
+patterns, every other alignment pattern, the format and version information and the dark module
+stay untouchable in both modes. The behaviour is one constant, `ALLOW_CENTRE_ALIGNMENT` in
+`src/domain/placement.ts`, on by default and threaded through `coverage`, `checkBox`,
+`largestBox`, `knockOut` and `planCode` rather than read again inside each of them. With it off
+the engine skips every version that has a middle alignment pattern, and that strict mode is not
+theoretical — it is built and tested: content that lands naturally on version 7 at H is planned
+onto version 14 instead. The scan gate ([ADR-010](#adr-010)) remains the judge of any individual
+code: this record decides what the engine may offer, never what may leave.
+
+**Why.** A decoder finds the symbol by its three finders, takes the grid from them and the timing
+patterns, and reads the format information beside them — none of which the plate touches.
+Alignment patterns refine the sampling grid where the symbol is large enough, or the surface
+uneven enough, that the grid drifts from one corner to another, and the ones doing that work are
+the outer ones, at the edges where the drift has accumulated. The middle one refines the middle,
+which is where the plate is and where there is now nothing to sample. The budget this engine
+spends is conservative on top of that: `SAFETY = 0.6` leaves 40 % of every block's correctable
+capacity to print and camera, so a code that has given up its middle alignment pattern is not a
+code sitting at the edge of what it can lose. The proof that it still reads is on the matrix, at
+the first version where the case exists — version 7 at H, with the largest plate the budget
+allows drawn over the pattern, decoded back to the same content by a decoder of a different
+lineage — and the same content planned at version 14 with the exception off, so both halves of
+the decision are held by the suite.
+
+**Cost accepted.** This leans on what decoders tolerate rather than on the letter of ISO/IEC
+18004, which draws that pattern and says nothing about a symbol that has covered it. No test here
+can settle that: every decoder in the suite is software, reading a clean raster, held still, at a
+scale of its own choosing — precisely the conditions under which a doubtful code passes. The
+proof is the phone matrix, per release, and until it has been held against a code on one of these
+versions the default is a bet, written down as one. If a camera fails on such a code the constant
+flips, every code on those twenty versions jumps to the next free version and its modules get
+smaller at the same printed size — which the module-size warning ([ADR-015](#adr-015)) then has
+to say out loud, because somebody who printed at 25 mm yesterday is printing denser modules
+today.

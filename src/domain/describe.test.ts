@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeCode, describeGate, gateState } from './describe';
+import { describeCode, describeGate, describePlan, gateState } from './describe';
+import { planCode, type Plan } from './placement';
 
 const verified = { verified: true, reason: null, decoder: 'rqrr 0.9.0' };
 const refused = { verified: false, reason: 'The decoder found no code.', decoder: 'rqrr 0.9.0' };
@@ -31,5 +32,41 @@ describe('describeGate', () => {
     expect(describeGate(null, false)).toBe('Not verified yet.');
     expect(describeGate(verified, false)).toBe('Verified — rqrr 0.9.0 read it back byte for byte.');
     expect(describeGate(refused, false)).toBe('The decoder found no code.');
+  });
+});
+
+describe('describePlan', () => {
+  /** A plan is what the engine returns; only the numbers this sentence reads matter here. */
+  const planned = (over: Partial<Extract<Plan, { ok: true }>>): Plan => ({
+    ok: true,
+    matrix: { size: 53, version: 9, ecl: 'H', mask: 3, modules: [] },
+    ecl: 'H',
+    version: 9,
+    mask: 3,
+    box: { x: 22, y: 22, width: 13, height: 13 },
+    coverage: { perBlock: [4, 3], worst: 4, budget: 7, touchesFunction: false },
+    ...over,
+  });
+
+  it('says the level, the version, the mask and what the logo costs', () => {
+    expect(describePlan(planned({}))).toBe(
+      'Level H, version 9, mask 3 — the logo uses 4 of 7 codewords a block can spare.',
+    );
+  });
+
+  it('has nothing to say about a code with no logo on it', () => {
+    expect(describePlan(planned({ box: null, coverage: null }))).toBeNull();
+  });
+
+  it('has nothing to say about a refusal — the refusal is its own sentence', () => {
+    expect(describePlan({ ok: false, reason: 'It does not fit.' })).toBeNull();
+  });
+
+  it('reads a real plan, whatever the engine chose', () => {
+    const plan = planCode('https://example.com/menu', { logo: true, quietZone: 4, padding: 1 });
+    expect(plan.ok).toBe(true);
+    expect(describePlan(plan)).toMatch(
+      /^Level [HQ], version \d+, mask [0-7] — the logo uses \d+ of \d+ codewords a block can spare\.$/,
+    );
   });
 });

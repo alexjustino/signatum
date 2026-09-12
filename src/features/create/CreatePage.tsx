@@ -18,8 +18,8 @@ import { describeError, errorKind } from '@/data/errors';
 import { useExportPng, useVerifyCode } from '@/data/hooks';
 import type { LogoPlacement } from '@/data/logos';
 import { NOMINAL_PRINT_MM, densityAdvice, densityWarning } from '@/domain/density';
-import { describeCode, gateState } from '@/domain/describe';
-import { centredLogoBox } from '@/domain/logo';
+import { describeCode, gateState, type GateReport } from '@/domain/describe';
+import { logoFraction } from '@/domain/logo';
 import {
   buildPayload,
   emptyForm,
@@ -28,7 +28,8 @@ import {
   type PayloadForm,
   type PayloadKind,
 } from '@/domain/payload';
-import { encodeText, type Ecl } from '@/domain/qr/encode';
+import { planCode, type Plan } from '@/domain/placement';
+import type { Ecl } from '@/domain/qr/encode';
 import { DEFAULT_STYLE, renderScene } from '@/domain/scene';
 import { announce } from '@/ui/announce';
 import { Button } from '@/ui/Button';
@@ -62,15 +63,24 @@ import { LogoCard, type ChosenLogo } from './LogoCard';
 const PIXEL_SIZE = 1024;
 
 /**
- * The error-correction level. `M` is the ordinary choice for a code with
- * nothing in the middle of it; a code with a logo in the middle of it is
- * encoded at `H`, the highest, because something is about to cover modules that
- * the decoder still has to be able to do without (spec §2.4). The choice is
- * automatic and only upward — a person is never asked to trade away the thing
- * that makes their code survive the logo.
+ * The error-correction level for a code with nothing in the middle of it. `M`
+ * is the ordinary choice.
+ *
+ * A code that carries a logo is not decided here at all: the placement engine
+ * starts at `H`, the highest, because something is about to cover modules the
+ * decoder still has to do without, and falls back to `Q` only when the content
+ * will not fit at `H` (spec §2.4). The choice is automatic and only upward —
+ * a person is never asked to trade away the thing that makes their code
+ * survive the logo.
  */
 const ECL: Ecl = 'M';
-const ECL_WITH_LOGO: Ecl = 'H';
+
+/**
+ * Modules of plate around the logo on every side. One module is what separates
+ * the mark from the modules it sits among; the engine charges it to the
+ * error-correction budget like everything else under the plate.
+ */
+const PLATE_PADDING = 1;
 
 /**
  * Long enough that a decoder is not asked about every keystroke, short enough
@@ -183,41 +193,81 @@ export function CreatePage({ kind, onKind, form, onForm, logo, onLogo }: CreateP
   const result = useMemo(() => buildPayload(form), [form]);
   const payload = result.ok ? result.payload : null;
 
+  /**
+   * The whole decision about this code, made in one place in the domain: the
+   * level, the version, the mask, and — with a logo — the box the logo may
+   * have. The screen asks once and is told everything, including "no": a logo
+   * this content cannot carry comes back as a refusal with the sentence to
+   * show, never as a smaller logo nobody asked for.
+   */
+  const plan = useMemo<Plan | null>(() => {
+    if (!result.ok) return null;
+    if (logo === null) {
+      return planCode(result.payload, {
+        logo: false,
+        ecl: ECL,
+        quietZone: DEFAULT_STYLE.quietZone,
+      });
+    }
+    const fraction = logoFraction(logo.size);
+    return planCode(result.payload, {
+      logo: true,
+      quietZone: DEFAULT_STYLE.quietZone,
+      padding: PLATE_PADDING,
+      // Left out rather than passed as nothing: "Largest" is the absence of a
+      // limit, and the engine reads a missing share as "as large as the budget
+      // allows".
+      ...(fraction === undefined ? {} : { fraction }),
+    });
+  }, [result, logo]);
+
+  /**
+   * The plan's refusal, when there is one. It is a verdict about the code
+   * before any decoder is asked — there is no artefact to decode — and it is
+   * the only thing this screen says about that code.
+   */
+  const refusal = plan !== null && !plan.ok ? plan.reason : null;
+  const box = plan !== null && plan.ok ? plan.box : null;
+
+  /** What the figure is called, and what the exported SVG carries as its title. */
+  const name = result.ok && refusal === null ? describeCode(result.summary) : 'No code yet';
+
   // The scene is the code. The same string is what the preview draws, what the
   // decoder is asked about and what the export writes — one artefact, checked
   // once. A preview rendered from anything else would be a picture of a
-  // different code.
+  // different code. The matrix is the plan's own, with the modules under the
+  // plate already knocked out, so no half-module shows at the logo's edge.
   const scene = useMemo(() => {
-    if (!result.ok) return { svg: null, side: null, box: null, failure: null };
+    if (plan === null || !plan.ok) return { svg: null, side: null, failure: null };
     try {
-      const matrix = encodeText(result.payload, logo === null ? ECL : ECL_WITH_LOGO);
-      // The domain decides where the logo goes; the screen and the host both
-      // read those same module coordinates, so the picture on the glass and the
-      // pixels the decoder is given are one thing rendered twice.
-      const box = logo === null ? null : centredLogoBox(matrix, DEFAULT_STYLE.quietZone);
       const rendered = renderScene(
-        matrix,
+        plan.matrix,
         DEFAULT_STYLE,
-        describeCode(result.summary),
-        logo !== null && box !== null
-          ? { box, plate: logo.plate, padding: 1, colour: DEFAULT_STYLE.background }
+        name,
+        logo !== null && plan.box !== null
+          ? {
+              box: plan.box,
+              plate: logo.plate,
+              padding: PLATE_PADDING,
+              colour: DEFAULT_STYLE.background,
+            }
           : undefined,
       );
-      return { svg: rendered.svg, side: rendered.side, box, failure: null };
+      return { svg: rendered.svg, side: rendered.side, failure: null };
     } catch (error) {
       return {
         svg: null,
         side: null,
-        box: null,
         failure: error instanceof Error ? error.message : 'This could not be made into a code.',
       };
     }
-  }, [result, logo]);
+  }, [plan, logo, name]);
   const svg = scene.svg;
-  const box = scene.box;
 
-  // The placement, in the shape the host takes. It is derived from the scene,
-  // so it changes exactly when the code does and never between.
+  // The placement, in the shape the host takes. It is the plan's own box, so
+  // the picture on the glass and the pixels the decoder is given are one set of
+  // module coordinates rendered twice — and it changes exactly when the code
+  // does, never between.
   const placement = useMemo<LogoPlacement | null>(
     () => (logo === null || box === null ? null : { id: logo.info.id, ...box }),
     [logo, box],
@@ -243,9 +293,15 @@ export function CreatePage({ kind, onKind, form, onForm, logo, onLogo }: CreateP
   // else is derived from that, so nothing has to be reset when the payload
   // changes and nothing can be left over from the payload before it.
   const current = answer !== null && answer.key === artefact ? answer : null;
-  const report = current?.report ?? null;
+  // A plan that refused is fed through the same gate as a decoder's answer, in
+  // the same shape: one refusal, one sentence, one disabled button. The gate
+  // stays the only thing that decides whether this code may leave — there is
+  // no second path to the export button, and no decoder to name.
+  const planReport: GateReport | null =
+    refusal === null ? null : { verified: false, reason: refusal, decoder: '' };
+  const report = planReport ?? current?.report ?? null;
   const hostFailure = current?.failure ?? null;
-  const inFlight = svg !== null && current === null;
+  const inFlight = refusal === null && svg !== null && current === null;
   const message = written !== null && written.key === artefact ? written : null;
 
   /** Every accepted payload is verified, once the typing stops. */
@@ -354,12 +410,12 @@ export function CreatePage({ kind, onKind, form, onForm, logo, onLogo }: CreateP
             </InfoBar>
           )}
 
-          <LogoCard logo={logo} onLogo={onLogo} />
+          <LogoCard logo={logo} onLogo={onLogo} plan={plan} />
         </div>
 
         <div className="flex flex-col gap-4">
           <CodePreview
-            name={result.ok ? describeCode(result.summary) : 'No code yet'}
+            name={name}
             svg={svg}
             overlay={
               logo !== null && logo.info.dataUrl !== null && box !== null && scene.side !== null
@@ -367,7 +423,9 @@ export function CreatePage({ kind, onKind, form, onForm, logo, onLogo }: CreateP
                 : undefined
             }
             caption={
-              payload !== null ? (
+              // The caption is the bytes the code carries; without a code there is nothing
+              // to carry, and a refused plan must not leave a page of text under an empty state.
+              payload !== null && svg !== null ? (
                 <span data-selectable className="font-mono break-all">
                   {payload}
                 </span>
@@ -376,8 +434,14 @@ export function CreatePage({ kind, onKind, form, onForm, logo, onLogo }: CreateP
             placeholder={
               <EmptyState
                 icon={<QrCode24Regular />}
-                title={EMPTY_PROMPT[kind] ?? 'Fill in the form to see its code'}
-                description="The code appears as you type, in the colours it will be printed in."
+                title={
+                  refusal !== null
+                    ? 'No code for this'
+                    : (EMPTY_PROMPT[kind] ?? 'Fill in the form to see its code')
+                }
+                description={
+                  refusal ?? 'The code appears as you type, in the colours it will be printed in.'
+                }
               />
             }
           />

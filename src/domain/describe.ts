@@ -3,6 +3,8 @@
  * accessible names and the end-to-end suite — so that two readings of one fact agree.
  */
 
+import type { Plan } from './placement';
+
 /**
  * The accessible name of the preview figure, from the payload's own summary:
  * "Opens example.com" becomes "QR code that opens example.com", "Joins
@@ -42,4 +44,21 @@ export function describeGate(report: GateReport | null, inFlight: boolean): stri
     case 'refused':
       return report?.reason ?? 'The code could not be verified.';
   }
+}
+
+/**
+ * What the placement engine decided, in one line: the level and version it chose for the
+ * logo, the mask it picked with the knock-out in place, and what the logo costs against what
+ * a block can spare.
+ *
+ * It is the plan made readable, not a verdict — the scan gate is the only thing that says
+ * whether a code reads. Null when there is nothing decided to report: no code, no logo, or a
+ * plan that refused, which says its own sentence instead.
+ */
+export function describePlan(plan: Plan): string | null {
+  if (!plan.ok || plan.coverage === null) return null;
+  return (
+    `Level ${plan.ecl}, version ${plan.version}, mask ${plan.mask} — the logo uses ` +
+    `${plan.coverage.worst} of ${plan.coverage.budget} codewords a block can spare.`
+  );
 }
