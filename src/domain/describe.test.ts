@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeCode, describeGate, describePlan, gateState } from './describe';
+import { describeCode, describeGate, describePlan, describeVariant, gateState } from './describe';
 import { planCode, type Plan } from './placement';
 
 const verified = { verified: true, reason: null, decoder: 'rqrr 0.9.0' };
@@ -68,5 +68,27 @@ describe('describePlan', () => {
     expect(describePlan(plan)).toMatch(
       /^Level [HQ], version \d+, mask [0-7] — the logo uses \d+ of \d+ codewords a block can spare\.$/,
     );
+  });
+});
+
+describe('describeVariant', () => {
+  it('says what was done to the code and whether it still reads', () => {
+    expect(describeVariant({ label: 'Shrunk to 25 %', verified: true })).toBe(
+      'Shrunk to 25 % — reads',
+    );
+    expect(describeVariant({ label: 'Blurred 3 px', verified: false })).toBe(
+      'Blurred 3 px — fails',
+    );
+    expect(describeVariant({ label: 'JPEG quality 50', verified: true })).toBe(
+      'JPEG quality 50 — reads',
+    );
+  });
+
+  it('carries the verdict in the word, never in a mark beside it', () => {
+    // The icon in the list is decorative; a line read aloud has to hold the answer on its own.
+    for (const label of ['Shrunk to 50 %', 'Blurred 1 px']) {
+      expect(describeVariant({ label, verified: true })).toMatch(/ — reads$/);
+      expect(describeVariant({ label, verified: false })).toMatch(/ — fails$/);
+    }
   });
 });

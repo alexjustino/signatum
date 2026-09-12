@@ -5,6 +5,7 @@ import { fetchAccentRamp } from '@/data/system';
 import { emptyForm, PAYLOAD_KINDS, type PayloadForm, type PayloadKind } from '@/domain/payload';
 import { DEFAULT_STYLE, type Style } from '@/domain/scene';
 import type { ThemeChoice } from '@/domain/settings';
+import { DEFAULT_PRINT_SIZE, type PrintSize } from '@/domain/size';
 import { AboutPage } from '@/features/about/AboutPage';
 import { CreatePage } from '@/features/create/CreatePage';
 import type { ChosenLogo } from '@/features/create/LogoCard';
@@ -56,6 +57,11 @@ export function App() {
   // style is the scene's, and the scene draws a matrix it is never asked to
   // choose the level for. Absent is "let the engine decide".
   const [ecl, setEcl] = useState<EclFloor | undefined>(undefined);
+  // The printed size lives here with the look and the logo, and for the same
+  // reason: somebody who said their sticker is 25 mm at 300 dpi said it about
+  // their codes, not about the link they happened to be typing. It starts at the
+  // default — a 25 mm code at print resolution, which is 295 pixels square.
+  const [printSize, setPrintSize] = useState<PrintSize>(DEFAULT_PRINT_SIZE);
   useEffect(() => {
     applyTheme(theme);
     void fetchAccentRamp()
@@ -98,6 +104,8 @@ export function App() {
               onStyle={setStyle}
               ecl={ecl}
               onEcl={setEcl}
+              printSize={printSize}
+              onPrintSize={setPrintSize}
             />
           )}
           {destination === 'diagnostics' && <DiagnosticsPage />}

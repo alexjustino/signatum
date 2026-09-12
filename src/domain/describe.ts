@@ -62,3 +62,21 @@ export function describePlan(plan: Plan): string | null {
     `${plan.coverage.worst} of ${plan.coverage.budget} codewords a block can spare.`
   );
 }
+
+/** One variant the scan margin was measured on, and whether a decoder still read it. */
+export interface ScanVariant {
+  /** What was done to the code: "Shrunk to 25 %", "Blurred 3 px", "JPEG quality 50". */
+  label: string;
+  verified: boolean;
+}
+
+/**
+ * One line of the scan margin: what was done to the code, and whether it still reads.
+ *
+ * "Reads" and "fails" rather than a tick and a cross, because the word is the meaning and the
+ * icon beside it is decoration (DESIGN_SYSTEM §5). The margin is a report and never a gate
+ * (ADR-027): a variant that fails says so in a line, and the export button never hears about it.
+ */
+export function describeVariant({ label, verified }: ScanVariant): string {
+  return `${label} — ${verified ? 'reads' : 'fails'}`;
+}

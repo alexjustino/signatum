@@ -3,6 +3,7 @@ import {
   Call20Regular,
   Chat20Regular,
   ContactCard20Regular,
+  Copy20Regular,
   Link20Regular,
   Location20Regular,
   Mail20Regular,
@@ -15,10 +16,17 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import type { VerificationReport } from '@/data/codes';
 import { describeError, errorKind } from '@/data/errors';
-import { useExportPng, useVerifyCode } from '@/data/hooks';
+import {
+  useCopyPng,
+  useExportPdf,
+  useExportPng,
+  useExportSvg,
+  useScanMargin,
+  useVerifyCode,
+} from '@/data/hooks';
 import type { LogoPlacement } from '@/data/logos';
-import { NOMINAL_PRINT_MM, densityAdvice, densityWarning } from '@/domain/density';
-import { describeCode, gateState, type GateReport } from '@/domain/describe';
+import { densityAdvice, densityWarning } from '@/domain/density';
+import { describeCode, gateState, type GateReport, type ScanVariant } from '@/domain/describe';
 import { logoFraction } from '@/domain/logo';
 import {
   buildPayload,
@@ -31,6 +39,7 @@ import {
 import { planCode, type Plan } from '@/domain/placement';
 import type { Ecl } from '@/domain/qr/encode';
 import { renderScene, type Style } from '@/domain/scene';
+import { checkPrintSize, pixelsFor, sizedSvg, toMillimetres, type PrintSize } from '@/domain/size';
 import { checkContrast } from '@/domain/style';
 import { announce } from '@/ui/announce';
 import { Button } from '@/ui/Button';
@@ -44,6 +53,8 @@ import { TabStrip } from '@/ui/TabStrip';
 import { PayloadFields } from './forms/PayloadFields';
 import { LogoCard, type ChosenLogo } from './LogoCard';
 import { LookCard, type EclFloor } from './LookCard';
+import { ScanMarginCard } from './ScanMarginCard';
+import { SizeCard } from './SizeCard';
 
 /**
  * Create: what a person wants the code to do becomes a code, and the code is
@@ -61,8 +72,14 @@ import { LookCard, type EclFloor } from './LookCard';
  * the code carries stay two readings of one fact.
  */
 
-/** Fixed in F0; the printed size becomes an input in F7 (spec §2.5). */
-const PIXEL_SIZE = 1024;
+/**
+ * How long after a verdict the scan margin is asked for.
+ *
+ * Long enough that a person still typing never pays for it, short enough that
+ * the answer is there while they are still looking at the code that was just
+ * verified. The margin never blocks an export (ADR-027).
+ */
+const MARGIN_MS = 400;
 
 /**
  * The error-correction level for a code with nothing in the middle of it, when
@@ -145,8 +162,33 @@ interface Answer {
 interface Written {
   key: string;
   tone: 'success' | 'danger';
+  /** The heading: what happened, or that nothing did. */
+  title: string;
   text: string;
+  /** True when the sentence carries a path — a path is read character by character. */
+  mono: boolean;
 }
+
+/** What the scan margin knows about the code on screen. */
+interface Margin {
+  key: string;
+  variants: ScanVariant[] | null;
+  /** Why it could not be measured, when it could not. Never a refusal. */
+  failure: string | null;
+}
+
+/** The three files this screen writes. The clipboard is the fourth way out, without a path. */
+type ExportKind = 'png' | 'svg' | 'pdf';
+
+/**
+ * What each kind is called in the save dialog, on disk, and in the sentence that
+ * says it was written.
+ */
+const FILE: Record<ExportKind, { extension: string; filter: string; format: string }> = {
+  png: { extension: 'png', filter: 'PNG image', format: 'PNG' },
+  svg: { extension: 'svg', filter: 'SVG image', format: 'SVG' },
+  pdf: { extension: 'pdf', filter: 'PDF document', format: 'PDF' },
+};
 
 /**
  * What was verified, as one string.
@@ -157,13 +199,21 @@ interface Written {
  * other. The identity the window compares is therefore the code *and* what is
  * being drawn into the middle of it.
  *
+ * The printed size is named too, through the raster it comes to: a verdict is
+ * about a number of pixels a decoder was handed.
+ *
  * The look is named in the key as well as carried by the SVG. A code that
  * changed colour or shape is a different artefact — a decoder that read the
  * black one has said nothing about the blue one — and saying so here means the
  * gate cannot be left showing yesterday's verdict beside today's look, whatever
  * a future scene does with the markup.
  */
-function artefactKey(svg: string, placement: LogoPlacement | null, style: Style): string {
+function artefactKey(
+  svg: string,
+  placement: LogoPlacement | null,
+  style: Style,
+  pixels: number,
+): string {
   const logo =
     placement === null
       ? 'no logo'
@@ -171,7 +221,11 @@ function artefactKey(svg: string, placement: LogoPlacement | null, style: Style)
   const look =
     `${style.foreground} on ${style.background}, quiet zone ${style.quietZone}, ` +
     `${style.moduleShape ?? 'square'} modules, ${style.finderShape ?? 'square'} finders`;
-  return `${logo}\n${look}\n${svg}`;
+  // The raster is part of the identity. A code verified at 295 pixels has had
+  // nothing said about it at 5 906: the decoder read a different picture, and
+  // the export writes the picture at the size on screen now. Leaving the size
+  // out of the key would leave the gate showing a verdict about another print.
+  return `${pixels} px\n${logo}\n${look}\n${svg}`;
 }
 
 /**
@@ -212,6 +266,14 @@ interface CreatePageProps {
    */
   ecl: EclFloor | undefined;
   onEcl: (ecl: EclFloor | undefined) => void;
+  /**
+   * The size the code will be printed at (SPEC §2.5). It lives in the shell with
+   * the look and the logo, for the same reason: a person who said their sticker
+   * is 25 mm said it about their codes, not about one link. Every number the
+   * export writes comes from here.
+   */
+  printSize: PrintSize;
+  onPrintSize: (size: PrintSize) => void;
 }
 
 export function CreatePage({
@@ -225,9 +287,31 @@ export function CreatePage({
   onStyle,
   ecl,
   onEcl,
+  printSize,
+  onPrintSize,
 }: CreatePageProps) {
   const result = useMemo(() => buildPayload(form), [form]);
   const payload = result.ok ? result.payload : null;
+
+  /**
+   * Whether the printed size is one a code can be printed at, and the raster it
+   * comes to. The rule and its sentence are the domain's; this screen only
+   * decides what to do about a refusal — which is the same thing it does about
+   * every other refusal: say it, and not let the code leave.
+   */
+  const sizeVerdict = checkPrintSize(printSize);
+  const sizeOk = sizeVerdict.ok;
+  const sizeRefusal = sizeVerdict.ok ? null : sizeVerdict.reason;
+  /**
+   * The raster, exactly as the printed size comes to — never clamped.
+   *
+   * One number for the verdict and for the file: the bytes that were decoded are
+   * the bytes that get written, so there is no "verify small, write large". A
+   * size whose raster the host would not render is refused by the domain with a
+   * sentence about the resolution, not quietly resized here — a person who asked
+   * for 1200 dpi and silently got 300 would find out on paper.
+   */
+  const pixels = pixelsFor(printSize);
 
   /**
    * The whole decision about this code, made in one place in the domain: the
@@ -282,7 +366,10 @@ export function CreatePage({
   // The look is only refused once there is a code for it to be the look of: a
   // reason shown over an empty form is a telling-off rather than help.
   const lookRefusal = plan !== null && !contrast.ok ? contrast.reason : null;
-  const refusal = planRefusal ?? lookRefusal;
+  // A size nothing can be printed at is refused where the plan and the look are:
+  // there is no artefact at that size to show or to decode, and the sentence is
+  // said beside the export button as well as beside the field it is about.
+  const refusal = planRefusal ?? lookRefusal ?? sizeRefusal;
   const box = plan !== null && plan.ok ? plan.box : null;
 
   /** What the figure is called, and what the exported SVG carries as its title. */
@@ -298,7 +385,8 @@ export function CreatePage({
   // no camera can read is a promise this product does not make, and the reason
   // is said where every other refusal is said.
   const scene = useMemo(() => {
-    if (plan === null || !plan.ok || !contrastOk) return { svg: null, side: null, failure: null };
+    if (plan === null || !plan.ok || !contrastOk || !sizeOk)
+      return { svg: null, side: null, failure: null };
     try {
       const rendered = renderScene(
         plan.matrix,
@@ -323,7 +411,7 @@ export function CreatePage({
         failure: error instanceof Error ? error.message : 'This could not be made into a code.',
       };
     }
-  }, [plan, logo, name, style, contrastOk]);
+  }, [plan, logo, name, style, contrastOk, sizeOk]);
   const svg = scene.svg;
 
   // The placement, in the shape the host takes. It is the plan's own box, so
@@ -334,7 +422,7 @@ export function CreatePage({
     () => (logo === null || box === null ? null : { id: logo.info.id, ...box }),
     [logo, box],
   );
-  const artefact = svg === null ? null : artefactKey(svg, placement, style);
+  const artefact = svg === null ? null : artefactKey(svg, placement, style, pixels);
 
   // How small the modules come out at the size this version prints at. It is
   // about the code on screen, not about the kind or the payload length, so it
@@ -343,13 +431,20 @@ export function CreatePage({
   const density =
     scene.side === null
       ? null
-      : densityWarning({ side: scene.side }, NOMINAL_PRINT_MM, densityAdvice(form));
+      : densityWarning({ side: scene.side }, toMillimetres(printSize), densityAdvice(form));
 
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [written, setWritten] = useState<Written | null>(null);
+  const [margin, setMargin] = useState<Margin | null>(null);
 
   const { mutateAsync: verify } = useVerifyCode();
-  const { mutateAsync: writePng, isPending: exporting } = useExportPng();
+  const { mutateAsync: writePng, isPending: writingPng } = useExportPng();
+  const { mutateAsync: writeSvg, isPending: writingSvg } = useExportSvg();
+  const { mutateAsync: writePdf, isPending: writingPdf } = useExportPdf();
+  const { mutateAsync: copyToClipboard, isPending: copying } = useCopyPng();
+  const { mutateAsync: measure } = useScanMargin();
+  // One busy state for the row: four ways out of the same code, one at a time.
+  const exporting = writingPng || writingSvg || writingPdf || copying;
 
   // Only an answer about the code on screen is an answer at all; everything
   // else is derived from that, so nothing has to be reset when the payload
@@ -368,10 +463,12 @@ export function CreatePage({
 
   /** Every accepted payload is verified, once the typing stops. */
   useEffect(() => {
+    // A size the domain refused never reaches the host: there is no scene at a
+    // size nothing can be printed at, and the reason is already on screen.
     if (svg === null || payload === null || artefact === null) return;
 
     const timer = window.setTimeout(() => {
-      verify({ svg, payload, pixelSize: PIXEL_SIZE, logo: placement })
+      verify({ svg, payload, pixelSize: pixels, logo: placement })
         .then((next) => setAnswer({ key: artefact, report: next, failure: null }))
         .catch((error: unknown) =>
           // Not a verdict: the decoder never answered. The gate stays at "not
@@ -382,35 +479,132 @@ export function CreatePage({
     }, DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [artefact, svg, payload, placement, verify]);
+  }, [artefact, svg, payload, placement, pixels, verify]);
 
   // The gate owns the export button. Nothing else is allowed to enable it.
   const gate = gateState(report, inFlight);
+  const verified = gate === 'verified';
 
-  const exportPng = async () => {
+  /**
+   * How far this code can be degraded and still read, asked for once it reads at
+   * all. The answer is carried with the code it is about, like the verdict, so a
+   * margin measured about a code the window has moved on from is no margin.
+   */
+  useEffect(() => {
+    if (!verified || svg === null || payload === null || artefact === null) return;
+
+    const timer = window.setTimeout(() => {
+      measure({ svg, payload, pixelSize: pixels, logo: placement })
+        .then((next) => {
+          setMargin({ key: artefact, variants: next.variants, failure: null });
+          // One sentence rather than nine: the lines are on screen to be read,
+          // and a live region that recites all of them is one a person turns off
+          // (DESIGN_SYSTEM §7).
+          const reads = next.variants.filter((variant) => variant.verified).length;
+          announce(`Scan margin measured — ${reads} of ${next.variants.length} still read.`);
+        })
+        .catch((error: unknown) =>
+          setMargin({
+            key: artefact,
+            variants: null,
+            failure: `The margin could not be measured. ${describeError(error)}`,
+          }),
+        );
+    }, MARGIN_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [verified, artefact, svg, payload, placement, pixels, measure]);
+
+  /**
+   * Write the code, in the format asked for.
+   *
+   * One function for three formats, because there is one gate and one code: the
+   * kind decides the dialog, the extension and the command, and nothing else.
+   * The SVG is the one that leaves with a different string from the one the
+   * decoder read — the domain's `sizedSvg`, the same scene with its printed
+   * width written in — and the host rasterises that string to decide whether it
+   * may write it (ADR-026).
+   */
+  const write = async (kind: ExportKind) => {
     if (svg === null || payload === null || artefact === null) return;
+    const file = FILE[kind];
     try {
       const path = await save({
-        defaultPath: 'signatum.png',
-        filters: [{ name: 'PNG image', extensions: ['png'] }],
+        defaultPath: `signatum.${file.extension}`,
+        filters: [{ name: file.filter, extensions: [file.extension] }],
       });
       if (path === null) return;
 
-      const done = await writePng({ svg, payload, pixelSize: PIXEL_SIZE, path, logo: placement });
+      const asked = { payload, pixelSize: pixels, path, logo: placement, dpi: printSize.dpi };
+      const done =
+        kind === 'png'
+          ? await writePng({ ...asked, svg })
+          : kind === 'svg'
+            ? await writeSvg({ ...asked, svg: sizedSvg(svg, printSize) })
+            : await writePdf({ ...asked, svg, widthMm: toMillimetres(printSize) });
+
       setWritten({
         key: artefact,
         tone: 'success',
-        text: `Written to ${path} — verified by ${done.decoder}`,
+        title: 'Exported',
+        text: `Written to ${path} — ${file.format} verified by ${done.decoder}`,
+        mono: true,
       });
-      announce(`The code was written, verified by ${done.decoder}`);
+      announce(`The ${file.format} was written, verified by ${done.decoder}`);
     } catch (error) {
       // `refused` is not a failure of the export: it is the gate doing its job,
       // and the host's message is already the reason.
       const text = describeError(error);
-      setWritten({ key: artefact, tone: 'danger', text });
+      setWritten({
+        key: artefact,
+        tone: 'danger',
+        title: 'Nothing was written',
+        text,
+        mono: false,
+      });
       if (errorKind(error) === 'refused') announce(`Nothing was written. ${text}`);
     }
   };
+
+  /**
+   * Put the code on the clipboard: the picture, never the payload text. A
+   * payload left in the clipboard is a paste into the wrong window, and it is
+   * verified before it is copied like everything else that leaves this screen.
+   */
+  const copy = async () => {
+    if (svg === null || payload === null || artefact === null) return;
+    try {
+      const done = await copyToClipboard({
+        svg,
+        payload,
+        pixelSize: pixels,
+        logo: placement,
+        dpi: printSize.dpi,
+      });
+      setWritten({
+        key: artefact,
+        tone: 'success',
+        title: 'Copied',
+        text: `Copied to the clipboard — verified by ${done.decoder}`,
+        mono: false,
+      });
+      announce(`The code was copied to the clipboard, verified by ${done.decoder}`);
+    } catch (error) {
+      const text = describeError(error);
+      setWritten({ key: artefact, tone: 'danger', title: 'Nothing was copied', text, mono: false });
+      if (errorKind(error) === 'refused') announce(`Nothing was copied. ${text}`);
+    }
+  };
+
+  /**
+   * The scan margin, asked for once a code has passed — and only then, because
+   * there is no margin worth measuring around a code that does not read at all.
+   *
+   * It is deliberately late and deliberately optional: a person typing never
+   * waits for it, nothing on screen is disabled by it, and a failure to measure
+   * is said in the card rather than anywhere near the export button (ADR-027).
+   */
+  const marginNow = margin !== null && margin.key === artefact ? margin : null;
 
   // The domain words the empty case too ("Type a link to see its code."), and
   // that is a prompt rather than a rejection: it is not coloured like one.
@@ -475,6 +669,8 @@ export function CreatePage({
           <LogoCard logo={logo} onLogo={onLogo} plan={plan} />
 
           <LookCard style={style} onStyle={onStyle} ecl={ecl} onEcl={onEcl} />
+
+          <SizeCard size={printSize} onSize={onPrintSize} side={scene.side} />
         </div>
 
         <div className="flex flex-col gap-4">
@@ -524,26 +720,62 @@ export function CreatePage({
             </InfoBar>
           )}
 
-          <div>
+          {/* Four ways out of one code, and one gate in front of all of them: the
+              row is enabled by the verdict beside it and by nothing else. PNG is
+              the accented one because it is what most codes are printed from;
+              the other three are the same action in another format, not lesser
+              ones (DESIGN_SYSTEM §8). */}
+          <div className="flex flex-wrap gap-2">
             <Button
               appearance="accent"
               icon={<ArrowDownload20Regular />}
-              disabled={gate !== 'verified' || exporting}
-              onClick={() => void exportPng()}
+              disabled={!verified || exporting}
+              onClick={() => void write('png')}
             >
               Export PNG…
+            </Button>
+            <Button
+              icon={<ArrowDownload20Regular />}
+              disabled={!verified || exporting}
+              onClick={() => void write('svg')}
+            >
+              Export SVG…
+            </Button>
+            <Button
+              icon={<ArrowDownload20Regular />}
+              disabled={!verified || exporting}
+              onClick={() => void write('pdf')}
+            >
+              Export PDF…
+            </Button>
+            <Button
+              icon={<Copy20Regular />}
+              disabled={!verified || exporting}
+              onClick={() => void copy()}
+            >
+              Copy
             </Button>
           </div>
 
           {message !== null && (
             <InfoBar
               severity={message.tone === 'success' ? 'success' : 'danger'}
-              title={message.tone === 'success' ? 'Exported' : 'Nothing was written'}
+              title={message.title}
             >
-              <span data-selectable className={message.tone === 'success' ? 'font-mono' : ''}>
+              <span data-selectable className={message.mono ? 'font-mono' : ''}>
                 {message.text}
               </span>
             </InfoBar>
+          )}
+
+          {/* Only for a code that passed: there is no margin around a code that
+              does not read, and this is a report about one that does. */}
+          {verified && (
+            <ScanMarginCard
+              variants={marginNow?.variants ?? null}
+              loading={marginNow === null}
+              failure={marginNow?.failure ?? null}
+            />
           )}
         </div>
       </div>
