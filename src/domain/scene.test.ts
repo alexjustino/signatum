@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { encodeText } from './qr/encode';
+import { centredLogoBox } from './logo';
 import { DEFAULT_STYLE, isColour, renderScene } from './scene';
 
 describe('renderScene', () => {
@@ -65,5 +66,60 @@ describe('renderScene', () => {
     expect(isColour('#ABCDEF')).toBe(true);
     expect(isColour('#abc')).toBe(false);
     expect(isColour('rgb(0,0,0)')).toBe(false);
+  });
+});
+
+describe('the logo plate', () => {
+  const matrix = encodeText('https://example.com/', 'H');
+  const box = centredLogoBox(matrix, 4);
+
+  it('is drawn over the modules, as part of the same SVG', () => {
+    const svg = renderScene(matrix, DEFAULT_STYLE, 'QR code', {
+      box,
+      plate: 'square',
+      padding: 1,
+      colour: '#ffffff',
+    }).svg;
+    const path = svg.indexOf('<path');
+    const plate = svg.indexOf(`<rect x="${box.x - 1}" y="${box.y - 1}"`);
+    expect(plate).toBeGreaterThan(path);
+    expect(svg).toContain(`width="${box.width + 2}" height="${box.height + 2}" fill="#ffffff"/>`);
+  });
+
+  it('rounds and circles when asked, and draws nothing for none', () => {
+    const rounded = renderScene(matrix, DEFAULT_STYLE, 'QR code', {
+      box,
+      plate: 'rounded',
+      padding: 1,
+      colour: '#ffffff',
+    }).svg;
+    expect(rounded).toMatch(
+      /<rect x="\d+" y="\d+" width="\d+" height="\d+" rx="\d+" fill="#ffffff"\/>/,
+    );
+    const circle = renderScene(matrix, DEFAULT_STYLE, 'QR code', {
+      box,
+      plate: 'circle',
+      padding: 0,
+      colour: '#ffffff',
+    }).svg;
+    expect(circle).toContain('<circle cx=');
+    const none = renderScene(matrix, DEFAULT_STYLE, 'QR code', {
+      box,
+      plate: 'none',
+      padding: 1,
+      colour: '#ffffff',
+    }).svg;
+    expect(none).toBe(renderScene(matrix).svg);
+  });
+
+  it('refuses a plate colour that is not one', () => {
+    expect(() =>
+      renderScene(matrix, DEFAULT_STYLE, 'QR code', {
+        box,
+        plate: 'square',
+        padding: 1,
+        colour: 'white',
+      }),
+    ).toThrow();
   });
 });
