@@ -123,6 +123,7 @@ describe('look', () => {
       payload: LINK,
       pixel_size: 1024,
       path: file,
+      dpi: 300,
     });
     expect(report, JSON.stringify(report)).not.toHaveProperty('__error');
     const png = PNG.sync.read(await readFile(file));

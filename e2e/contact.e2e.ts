@@ -107,6 +107,7 @@ describe('contact cards', () => {
       payload,
       pixel_size: 1024,
       path: file,
+      dpi: 300,
     });
     expect(report, JSON.stringify(report)).not.toHaveProperty('__error');
     return decodePng(await readFile(file));

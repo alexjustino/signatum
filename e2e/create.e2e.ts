@@ -87,6 +87,7 @@ describe('create', () => {
       payload: LINK,
       pixel_size: 1024,
       path: file,
+      dpi: 300,
     });
     expect(report).not.toHaveProperty('__error');
     const ok = report as Report;
@@ -110,6 +111,7 @@ describe('create', () => {
       payload: 'https://other.example/',
       pixel_size: 1024,
       path: file,
+      dpi: 300,
     });
     expect(result).toHaveProperty('__error');
     expect((result as { __error: string }).__error).toContain('read something else');
