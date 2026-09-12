@@ -114,6 +114,7 @@ describe('placement', () => {
       payload: LINK,
       pixel_size: 1024,
       path: file,
+      dpi: 300,
       logo: { id: brand?.id, ...(await box()) },
     });
     expect(report, JSON.stringify(report)).not.toHaveProperty('__error');

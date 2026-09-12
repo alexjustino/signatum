@@ -31,6 +31,8 @@ part that matters most later — the cost we accepted.
 | [023](#adr-023) | The logo is composed by the host into the bytes the gate decodes                 | Accepted                      |
 | [024](#adr-024) | The middle alignment pattern may sit under the plate                             | Proposed                      |
 | [025](#adr-025) | A look is gated before the scan gate, and function patterns are never reshaped   | Accepted                      |
+| [026](#adr-026) | What is written is what was verified, with one named exception                   | Accepted                      |
+| [027](#adr-027) | The scan margin is a report, never a gate                                        | Accepted                      |
 
 ---
 
@@ -923,3 +925,127 @@ colours are the host's knowledge, not the domain's — the domain never sees the
 ([ADR-023](#adr-023)). The case therefore belongs where a code is judged as a picture rather than as
 a payload: the Read screen in F10, which already has to say what it sees in an image somebody
 photographed. Written down here so that the gap is a decision and not an oversight.
+
+## ADR-026 — What is written is what was verified, with one named exception {#adr-026}
+
+**Status: Accepted.**
+
+**Context.** [ADR-010](#adr-010) fixed the order — nothing leaves that a decoder did not read
+back, and the export writes _that_ buffer — at a time when there was one way out of the product.
+F7 opens four. Each of them asks the same question in a different shape: what exactly are the
+bytes the verdict is about? A PNG has pixels a decoder can read. A PDF is a container around
+something. The clipboard is not a file at all. And an SVG has no pixels until something draws it —
+and the thing that will draw it is somebody else's renderer, in somebody else's layout tool,
+months later.
+
+**Decision.** One sentence per way out, and the exception is named rather than smoothed over.
+
+- **PNG — the verified pixmap _is_ the written file.** Unchanged from F0, with one addition: the
+  encoder writes a `pHYs` chunk carrying the resolution the code was designed at, both axes, in
+  pixels per metre — 300 dpi is 11,811, the number `pixelsPerMetre` in `src/domain/size.ts`
+  computes — so the file states its own physical size instead of leaving it to whatever opens it
+  next ([ADR-015](#adr-015)).
+- **PDF — the page is the printed size, and what is on the page is the verified raster.** The
+  `/MediaBox` is the physical size in points (millimetres × 72 ÷ 25.4, so 25 mm is 70.87 pt) and
+  the verified PNG is embedded edge to edge. The PDF therefore carries the verified bytes: what a
+  printer rips is the image a decoder read, at the size the person asked for. Writing the modules
+  as vector paths would have looked better under a loupe and would have broken the rule — it is a
+  second rendering of the scene, by a second code path, and [ADR-010](#adr-010) exists to forbid
+  exactly that.
+- **SVG — the written file is the very SVG string the decoder rasterised.** `sizedSvg` inserts
+  `width` and `height` in millimetres immediately after the `viewBox` and touches nothing else, so
+  the document inside is byte-identical to the one that was verified; placing it in a layout tool
+  gives the size it was designed at. **Plus, when there is a logo:** the logo the host composed
+  from the same stored bytes ([ADR-023](#adr-023)), embedded before `</svg>` as a `data:` image or
+  as the normalised drawing inlined as a nested `<svg>` at the plate's box. Either way the file
+  points at nothing outside itself — a `data:` URI carries its bytes inside the document, and the
+  inlined drawing references nothing — which is the rule [ADR-016](#adr-016) set for everything
+  this product writes.
+
+  **This is the one place where the bytes written are not the bytes decoded**, and it is a
+  decision rather than an oversight. An SVG has no pixels to verify: the host has to rasterise it
+  to be able to say anything at all, and the raster it verified is the composed pixmap, logo
+  included, exactly as for a PNG. What is written is the same scene that decoder read, plus the
+  mark the host drew onto it from the same stored bytes. The alternative — refusing to embed the
+  logo — exports a vector file with the brand missing from the middle, which is not the artefact
+  anybody asked for. The gap is closed from the other side, in the end-to-end suite: a **third**
+  renderer rasterises the **written** SVG and a third decoder reads the payload off it
+  ([ADR-008](#adr-008), [ADR-011](#adr-011)).
+
+- **Clipboard — the verified PNG's pixels, as an image, and never the payload text.** A payload on
+  the clipboard is a paste into the wrong window: into the message somebody was writing, into a
+  terminal, into a document that is about to be sent. The clipboard is an export like any other
+  and goes through the same verification before anything is put on it.
+
+**Why.** Four ways out is four chances to verify one artefact and write another, which is the one
+bug [ADR-010](#adr-010) was written to make impossible and the one that reaches paper without
+anybody noticing. Stating per format what the verified bytes are turns that from a property
+somebody has to remember into a sentence a reviewer can hold against the code. And where the
+property genuinely cannot hold, one paragraph saying so is worth more than a claim that is true of
+three formats out of four.
+
+**Cost accepted: the SVG asymmetry, stated.** A logo embedded after the raster was decoded is a
+logo no decoder in this product read _in that document_. What is verified is the same mark in the
+same box, rasterised by the same host; what is not verified is a foreign renderer drawing it. A
+defect only such a renderer can produce — a `data:` image ignored, a nested `<svg>` positioned
+differently — would be invisible to the gate. The end-to-end suite's third renderer is what
+narrows that, and it narrows rather than closes it.
+
+**Second cost: the size is bounded by the raster.** The host renders between
+`MIN_PIXEL_SIZE` = 64 and `MAX_PIXEL_SIZE` = 4096 pixels square
+(`src-tauri/src/imaging/render.rs`), and the export is that same raster, so a printed size and
+resolution whose raster falls outside — 5 mm at 150 dpi is 30 pixels, 1000 mm at 1200 dpi is
+47 244 — is refused by the domain before anything is rendered, with the sentence naming the
+resolution to change (`checkPrintSize` in `src/domain/size.ts`, `MIN_PIXELS` and `MAX_PIXELS`
+mirroring the host's constants). A refusal rather than a silent clamp, because a clamp writes a
+file at a size nobody asked for; and a floor at all, because below it a code has fewer pixels than
+modules and a decode that succeeded there would prove nothing. The two constants live in two
+places and must agree; a host test and a domain test each pin their own, and a change to one
+without the other is a refusal on one side that the other cannot explain.
+
+## ADR-027 — The scan margin is a report, never a gate {#adr-027}
+
+**Status: Accepted.**
+
+**Context.** The scan gate answers one question about one artefact under laboratory conditions
+(SPEC §9, R2): does this file read, clean, held still, at the scale the renderer chose. That is
+the right question and it is not the whole of what somebody printing a menu, a bottle or a bus
+shelter needs to know. The code that reads perfectly at 2,000 pixels is going onto paper, through
+a press, under a phone held at an angle in poor light — and the honest thing to say about that is
+not a verdict, it is a distance: how much abuse is left before it stops reading.
+
+**Decision.** After a verdict, and only after one, the host degrades the render it already has
+nine ways and hands each variant to the same decoder that produced the verdict:
+
+| Degradation  | Variants                                         | Why that one                                                        |
+| ------------ | ------------------------------------------------ | ------------------------------------------------------------------- |
+| Shrunk       | 50 %, 33 %, 25 % of the pixel size               | printed small, or read from far — nearest-neighbour, the cruel one  |
+| Blurred      | box blur, radius 1, 2 and 3 px at the pixel size | a camera that did not focus, or ink that spread                     |
+| Recompressed | JPEG at quality 80, 50 and 25, decoded back      | the code that went through a chat application before it was printed |
+
+Each variant reports its label and whether it read, and the screen shows them as short lines —
+"Shrunk to 25 %: reads", "Blurred 3 px: fails". **It informs, and it never blocks.** It does not
+gate an export, it does not change the verdict, and a code the gate passed is exportable whatever
+the nine lines say. Nothing in F7 writes the margin down: it is a report about one render at one
+moment, not evidence about a file that was written.
+
+**Why.** The two questions are different, and answering the second one with a refusal would be a
+category error. The gate answers _does this file read_ — a fact about one artefact, with one
+correct answer, and it is requirement one (SPEC §4). The margin answers _how much abuse before it
+does not_ — a set of measurements with no threshold anybody in this repository can defend. A clean
+raster passing while a blurred one fails is **information**: it says this code is at the edge of
+what a downscale can take, so print it larger or shorten the payload. Turned into a gate it would
+become a number chosen by us, refusing codes that scan, and the first person to meet it would ask
+which of the nine lines they are allowed to fail — a question with no answer. Shown as nine lines
+it needs no threshold at all, because the person reading it knows what their code is going onto
+and this product does not.
+
+**Cost accepted: it is the host decoder's opinion, not a camera's.** One implementation (`rqrr`,
+[ADR-019](#adr-019)) reading synthetic degradations of a clean render. A box blur is not a
+defocus, a nearest-neighbour downscale is not a printer's screening, a JPEG quality is not a
+phone's imaging pipeline — and the decoder that produced the verdict is the decoder that produces
+the margin, so one that is generous in the first is generous in the second. The margin is
+therefore written and read as an indication, in the same breath as the thing that actually
+decides: the phone matrix, two phones at the printed size, per release (SPEC §6). A smaller second
+cost: nine decodes cost what nine decodes cost, so the margin is asked for after the verdict and
+is never on the path between a verdict and a file.

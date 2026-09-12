@@ -14,7 +14,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { exportPng, verifyCode } from './codes';
+import { copyPng, exportPdf, exportPng, exportSvg, scanMargin, verifyCode } from './codes';
 import { deleteLogo, importLogo, listLogos, logoDataUrl } from './logos';
 import { fetchAccentRamp, fetchSystemInfo } from './system';
 
@@ -44,6 +44,33 @@ export function useVerifyCode() {
 /** Ask the host to write a code — which it does only if it decoded it first. */
 export function useExportPng() {
   return useMutation({ mutationFn: exportPng });
+}
+
+/** The same file, as the vector the print shop asks for. */
+export function useExportSvg() {
+  return useMutation({ mutationFn: exportSvg });
+}
+
+/** The same code as a page, measured in millimetres. */
+export function useExportPdf() {
+  return useMutation({ mutationFn: exportPdf });
+}
+
+/** The verified picture on the clipboard — the image, never the payload text. */
+export function useCopyPng() {
+  return useMutation({ mutationFn: copyPng });
+}
+
+/**
+ * How far the code can be degraded and still read.
+ *
+ * A mutation although it writes nothing, for the reason the two gate commands
+ * are: it is a question about a code that exists only in this window, asked at a
+ * moment the screen chose — 400 ms after a verdict — and nothing else ever wants
+ * to read the answer back. A cache key for it would be a key nobody looks up.
+ */
+export function useScanMargin() {
+  return useMutation({ mutationFn: scanMargin });
 }
 
 /**

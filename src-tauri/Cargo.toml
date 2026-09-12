@@ -51,12 +51,40 @@ rqrr = "0.10"
 # from a file, so dimensions are read from the header and capped before a pixel
 # is decoded (ADR-016).
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+# `jpeg` is also what the scan margin recompresses with (F7): the encoder is the
+# same feature as the decoder.
+#
+# One honest note about this line. `arboard`'s `image-data` feature asks `image`
+# for `bmp` on Windows, and Cargo unifies features — so a BMP decoder is compiled
+# into the binary even though nothing here names it. It is reachable only from
+# arboard's clipboard *reading* path, which this host never calls (it only ever
+# puts an image on the clipboard), and the logo importer picks its decoder from
+# the magic bytes against a closed list of five formats, so a `.bmp` somebody was
+# sent is still one sentence and no decode (ADR-016).
 sha2 = "0.10"
 hex = "0.4"
 # The normalised logo reaches the screen as a `data:` URL, because the interface
 # cannot read a file and the host will not hand it a path. Already in the tree
 # for the corpus test; declared here so a release build links it too.
 base64 = "0.22"
+
+# The PNG encoder the exports use, rather than tiny-skia's, for one reason: it
+# can write the `pHYs` chunk, which is where a printed code's physical size
+# lives. The same encoder produces the bytes that are decoded and the bytes that
+# are written, so the hash in the report is the hash of the file (ADR-010).
+# Already in the tree — `image` links this exact version.
+png = "0.18"
+# PDF wants its image streams deflated, and `flate2` is already in the tree
+# (usvg and png both pull it). Declared so the export links it directly rather
+# than reaching through a transitive dependency.
+flate2 = "1"
+# A one-page PDF at an exact physical size: a writer, not a layout engine.
+# It emits the objects this host names and nothing else — no fonts, no forms,
+# no JavaScript surface to leave switched off.
+pdf-writer = "0.15"
+# The clipboard. Host-side, so no capability is granted for it: what goes on
+# the clipboard is the verified image and never the payload text (SECURITY.md).
+arboard = { version = "3.6", default-features = false, features = ["image-data"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = ["UI_ViewManagement", "Foundation"] }
@@ -85,7 +113,8 @@ strip = true
 #     └ tiny-skia                 BSD-3-Clause        (re-exported as resvg::tiny_skia)
 #   rqrr                          (MIT OR Apache-2.0) AND ISC
 #   image                         MIT OR Apache-2.0
-#     the four decoders its features compile in, none of them copyleft:
+#     the decoders its features compile in, none of them copyleft (bmp arrives
+#     through arboard and needs no crate of its own — see the note above):
 #     └ zune-jpeg, zune-core     MIT OR Apache-2.0 OR Zlib   (jpeg)
 #     └ gif, weezl, color_quant  MIT OR Apache-2.0 / MIT     (gif)
 #     └ image-webp, quick-error  MIT OR Apache-2.0           (webp)
@@ -93,3 +122,20 @@ strip = true
 #   hex                           MIT OR Apache-2.0
 #   base64                        MIT OR Apache-2.0
 #   windows                       MIT OR Apache-2.0
+#
+# F7 (size and export) adds four, and pulls three more in on Windows:
+#   png                           MIT OR Apache-2.0   (the `pHYs` chunk; same version `image` links)
+#   flate2                        MIT OR Apache-2.0   (already in the tree via usvg and png)
+#     └ miniz_oxide               MIT OR Zlib OR Apache-2.0
+#     └ zlib-rs                   Zlib
+#   pdf-writer                    MIT OR Apache-2.0
+#     └ itoa, memchr, bitflags    MIT OR Apache-2.0 / Unlicense OR MIT / MIT OR Apache-2.0
+#     └ ryu                       Apache-2.0 OR BSL-1.0
+#   arboard                       MIT OR Apache-2.0
+#     what it brings on Windows, none of it copyleft:
+#     └ clipboard-win             BSL-1.0
+#     └ error-code                BSL-1.0
+#     └ windows-sys               MIT OR Apache-2.0
+#     (its Unix and macOS dependencies — x11rb, tiff, fax, half, rustix — are in
+#      Cargo.lock because a lock file covers every target, and are never compiled
+#      for this one.)

@@ -37,6 +37,12 @@ pub struct VerificationRow<'a> {
     pub path: Option<&'a str>,
     /// The sentence shown when the code was not verified.
     pub reason: Option<&'a str>,
+    /// The resolution the artefact was made for, in dots per inch; `None` for a
+    /// preview, which is not going to be printed.
+    pub dpi: Option<u32>,
+    /// What the export was: `png`, `svg`, `pdf` or `clipboard`. `None` for a
+    /// preview, which wrote nothing anywhere.
+    pub format: Option<&'a str>,
 }
 
 /// Write one verification and return its identifier.
@@ -49,8 +55,8 @@ pub fn record(conn: &Connection, row: &VerificationRow) -> Result<String> {
     conn.execute(
         "INSERT INTO verifications
            (id, created_at, kind, decoder, verified, payload_sha256, decoded_sha256,
-            artefact_sha256, width, height, duration_ms, path, reason)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            artefact_sha256, width, height, duration_ms, path, reason, dpi, format)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
         rusqlite::params![
             id,
             now(),
@@ -65,6 +71,8 @@ pub fn record(conn: &Connection, row: &VerificationRow) -> Result<String> {
             row.duration_ms as i64,
             row.path,
             row.reason,
+            row.dpi,
+            row.format,
         ],
     )?;
     Ok(id)
@@ -99,6 +107,8 @@ mod tests {
                 duration_ms: 12,
                 path: Some("C:/somewhere/signatum.png"),
                 reason: None,
+                dpi: Some(300),
+                format: Some("png"),
             },
         )
         .expect("record");
@@ -113,6 +123,16 @@ mod tests {
         assert_eq!(kind, "export");
         assert_eq!(verified, 1);
         assert_eq!(path.as_deref(), Some("C:/somewhere/signatum.png"));
+
+        let (dpi, format): (Option<i64>, Option<String>) = conn
+            .query_row(
+                "SELECT dpi, format FROM verifications WHERE id = ?1",
+                [&id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .expect("read back what was exported");
+        assert_eq!(dpi, Some(300));
+        assert_eq!(format.as_deref(), Some("png"));
     }
 
     #[test]
@@ -132,6 +152,8 @@ mod tests {
                 duration_ms: 3,
                 path: None,
                 reason: Some("The decoder found no code."),
+                dpi: None,
+                format: None,
             },
         )
         .expect("record");
@@ -162,6 +184,8 @@ mod tests {
                 duration_ms: 3,
                 path: None,
                 reason: None,
+                dpi: None,
+                format: None,
             },
         );
         assert!(

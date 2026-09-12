@@ -114,9 +114,24 @@ a choice too, with a sentence under the four modules the standard asks for and a
 there is none at all — a warning and never a refusal, since what decides whether a code may leave is
 still the decoder that reads it back.
 
-What it does not do yet: a fixed 1024-pixel square rather than a physical size; PNG and nothing
-else; an error-correction level chosen for you rather than raised by hand; and no code is saved — close the window and the code is gone,
-though the logos imported stay in the workspace. Those are the slices that follow.
+F7 has made the size an input and given the code four ways out. A code is designed for a width on
+paper — millimetres or inches, from 5 mm to a metre — at a chosen resolution, and everything else
+follows from those two numbers: a 25 mm code at 300 dpi is 295 pixels square, and the module size
+the screen warns about is now the size those modules will really be printed at rather than one
+assumed for the warning. It leaves as a PNG with the resolution written into the file, so the file
+states its own physical size instead of leaving it to whatever opens it next; as an SVG at the
+printed size with the logo embedded, for a layout tool; as a PDF whose page is exactly the size
+asked for, with the verified image on it edge to edge, which is the answer for a printer; or
+straight onto the clipboard — the picture, never the payload text, because a payload on the
+clipboard is a paste into the wrong window. Every one of them is verified before it is written, and
+where "the bytes written are the bytes decoded" could not be literally true — a vector file has no
+pixels for a decoder to read — it is written down rather than glossed over. Alongside the verdict,
+the code is also shrunk, blurred and recompressed nine ways and read again, so the screen can say
+how much abuse it has left in it: a report, and never a gate.
+
+What it does not do yet: an error-correction level chosen for you rather than raised by hand; and
+no code is saved — close the window and the code is gone, though the logos imported stay in the
+workspace. Those are the slices that follow.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 

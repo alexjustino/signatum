@@ -14,4 +14,4 @@
 
 # Lockfiles are generated: keep them out of diff review by default.
 package-lock.json linguist-generated=true -diff
-src-tauri/Cargo.lock linguist-generated=true -diff
+src-tauri/Cargo.lock linguist-generated=true

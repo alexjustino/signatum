@@ -14,7 +14,7 @@ use crate::error::Result;
 use crate::imaging::compose::{draw_logo, LogoBox};
 use crate::imaging::decode::decode_png;
 use crate::imaging::logo::NormalisedLogo;
-use crate::imaging::render::{encode, render_pixmap};
+use crate::imaging::render::{encode, render_pixmap, Rendered};
 
 /// The decoder's name, as the report and the record spell it.
 pub const DECODER_NAME: &str = "rqrr";
@@ -82,12 +82,57 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
 
+/// Render `svg`, draw `logo` on it if there is one, and encode the result: the
+/// exact artefact the gate is about to answer for.
+///
+/// Split out of [`verify`] because two callers need the same bytes for
+/// different questions — the gate asks whether they read back, and the scan
+/// margin asks how much abuse they survive — and a second way of producing them
+/// would be a second artefact.
+///
+/// `dpi`, when given, is written into the PNG as its physical resolution.
+///
+/// # Errors
+///
+/// [`crate::error::Error::Render`] when the drawing could not be rasterised or
+/// encoded, and [`crate::error::Error::InvalidInput`] when the logo's box is not
+/// a rectangle or does not lie inside the code.
+pub fn artefact(
+    svg: &[u8],
+    pixel_size: u32,
+    logo: Option<(&NormalisedLogo, LogoBox)>,
+    dpi: Option<u32>,
+) -> Result<Rendered> {
+    let raster = render_pixmap(svg, pixel_size)?;
+    let mut pixmap = raster.pixmap;
+
+    if let Some((logo, area)) = logo {
+        // The box arrives in the scene's units; the scale that took the
+        // `viewBox` to pixels is the one that takes the box there too.
+        draw_logo(
+            &mut pixmap,
+            logo,
+            (
+                area.x * raster.scale_x,
+                area.y * raster.scale_y,
+                area.width * raster.scale_x,
+                area.height * raster.scale_y,
+            ),
+        )?;
+    }
+
+    encode(&pixmap, dpi)
+}
+
 /// Render `svg`, draw `logo` on it if there is one, decode the pixels, and
 /// compare what came back with `payload`.
 ///
 /// Writes nothing and touches nothing outside memory. `decoder` is the name to
 /// record — [`decoder()`] in the product, a fixed string in a test that must
-/// not change when the dependency does.
+/// not change when the dependency does. `dpi` is the resolution the artefact is
+/// for: every export passes it, so the bytes that were decoded are the bytes
+/// that will be written, `pHYs` chunk and all. A preview passes `None` — it is
+/// not going to be printed, and a number nobody asked for is a number in a file.
 ///
 /// The logo is drawn **between** the render and the encode. That ordering is
 /// the point of the gate: the bytes the decoder is given are the bytes with the
@@ -107,28 +152,11 @@ pub fn verify(
     pixel_size: u32,
     decoder: &str,
     logo: Option<(&NormalisedLogo, LogoBox)>,
+    dpi: Option<u32>,
 ) -> Result<Verification> {
     let started = Instant::now();
 
-    let raster = render_pixmap(svg, pixel_size)?;
-    let mut pixmap = raster.pixmap;
-
-    if let Some((logo, area)) = logo {
-        // The box arrives in the scene's units; the scale that took the
-        // `viewBox` to pixels is the one that takes the box there too.
-        draw_logo(
-            &mut pixmap,
-            logo,
-            (
-                area.x * raster.scale_x,
-                area.y * raster.scale_y,
-                area.width * raster.scale_x,
-                area.height * raster.scale_y,
-            ),
-        )?;
-    }
-
-    let rendered = encode(&pixmap)?;
+    let rendered = artefact(svg, pixel_size, logo, dpi)?;
     let decoded = decode_png(&rendered.png)?;
 
     let duration_ms = started.elapsed().as_millis() as u64;
@@ -198,6 +226,7 @@ mod tests {
             512,
             &decoder(),
             None,
+            None,
         )
         .expect("verify");
         let report = verification.report;
@@ -218,6 +247,7 @@ mod tests {
             512,
             &decoder(),
             None,
+            None,
         )
         .expect("verify")
         .report;
@@ -236,6 +266,7 @@ mod tests {
             512,
             &decoder(),
             None,
+            None,
         )
         .expect("verify")
         .report;
@@ -248,7 +279,7 @@ mod tests {
 
     #[test]
     fn the_report_speaks_snake_case_to_the_interface() {
-        let report = verify(blank_svg().as_bytes(), b"x", 64, "rqrr 0.0.0", None)
+        let report = verify(blank_svg().as_bytes(), b"x", 64, "rqrr 0.0.0", None, None)
             .expect("verify")
             .report;
         let json = serde_json::to_value(&report).expect("serialise");
@@ -287,6 +318,7 @@ mod tests {
             512,
             &decoder(),
             Some((&logo, area)),
+            None,
         )
         .expect("verify")
         .report;
@@ -308,6 +340,7 @@ mod tests {
             512,
             &decoder(),
             Some((&logo, area)),
+            None,
         )
         .expect("verify")
         .report;
@@ -329,6 +362,7 @@ mod tests {
             512,
             &decoder(),
             None,
+            None,
         )
         .expect("verify");
         let with = verify(
@@ -337,6 +371,7 @@ mod tests {
             512,
             &decoder(),
             Some((&logo, area)),
+            None,
         )
         .expect("verify");
 
@@ -359,6 +394,7 @@ mod tests {
             512,
             &decoder(),
             Some((&logo, area)),
+            None,
         ) {
             Err(error) => error,
             Ok(verification) => panic!(

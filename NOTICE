@@ -57,6 +57,13 @@ the one generated from the dependency manifests (Cargo.toml, package.json).
     image-webp, quick-error ...... MIT OR Apache-2.0           (WebP)
   sha2, hex ...................... MIT OR Apache-2.0
   base64 ......................... MIT OR Apache-2.0
+  png ........................... MIT OR Apache-2.0
+  flate2 ........................ MIT OR Apache-2.0
+  pdf-writer .................... MIT OR Apache-2.0
+  ryu ........................... Apache-2.0 OR BSL-1.0
+  arboard ....................... MIT OR Apache-2.0
+  clipboard-win ................. BSL-1.0
+  error-code .................... BSL-1.0
 
 The vendored encoder carries its licence in the header of the file itself
 (src/domain/qr/vendor/), together with the upstream commit it was taken from
@@ -64,6 +71,9 @@ and every local change made to it.
 
 Components specific to this product are added to this list as they are adopted,
 after the dependency audit (see docs/SPEC.md §3).
+
+BSL-1.0 is the Boost Software License 1.0, a permissive licence that asks for the
+notice to be kept in source distributions only.
 
 Full license texts of the above are retained in the dependency lockfiles and
 are reproduced in the distributed package.

@@ -15,6 +15,10 @@ use crate::error::Result;
 const MIGRATIONS: &[(&str, &str)] = &[
     ("001_init", include_str!("../../migrations/001_init.sql")),
     ("002_logos", include_str!("../../migrations/002_logos.sql")),
+    (
+        "003_export_formats",
+        include_str!("../../migrations/003_export_formats.sql"),
+    ),
 ];
 
 /// Every migration, name and SQL, in the order they apply.
@@ -97,7 +101,7 @@ mod tests {
     /// to somebody whose file is a release behind.
     #[test]
     fn a_workspace_at_any_earlier_version_migrates_to_this_one() {
-        assert_eq!(target_version(), 2, "F4 adds the second migration");
+        assert_eq!(target_version(), 3, "F7 adds the third migration");
 
         for stop_at in 0..=target_version() {
             let conn = memory();
@@ -153,7 +157,7 @@ mod tests {
             )
             .expect("read back");
         assert_eq!(kept, 1, "a migration must not lose a row");
-        assert_eq!(current_version(&conn), 2);
+        assert_eq!(current_version(&conn), target_version());
     }
 
     #[test]
@@ -220,6 +224,37 @@ mod tests {
             .expect("a verified row whose hashes agree is accepted");
         conn.execute(insert, rusqlite::params!["d", 0, "bbbb"])
             .expect("an unverified row may record what was read instead");
+    }
+
+    /// The columns F7 adds, and the promise the schema makes about them: a
+    /// format is one of the four things a code can leave as, and nothing else.
+    /// The clipboard is one of them and has no path, which is why the kind of
+    /// an export is recorded beside the fact of it.
+    #[test]
+    fn an_export_records_what_it_wrote_and_at_what_resolution() {
+        let conn = memory();
+        apply(&conn).expect("migrate");
+
+        let insert = "INSERT INTO verifications
+             (id, created_at, kind, decoder, verified, payload_sha256, decoded_sha256,
+              artefact_sha256, width, height, duration_ms, dpi, format)
+             VALUES (?1, 't', 'export', 'rqrr 0.0.0', 1, 'aaaa', 'aaaa', 'cccc', 8, 8, 1, ?2, ?3)";
+
+        for (index, format) in ["png", "svg", "pdf", "clipboard"].iter().enumerate() {
+            conn.execute(insert, rusqlite::params![index.to_string(), 300, format])
+                .unwrap_or_else(|error| panic!("`{format}` must be recordable: {error}"));
+        }
+        conn.execute(
+            insert,
+            rusqlite::params!["none", None::<i64>, None::<String>],
+        )
+        .expect("a preview records neither, and says so with NULL");
+
+        let refused = conn.execute(insert, rusqlite::params!["bad", 300, "tiff"]);
+        assert!(
+            refused.is_err(),
+            "`tiff` is not something this product exports"
+        );
     }
 
     #[test]
