@@ -71,6 +71,20 @@ is about to print. Our palette is checked for a person reading a screen in two t
 code's palette is checked for a phone reading ink in a dim room. Two questions, two gates, and
 neither answers for the other.
 
+**A swatch shows the print colour, and that is where a literal is allowed.** The controls that
+choose the code's colours show those colours: a swatch, and the hex value beside it. A literal
+therefore reaches the screen in the one place §2 otherwise forbids one, and it is allowed for the
+same reason the preview is not themed — a swatch drawn from a token would be showing a colour
+nobody chose. Everything around it is themed as usual, and the swatch takes its own border from
+the token layer so that a near-white choice still has an edge against the card it sits on.
+
+**The gate over those two colours is the domain's, not axe's.** axe-core judges the interface —
+labels, controls, states, in both themes — and it is right to fail text that cannot be read. It has
+no opinion worth having about ink, and a swatch is not text. The 4.5 the code's colours must clear
+is the one in `domain/`, decided before the code is built and refused with a sentence
+(ADR-025); the 4.5 the labels around it must clear is the one axe measures. Same number, two
+readers, two gates.
+
 ### A view says what it left out
 
 A screen that cannot show every row does not quietly show the rest. A batch that made 198 files
@@ -247,6 +261,12 @@ question it answers — _"What the code does"_.
 
 A shortcut shown beside the thing it triggers is a `Kbd`, everywhere, so a person learns to
 read it once.
+
+**F6 added no primitive.** The look is chosen with controls already on the list: a `Select` for
+each shape and an `Input` for each colour and for the margin. A shape is offered by name rather
+than by a row of pictures, for the reason the plate picker is — "Circle" is a word before it is a
+picture — and grouping those controls together is a `Card`, not a new control. A slice that needs
+nothing new is the list working.
 
 ### What this product adds to the list
 

@@ -97,8 +97,25 @@ code place exactly in the middle is allowed to go under the logo, because refusi
 the code to a far larger size, and whether real phone cameras agree is proved with two phones
 before it is accepted.
 
-What it does not do yet: no colours or shapes to choose; a fixed 1024-pixel square rather than a
-physical size; PNG and nothing else; and no code is saved — close the window and the code is gone,
+F6 has given the code a look, and put a gate in front of it. Both colours can be chosen — they are
+the colours of the print rather than of the application's theme, and they are the same in a light
+window as in a dark one, because paper has no theme — and the pair is measured before the code is
+built: colours too close together are refused with the contrast they reached against the 4.5 a
+camera needs, and a code lighter than the plate it sits on is refused however strong the contrast,
+because phone cameras look for a dark code on a light background and several will not turn the
+picture over to find one. The modules can be square, softened at the corners or drawn as separate
+dots, and the three large squares in the corners square, rounded or round. What keeps its shape is
+what a camera navigates by — the lines of alternating modules between those corners, the small
+alignment squares, the strip that records how the code was drawn — because a scanner finds the grid
+by measuring those runs, and a row of dots is not a run. All nine combinations of module and corner
+shape are rasterised and read back by an independent decoder on every run of the suite, and a code
+nobody restyled is drawn exactly as it was before, to the byte. The blank margin around the code is
+a choice too, with a sentence under the four modules the standard asks for and a blunter one when
+there is none at all — a warning and never a refusal, since what decides whether a code may leave is
+still the decoder that reads it back.
+
+What it does not do yet: a fixed 1024-pixel square rather than a physical size; PNG and nothing
+else; an error-correction level chosen for you rather than raised by hand; and no code is saved — close the window and the code is gone,
 though the logos imported stay in the workspace. Those are the slices that follow.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
