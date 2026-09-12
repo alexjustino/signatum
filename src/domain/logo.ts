@@ -1,10 +1,12 @@
 /**
- * Where the logo goes. In F4 the answer is simple and conservative — a small square in the
- * middle — and the scan gate says whether the code still reads with it there. F5 replaces this
- * with the placement engine that knows the error-correction budget and every function pattern.
+ * The logo's vocabulary: the box it fills, the plate it sits on, and the sizes a person may
+ * ask for.
+ *
+ * Where the box goes is not decided here. The placement engine (`placement.ts`) knows the
+ * error-correction budget and every function pattern, and it is the one that answers — this
+ * file only names the things a person chooses between, so the screen, the scene and the
+ * engine say them the same way.
  */
-
-import type { Matrix } from './qr/encode';
 
 /** A rectangle in scene modules: the quiet zone is inside the coordinate system. */
 export interface LogoBox {
@@ -25,33 +27,32 @@ export const PLATE_LABELS: Record<Plate, string> = {
   circle: 'Circle',
 };
 
-/** The share of the symbol's side a F4 logo takes: small enough to leave level H its margin. */
-export const DEFAULT_LOGO_FRACTION = 0.2;
+/** How big a logo is asked to be — never how big it will be; the budget decides that. */
+export type LogoSize = 'largest' | 'medium' | 'small';
 
-/** The smallest logo worth drawing, in modules. */
-export const MIN_LOGO_MODULES = 5;
+export const LOGO_SIZES: readonly LogoSize[] = ['largest', 'medium', 'small'];
+
+export const LOGO_SIZE_LABELS: Record<LogoSize, string> = {
+  largest: 'Largest',
+  medium: 'Medium',
+  small: 'Small',
+};
 
 /**
- * A square box centred on the symbol. Its side is an odd number of modules, so that on a
- * symbol — whose side is always odd — the box sits exactly in the middle rather than half a
- * module to one side.
+ * The share of the symbol's side a size asks for, or nothing at all.
+ *
+ * "Largest" asks for no share: the engine gives whatever the error-correction budget allows,
+ * which is the most a logo is ever allowed to take. The other two ask for less than that —
+ * "or smaller by choice, never larger" (SPEC §2.2) — and a share larger than the budget's
+ * answer is ignored by the engine rather than honoured.
  */
-export function centredLogoBox(
-  matrix: Pick<Matrix, 'size'>,
-  quietZone: number,
-  fraction = DEFAULT_LOGO_FRACTION,
-): LogoBox {
-  if (!(fraction > 0 && fraction < 1)) {
-    throw new Error('the logo fraction has to lie between 0 and 1');
+export function logoFraction(size: LogoSize): number | undefined {
+  switch (size) {
+    case 'largest':
+      return undefined;
+    case 'medium':
+      return 0.2;
+    case 'small':
+      return 0.12;
   }
-  let side = Math.max(MIN_LOGO_MODULES, Math.round(matrix.size * fraction));
-  if (side % 2 === 0) side += 1;
-  // A finder and its separator take eight modules from each edge; a version-1 symbol leaves a
-  // five-module square between them, which is exactly the smallest logo.
-  if (side > matrix.size - 2 * 8) {
-    side = matrix.size - 2 * 8;
-    if (side % 2 === 0) side -= 1;
-  }
-  const offset = quietZone + (matrix.size - side) / 2;
-  return { x: offset, y: offset, width: side, height: side };
 }

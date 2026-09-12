@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { encodeText } from './qr/encode';
-import { centredLogoBox } from './logo';
+import { centredBox } from './placement';
 import { DEFAULT_STYLE, isColour, renderScene } from './scene';
 
 describe('renderScene', () => {
@@ -71,7 +71,7 @@ describe('renderScene', () => {
 
 describe('the logo plate', () => {
   const matrix = encodeText('https://example.com/', 'H');
-  const box = centredLogoBox(matrix, 4);
+  const box = centredBox(matrix.version, 9, 4);
 
   it('is drawn over the modules, as part of the same SVG', () => {
     const svg = renderScene(matrix, DEFAULT_STYLE, 'QR code', {
