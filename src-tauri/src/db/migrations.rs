@@ -12,7 +12,10 @@ use crate::error::Result;
 /// Every migration, in order. The index plus one is the schema version it
 /// produces, so a migration can never be reordered without the compiler and the
 /// round-trip test both objecting.
-const MIGRATIONS: &[(&str, &str)] = &[("001_init", include_str!("../../migrations/001_init.sql"))];
+const MIGRATIONS: &[(&str, &str)] = &[
+    ("001_init", include_str!("../../migrations/001_init.sql")),
+    ("002_logos", include_str!("../../migrations/002_logos.sql")),
+];
 
 /// Every migration, name and SQL, in the order they apply.
 ///
@@ -88,6 +91,71 @@ mod tests {
         assert_eq!(current_version(&conn), target_version());
     }
 
+    /// The version is a number this build states, and a number a workspace
+    /// carries. A round trip has to end at the same one, from empty and from
+    /// every version in between — which is what makes a migration safe to ship
+    /// to somebody whose file is a release behind.
+    #[test]
+    fn a_workspace_at_any_earlier_version_migrates_to_this_one() {
+        assert_eq!(target_version(), 2, "F4 adds the second migration");
+
+        for stop_at in 0..=target_version() {
+            let conn = memory();
+            for (index, (_, sql)) in sources().iter().enumerate() {
+                let version = index as i64 + 1;
+                if version > stop_at {
+                    break;
+                }
+                conn.execute_batch(&format!(
+                    "BEGIN; {sql}
+                     UPDATE workspace SET schema_version = {version} WHERE id = 1; COMMIT;"
+                ))
+                .expect("apply one migration by hand");
+            }
+            assert_eq!(current_version(&conn), stop_at);
+
+            apply(&conn).expect("migrate the rest of the way");
+
+            assert_eq!(current_version(&conn), target_version());
+            let logos: i64 = conn
+                .query_row("SELECT count(*) FROM logos", [], |r| r.get(0))
+                .expect("the logos table exists at head");
+            assert_eq!(logos, 0);
+        }
+    }
+
+    /// What was in the file before the migration is still in it afterwards.
+    #[test]
+    fn migrating_keeps_what_was_already_recorded() {
+        let conn = memory();
+        let (_, first) = sources()[0];
+        conn.execute_batch(&format!(
+            "BEGIN; {first}
+             UPDATE workspace SET schema_version = 1 WHERE id = 1; COMMIT;"
+        ))
+        .expect("apply 001");
+        conn.execute(
+            "INSERT INTO verifications
+               (id, created_at, kind, decoder, verified, payload_sha256, decoded_sha256,
+                artefact_sha256, width, height, duration_ms)
+             VALUES ('kept', 't', 'export', 'rqrr 0.0.0', 1, 'aaaa', 'aaaa', 'cccc', 8, 8, 1)",
+            [],
+        )
+        .expect("record something at version 1");
+
+        apply(&conn).expect("migrate");
+
+        let kept: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM verifications WHERE id = 'kept'",
+                [],
+                |r| r.get(0),
+            )
+            .expect("read back");
+        assert_eq!(kept, 1, "a migration must not lose a row");
+        assert_eq!(current_version(&conn), 2);
+    }
+
     #[test]
     fn is_idempotent() {
         let conn = memory();
@@ -103,7 +171,7 @@ mod tests {
         let conn = memory();
         apply(&conn).expect("migrate");
 
-        for table in ["workspace", "verifications"] {
+        for table in ["workspace", "verifications", "logos"] {
             let found: i64 = conn
                 .query_row(
                     "SELECT count(*) FROM sqlite_master WHERE name = ?1",

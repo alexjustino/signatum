@@ -6,4 +6,5 @@
 //! `os`.
 
 pub mod codes;
+pub mod logos;
 pub mod system;

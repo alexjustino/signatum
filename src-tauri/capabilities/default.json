@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The capabilities the main window is granted. Every entry is here because a feature needs it. The dialog plugin may only open and save — it returns the path a person chose, and the host's own command writes that one file, after the code in it has been rendered, decoded and matched byte for byte. There is no filesystem plugin, so nothing can walk a directory, and no shell plugin, so nothing can run a program.",
+  "description": "The capabilities the main window is granted. Every entry is here because a feature needs it. The dialog plugin may only open and save — it returns the path a person chose, and the host's own command writes that one file, after the code in it has been rendered, decoded and matched byte for byte. Opening is granted because a logo has to come from somewhere: the interface never reads a file; it learns the one path a person chose in a dialog and hands it to the host's own command, which reads that file once, under the caps, normalises it before anything else sees it, and never returns the path. There is no filesystem plugin, so nothing can walk a directory, and no shell plugin, so nothing can run a program.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -14,6 +14,7 @@
     "core:window:allow-theme",
     "core:event:default",
     "log:default",
+    "dialog:allow-open",
     "dialog:allow-save"
   ]
 }

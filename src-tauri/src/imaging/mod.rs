@@ -6,12 +6,17 @@
 //! without an application running, which is the only way a gate stays honest
 //! (ADR-010, ADR-011).
 //!
-//! The split: `render` turns the SVG into PNG bytes, `decode` reads a code out
-//! of those bytes, `verify` puts the two together and says so in a sentence.
+//! The split: `render` turns the SVG into pixels, `decode` reads a code out of
+//! those bytes, `verify` puts the two together and says so in a sentence.
 //! `matrix` sits beside them for the case where the modules are already known
-//! and only the decoder's reading of them is in question.
+//! and only the decoder's reading of them is in question. `logo` normalises a
+//! file somebody was sent and `compose` draws the result onto the code —
+//! between the render and the encode, so the pixels that are decoded are the
+//! pixels that carry the logo.
 
+pub mod compose;
 pub mod decode;
+pub mod logo;
 pub mod matrix;
 pub mod render;
 pub mod verify;

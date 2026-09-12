@@ -44,15 +44,18 @@ resvg = { version = "0.45", default-features = false }
 # The decoder. Independent of the encoder by design: nothing on this side of the
 # gate shares a line of code with what drew the code (ADR-011).
 rqrr = "0.10"
-# Only to turn the PNG the host just encoded back into the grey pixels `rqrr`
-# reads. No other format is compiled in.
-image = { version = "0.25", default-features = false, features = ["png"] }
+# Two jobs: turn the PNG this host just encoded back into the grey pixels
+# `rqrr` reads, and decode a logo somebody else's file brought in. Default
+# features stay off — the four formats a logo may arrive as are named one by
+# one, and nothing else is compiled in. Every one of them is a decoder reachable
+# from a file, so dimensions are read from the header and capped before a pixel
+# is decoded (ADR-016).
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 sha2 = "0.10"
 hex = "0.4"
-
-# Only the corpus test needs these: the generated corpus carries payload and
-# module bits as base64, and nothing the product ships reads base64.
-[dev-dependencies]
+# The normalised logo reaches the screen as a `data:` URL, because the interface
+# cannot read a file and the host will not hand it a path. Already in the tree
+# for the corpus test; declared here so a release build links it too.
 base64 = "0.22"
 
 [target.'cfg(windows)'.dependencies]
@@ -82,10 +85,11 @@ strip = true
 #     └ tiny-skia                 BSD-3-Clause        (re-exported as resvg::tiny_skia)
 #   rqrr                          (MIT OR Apache-2.0) AND ISC
 #   image                         MIT OR Apache-2.0
+#     the four decoders its features compile in, none of them copyleft:
+#     └ zune-jpeg, zune-core     MIT OR Apache-2.0 OR Zlib   (jpeg)
+#     └ gif, weezl, color_quant  MIT OR Apache-2.0 / MIT     (gif)
+#     └ image-webp, quick-error  MIT OR Apache-2.0           (webp)
 #   sha2                          MIT OR Apache-2.0
 #   hex                           MIT OR Apache-2.0
-#   windows                       MIT OR Apache-2.0
-#
-# Development only, never linked into a release build:
-#
 #   base64                        MIT OR Apache-2.0
+#   windows                       MIT OR Apache-2.0
