@@ -123,3 +123,41 @@ describe('the logo plate', () => {
     ).toThrow();
   });
 });
+
+describe('shapes', () => {
+  const matrix = encodeText('https://example.com/', 'M');
+
+  it('draws the default look exactly as before the shapes existed', () => {
+    const plain = renderScene(matrix, {
+      foreground: '#000000',
+      background: '#ffffff',
+      quietZone: 4,
+    }).svg;
+    expect(renderScene(matrix).svg).toBe(plain);
+    expect(plain).toContain('shape-rendering="crispEdges"');
+    expect(plain).not.toContain('<circle');
+  });
+
+  it('draws rounded modules and dots as one path of arcs, and counts the modules the same', () => {
+    const square = renderScene(matrix);
+    const rounded = renderScene(matrix, { ...DEFAULT_STYLE, moduleShape: 'rounded' });
+    const dots = renderScene(matrix, { ...DEFAULT_STYLE, moduleShape: 'dot' });
+    expect(rounded.darkModules).toBe(square.darkModules);
+    expect(dots.darkModules).toBe(square.darkModules);
+    expect(rounded.svg).toContain('a0.28 0.28 0 0 1');
+    expect(dots.svg).toContain('a0.42 0.42 0 1 0');
+    // The timing pattern stays square: its first dark module after the finder is at (8, 6).
+    expect(dots.svg).toContain('M12 10h1v1h-1z');
+    expect(rounded.svg).toContain('shape-rendering="geometricPrecision"');
+    // The finders are drawn on their own, as squares, once the modules are shaped.
+    expect((rounded.svg.match(/<rect /g) ?? []).length).toBe(1 + 9);
+  });
+
+  it('draws the three finders rounded when asked, modestly, and never as circles', () => {
+    const rounded = renderScene(matrix, { ...DEFAULT_STYLE, finderShape: 'rounded' }).svg;
+    expect((rounded.match(/rx="0.75"/g) ?? []).length).toBe(3);
+    expect((rounded.match(/rx="0.3"/g) ?? []).length).toBe(3);
+    expect(rounded).not.toContain('<circle');
+    expect(rounded).toContain('<rect x="4" y="4" width="7" height="7" rx="0.75" fill="#000000"/>');
+  });
+});
