@@ -6,8 +6,8 @@
 //! This crate is deliberately thin. It owns four things and nothing else:
 //! storage (SQLite, migrations, the record of every verification), the scan
 //! gate (render the drawing, hand the pixels to an independent decoder, compare
-//! byte for byte), the operating system (the accent colour, and the one file a
-//! person asked to be written), and the typed command boundary. What a link is,
+//! byte for byte), the operating system (the accent colour, the clipboard, and
+//! the one file a person asked to be written), and the typed command boundary. What a link is,
 //! what a code looks like and how it is encoded are pure TypeScript in
 //! `src/domain/`, where they can be unit-tested without a window (ADR-011,
 //! ADR-012).
@@ -23,10 +23,18 @@
 //!   never passed through (ADR-016) — and is drawn onto the code *before* the
 //!   PNG is encoded, so the artefact the decoder read is the artefact with the
 //!   logo on it.
+//! - F7: the printed size. One code now leaves as four things — a PNG carrying
+//!   its resolution, an SVG carrying its logo, a PDF page of exact millimetres,
+//!   or an image on the clipboard — and every one of them passes the same gate
+//!   first. `export/` builds the bytes of the two files that are made *around*
+//!   the verified artefact; `os::clipboard` is the second thing in this crate
+//!   that talks to the system. The scan margin reports how much the artefact
+//!   survives and blocks nothing (ADR-026, ADR-027).
 
 pub mod commands;
 pub mod db;
 pub mod error;
+pub mod export;
 pub mod imaging;
 pub mod os;
 
@@ -70,6 +78,10 @@ pub fn run() {
             commands::system::accent_ramp,
             commands::codes::verify_code,
             commands::codes::export_png,
+            commands::codes::export_svg,
+            commands::codes::export_pdf,
+            commands::codes::copy_png,
+            commands::codes::scan_margin,
             commands::logos::import_logo,
             commands::logos::list_logos,
             commands::logos::logo_data_url,

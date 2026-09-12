@@ -12,11 +12,14 @@
 //! and only the decoder's reading of them is in question. `logo` normalises a
 //! file somebody was sent and `compose` draws the result onto the code —
 //! between the render and the encode, so the pixels that are decoded are the
-//! pixels that carry the logo.
+//! pixels that carry the logo. `margin` asks the decoder the other question,
+//! nine times over: how much shrinking, blurring and recompression the verified
+//! artefact survives. That one is a report and never a gate (ADR-027).
 
 pub mod compose;
 pub mod decode;
 pub mod logo;
+pub mod margin;
 pub mod matrix;
 pub mod render;
 pub mod verify;
