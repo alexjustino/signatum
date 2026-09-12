@@ -114,6 +114,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Logos you have used.** Imported logos stay in the workspace and are offered as a row of
   thumbnails, so the second code does not need the file again. Taking a logo out of a code
   deletes it, because a logo nobody is using is a file this product has no reason to keep.
+- **The logo's size now comes from the code itself.** How much of a QR code a logo may cover is
+  not a matter of taste: a code carries a fixed amount of error correction, and a logo spends it.
+  The engine counts, before anything is drawn, exactly how many of the code's data pieces the
+  logo would take from each block of error correction, and allows the largest centred square that
+  stays inside that budget — with a deliberate margin left over, four tenths of what the code
+  could correct, kept back for the things nobody controls: a smudged print, a bad angle, a cheap
+  camera, a phone held at arm's length. The result is a logo smaller than a design tool would
+  draw, and one the code can actually afford.
+- **It never covers a part of the code that cannot be lost.** A QR code is not uniform. The three
+  squares in its corners, the lines of alternating modules between them, the small squares that
+  keep large codes from drifting, and the strip that says which error-correction level and mask
+  the code uses are not data — a decoder needs them to find and read the code at all, and error
+  correction does not cover them. The engine knows where every one of them sits, on all forty
+  sizes of code, and the logo stops before it reaches one. The single exception is the small
+  alignment square that some sizes of code place exactly in the middle, where a centred logo
+  cannot avoid it; that one is allowed to go under the logo, because refusing it would push the
+  code to a much larger size for the sake of the smallest pattern on it. It is written down as a
+  decision still to be confirmed against real phone cameras, and it can be switched off.
+- **The modules under the logo are cleared, whole ones only.** Rather than the image being laid
+  over the pattern and the edges falling where they fall, the modules the logo covers are cleared
+  out of the code first. No half module survives at the border of the plate to be read as a
+  smudge, and no clipped module accidentally forms a shape that looks like part of the code.
+- **The pattern is chosen again with the logo in place.** Every QR code is drawn through one of
+  eight interchangeable patterns, and the encoder picks the one that gives the cleanest-looking
+  code — large blank areas and misleading shapes are what make a code slow to scan. That choice
+  is now made after the logo's modules have been cleared, on the code as it will really be
+  printed, instead of on a code that no longer exists.
+- **The level and the size of the code are chosen for the logo.** With a logo, the code is built
+  at the strongest error correction the content allows, dropping one step only when the content
+  will not otherwise fit, and never at the smallest size of code, which has no room to give.
+- **A logo that will not fit is refused, and says why.** Not shrunk quietly until it does. The
+  refusal names the cause in a sentence a person can act on: either it would reach a pattern the
+  code cannot lose, or it is over the budget — by how many pieces, against how many that level
+  can spare.
+- **Smaller by choice, never larger.** The largest size the budget allows is what is offered, and
+  a smaller logo can be asked for. There is no way to ask for a bigger one.
 - **The application shell.** Four destinations — Create, Diagnostics, Settings and About — in
   the Windows 11 visual language, following the accent colour chosen for the desktop, in light
   or dark by choice or by the system. The theme is remembered between sessions.

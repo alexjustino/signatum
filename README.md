@@ -79,11 +79,27 @@ exported file is those same bytes. A plate — none, square, rounded or circle �
 itself rather than a decoration over it, and a code with a logo is encoded at the strongest error
 correction the standard offers.
 
-What it does not do yet: the logo is a fixed fifth of the code, centred, until the placement engine
-lands and works out how large it may really be; no colours or shapes to choose; a fixed 1024-pixel
-square rather than a physical size; PNG and nothing else; and no code is saved — close the window
-and the code is gone, though the logos imported stay in the workspace. Those are the slices that
-follow.
+F5 has worked out how large the logo may really be, and it is arithmetic rather than taste. A QR
+code carries a fixed amount of error correction, and a logo spends it: the engine counts, before
+anything is drawn, how much of that budget a given size would cost the worst-affected block, and
+allows the largest centred square that stays within it — keeping four tenths of what the code could
+correct in reserve for the smudged print, the bad angle and the cheap camera. It knows where every
+part of a code that cannot be lost sits, on all forty sizes — the corner squares, the timing lines,
+the alignment squares, the strip that says how the code was drawn — and stops before reaching one.
+The modules the logo covers are cleared, whole ones only, so no half module survives at the edge of
+the plate; the pattern the code is drawn through is then chosen again, on the code as it will
+really be printed; and the error-correction level and the size of the code are chosen for the logo,
+never the smallest code and never weaker than the content forces. A logo that will not fit is
+refused with the reason — which pattern it would reach, or by how much it is over the budget —
+rather than quietly shrunk, and a smaller logo can be asked for, never a larger one. One decision
+in it is not yet settled and is written down as such: the small alignment square that some sizes of
+code place exactly in the middle is allowed to go under the logo, because refusing it would push
+the code to a far larger size, and whether real phone cameras agree is proved with two phones
+before it is accepted.
+
+What it does not do yet: no colours or shapes to choose; a fixed 1024-pixel square rather than a
+physical size; PNG and nothing else; and no code is saved — close the window and the code is gone,
+though the logos imported stay in the workspace. Those are the slices that follow.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 

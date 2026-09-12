@@ -127,9 +127,10 @@ the export command write the file — and it writes the bytes it verified, not a
 verifier built from the same code as the encoder would share its mistakes; independence is the
 point.
 
-**The placement engine** (ADR-013): the logo is a region of the matrix, not an image on top.
-The engine knows every function pattern — the three finders and their separators, timing, the
-alignment patterns, format and version information, the dark module — and **never covers one**.
+**The placement engine** (ADR-013; the middle alignment pattern, ADR-024): the logo is a region
+of the matrix, not an image on top. The engine knows every function pattern — the three finders
+and their separators, timing, the alignment patterns, format and version information, the dark
+module — and **never covers one**, with the single exception that second record names.
 It sizes the logo from the error-correction budget with a safety factor, knocks out the covered
 modules so no half-module shows at the edge of the plate, re-evaluates the mask with the knock-out
 in place, and raises the error-correction level if the logo needs it. A logo that cannot fit is
