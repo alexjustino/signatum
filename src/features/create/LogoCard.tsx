@@ -5,12 +5,15 @@ import { useState } from 'react';
 import { describeError } from '@/data/errors';
 import { useDeleteLogo, useImportLogo, useLogoDataUrl, useLogos } from '@/data/hooks';
 import { logoDataUrl, type LogoInfo } from '@/data/logos';
-import type { Plate } from '@/domain/logo';
+import { describePlan } from '@/domain/describe';
+import { LOGO_SIZE_LABELS, LOGO_SIZES, type LogoSize, type Plate } from '@/domain/logo';
+import type { Plan } from '@/domain/placement';
 import { announce } from '@/ui/announce';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
 import { InfoBar } from '@/ui/InfoBar';
 import { LogoPlatePicker } from '@/ui/LogoPlatePicker';
+import { Select } from '@/ui/Select';
 
 /**
  * The logo, chosen and shown (SPEC §2.4, F4).
@@ -34,14 +37,26 @@ const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
 /**
  * A plate under the logo by default: a code reads better when the logo does not
  * sit straight on the modules, and "None" is one keystroke away for anybody who
- * wants it. F5 turns this into a budget the placement engine argues about.
+ * wants it.
  */
 const DEFAULT_PLATE: Plate = 'square';
+
+/**
+ * As large as the code can carry, by default.
+ *
+ * "Largest" is not a gamble: it is the biggest box the error-correction budget
+ * allows with a safety margin the placement engine keeps back for print and
+ * camera, so the default is both the most useful logo and one the engine has
+ * already argued for. The smaller sizes are there for a person who wants less
+ * of their code covered — smaller by choice, never larger (SPEC §2.2).
+ */
+const DEFAULT_SIZE: LogoSize = 'largest';
 
 /** The logo the editor is using, and how it is set into the code. */
 export interface ChosenLogo {
   info: LogoInfo;
   plate: Plate;
+  size: LogoSize;
 }
 
 /** A problem worth a sentence: the host's refusal, or a read that did not happen. */
@@ -53,12 +68,25 @@ interface Problem {
 export function LogoCard({
   logo,
   onLogo,
+  plan,
 }: {
   logo: ChosenLogo | null;
   onLogo: (logo: ChosenLogo | null) => void;
+  /**
+   * What the placement engine decided about the code on screen, so that the
+   * card can say it in one line. It is read, never acted on: the size asked for
+   * lives here, the size granted is the engine's answer.
+   */
+  plan: Plan | null;
 }) {
   const [problem, setProblem] = useState<Problem | null>(null);
   const [adopting, setAdopting] = useState(false);
+
+  // What the engine made of the choice, as a sentence: the level and version it
+  // needed, and what the logo costs against what a block can spare. It is the
+  // one place a person can see that "Largest" was a decision rather than a
+  // guess — and it is the domain's words, not this card's.
+  const planLine = plan === null ? null : describePlan(plan);
 
   const logos = useLogos();
   const { mutateAsync: importFile, isPending: importing } = useImportLogo();
@@ -75,7 +103,7 @@ export function LogoCard({
       if (path === null) return;
 
       const info = await importFile(path);
-      onLogo({ info, plate: DEFAULT_PLATE });
+      onLogo({ info, plate: DEFAULT_PLATE, size: DEFAULT_SIZE });
       announce(`${info.name} is in the middle of the code; it is being checked again.`);
     } catch (error) {
       setProblem({ title: 'This logo cannot be used', text: describeError(error) });
@@ -88,7 +116,7 @@ export function LogoCard({
     setAdopting(true);
     try {
       const dataUrl = bytes ?? info.dataUrl ?? (await logoDataUrl(info.id));
-      onLogo({ info: { ...info, dataUrl }, plate: DEFAULT_PLATE });
+      onLogo({ info: { ...info, dataUrl }, plate: DEFAULT_PLATE, size: DEFAULT_SIZE });
       announce(`${info.name} is in the middle of the code; it is being checked again.`);
     } catch (error) {
       setProblem({ title: 'That logo could not be opened', text: describeError(error) });
@@ -169,6 +197,24 @@ export function LogoCard({
             onChange={(plate) => onLogo({ ...logo, plate })}
             disabled={deleting}
           />
+
+          <label className="flex flex-col gap-1">
+            <span className="text-caption font-semibold text-fg-secondary">Size</span>
+            <Select
+              aria-label="Size"
+              value={logo.size}
+              disabled={deleting}
+              onChange={(event) => onLogo({ ...logo, size: event.target.value as LogoSize })}
+            >
+              {LOGO_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {LOGO_SIZE_LABELS[size]}
+                </option>
+              ))}
+            </Select>
+          </label>
+
+          {planLine !== null && <p className="text-caption text-fg-secondary">{planLine}</p>}
 
           <div>
             <Button appearance="subtle" disabled={deleting} onClick={() => void remove()}>
