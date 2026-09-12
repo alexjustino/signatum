@@ -30,7 +30,8 @@ import {
 } from '@/domain/payload';
 import { planCode, type Plan } from '@/domain/placement';
 import type { Ecl } from '@/domain/qr/encode';
-import { DEFAULT_STYLE, renderScene } from '@/domain/scene';
+import { renderScene, type Style } from '@/domain/scene';
+import { checkContrast } from '@/domain/style';
 import { announce } from '@/ui/announce';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -42,6 +43,7 @@ import { TabStrip } from '@/ui/TabStrip';
 
 import { PayloadFields } from './forms/PayloadFields';
 import { LogoCard, type ChosenLogo } from './LogoCard';
+import { LookCard, type EclFloor } from './LookCard';
 
 /**
  * Create: what a person wants the code to do becomes a code, and the code is
@@ -63,15 +65,15 @@ import { LogoCard, type ChosenLogo } from './LogoCard';
 const PIXEL_SIZE = 1024;
 
 /**
- * The error-correction level for a code with nothing in the middle of it. `M`
- * is the ordinary choice.
+ * The error-correction level for a code with nothing in the middle of it, when
+ * nobody has asked for more. `M` is the ordinary choice.
  *
  * A code that carries a logo is not decided here at all: the placement engine
  * starts at `H`, the highest, because something is about to cover modules the
  * decoder still has to do without, and falls back to `Q` only when the content
- * will not fit at `H` (spec §2.4). The choice is automatic and only upward —
- * a person is never asked to trade away the thing that makes their code
- * survive the logo.
+ * will not fit at `H` (spec §2.4). What a person may choose in the Look card is
+ * a *floor*, never a ceiling — the engine's own choice can only be raised, so
+ * nobody can trade away the thing that makes their code survive the logo.
  */
 const ECL: Ecl = 'M';
 
@@ -154,13 +156,22 @@ interface Written {
  * and would make a verdict about one of them look like a verdict about the
  * other. The identity the window compares is therefore the code *and* what is
  * being drawn into the middle of it.
+ *
+ * The look is named in the key as well as carried by the SVG. A code that
+ * changed colour or shape is a different artefact — a decoder that read the
+ * black one has said nothing about the blue one — and saying so here means the
+ * gate cannot be left showing yesterday's verdict beside today's look, whatever
+ * a future scene does with the markup.
  */
-function artefactKey(svg: string, placement: LogoPlacement | null): string {
+function artefactKey(svg: string, placement: LogoPlacement | null, style: Style): string {
   const logo =
     placement === null
       ? 'no logo'
       : `${placement.id}@${placement.x},${placement.y},${placement.width}x${placement.height}`;
-  return `${logo}\n${svg}`;
+  const look =
+    `${style.foreground} on ${style.background}, quiet zone ${style.quietZone}, ` +
+    `${style.moduleShape ?? 'square'} modules, ${style.finderShape ?? 'square'} finders`;
+  return `${logo}\n${look}\n${svg}`;
 }
 
 /**
@@ -187,9 +198,34 @@ interface CreatePageProps {
    */
   logo: ChosenLogo | null;
   onLogo: (logo: ChosenLogo | null) => void;
+  /**
+   * The look, which belongs to the editor for the same reason the logo does: a
+   * person who set their brand colours set them for their codes, not for one
+   * link. It lives in the shell and survives a change of kind.
+   */
+  style: Style;
+  onStyle: (style: Style) => void;
+  /**
+   * The lowest error-correction level the person will accept, or `undefined`
+   * while the engine decides (SPEC §2.4). It is handed to the placement engine
+   * as a floor — never as the level, which stays the engine's to raise.
+   */
+  ecl: EclFloor | undefined;
+  onEcl: (ecl: EclFloor | undefined) => void;
 }
 
-export function CreatePage({ kind, onKind, form, onForm, logo, onLogo }: CreatePageProps) {
+export function CreatePage({
+  kind,
+  onKind,
+  form,
+  onForm,
+  logo,
+  onLogo,
+  style,
+  onStyle,
+  ecl,
+  onEcl,
+}: CreatePageProps) {
   const result = useMemo(() => buildPayload(form), [form]);
   const payload = result.ok ? result.payload : null;
 
@@ -205,28 +241,48 @@ export function CreatePage({ kind, onKind, form, onForm, logo, onLogo }: CreateP
     if (logo === null) {
       return planCode(result.payload, {
         logo: false,
-        ecl: ECL,
-        quietZone: DEFAULT_STYLE.quietZone,
+        // Without a logo the floor is the level, and `M` is the ordinary
+        // choice for a code with nothing covering it.
+        ecl: ecl ?? ECL,
+        quietZone: style.quietZone,
       });
     }
     const fraction = logoFraction(logo.size);
     return planCode(result.payload, {
       logo: true,
-      quietZone: DEFAULT_STYLE.quietZone,
+      quietZone: style.quietZone,
       padding: PLATE_PADDING,
+      // Left out when nobody chose one: the engine starts at H with a logo and
+      // never goes below Q, and a floor passed here can only raise that.
+      ...(ecl === undefined ? {} : { ecl }),
       // Left out rather than passed as nothing: "Largest" is the absence of a
       // limit, and the engine reads a missing share as "as large as the budget
       // allows".
       ...(fraction === undefined ? {} : { fraction }),
     });
-  }, [result, logo]);
+  }, [result, logo, style.quietZone, ecl]);
 
   /**
-   * The plan's refusal, when there is one. It is a verdict about the code
-   * before any decoder is asked — there is no artefact to decode — and it is
-   * the only thing this screen says about that code.
+   * Whether the two colours are far enough apart, and the right way round, for
+   * a camera to read the code at all. It is a rule about ink rather than about
+   * bytes, so it is decided in the domain and asked before the decoder is: a
+   * look that no camera can read has nothing worth rasterising.
    */
-  const refusal = plan !== null && !plan.ok ? plan.reason : null;
+  const contrast = checkContrast(style);
+  // The verdict is a fresh object every render; the answer it carries is not,
+  // and it is the answer the scene depends on.
+  const contrastOk = contrast.ok;
+
+  /**
+   * The refusal, when there is one: the plan's, or the look's. It is a verdict
+   * about the code before any decoder is asked — there is no artefact to decode
+   * — and it is the only thing this screen says about that code.
+   */
+  const planRefusal = plan !== null && !plan.ok ? plan.reason : null;
+  // The look is only refused once there is a code for it to be the look of: a
+  // reason shown over an empty form is a telling-off rather than help.
+  const lookRefusal = plan !== null && !contrast.ok ? contrast.reason : null;
+  const refusal = planRefusal ?? lookRefusal;
   const box = plan !== null && plan.ok ? plan.box : null;
 
   /** What the figure is called, and what the exported SVG carries as its title. */
@@ -237,19 +293,25 @@ export function CreatePage({ kind, onKind, form, onForm, logo, onLogo }: CreateP
   // once. A preview rendered from anything else would be a picture of a
   // different code. The matrix is the plan's own, with the modules under the
   // plate already knocked out, so no half-module shows at the logo's edge.
+  //
+  // A look the contrast rule refused is not drawn at all: a picture of a code
+  // no camera can read is a promise this product does not make, and the reason
+  // is said where every other refusal is said.
   const scene = useMemo(() => {
-    if (plan === null || !plan.ok) return { svg: null, side: null, failure: null };
+    if (plan === null || !plan.ok || !contrastOk) return { svg: null, side: null, failure: null };
     try {
       const rendered = renderScene(
         plan.matrix,
-        DEFAULT_STYLE,
+        style,
         name,
         logo !== null && plan.box !== null
           ? {
               box: plan.box,
               plate: logo.plate,
               padding: PLATE_PADDING,
-              colour: DEFAULT_STYLE.background,
+              // The plate is the background: a logo sits in a clearing of the
+              // colour the code is printed on, not of a colour nobody chose.
+              colour: style.background,
             }
           : undefined,
       );
@@ -261,7 +323,7 @@ export function CreatePage({ kind, onKind, form, onForm, logo, onLogo }: CreateP
         failure: error instanceof Error ? error.message : 'This could not be made into a code.',
       };
     }
-  }, [plan, logo, name]);
+  }, [plan, logo, name, style, contrastOk]);
   const svg = scene.svg;
 
   // The placement, in the shape the host takes. It is the plan's own box, so
@@ -272,7 +334,7 @@ export function CreatePage({ kind, onKind, form, onForm, logo, onLogo }: CreateP
     () => (logo === null || box === null ? null : { id: logo.info.id, ...box }),
     [logo, box],
   );
-  const artefact = svg === null ? null : artefactKey(svg, placement);
+  const artefact = svg === null ? null : artefactKey(svg, placement, style);
 
   // How small the modules come out at the size this version prints at. It is
   // about the code on screen, not about the kind or the payload length, so it
@@ -411,6 +473,8 @@ export function CreatePage({ kind, onKind, form, onForm, logo, onLogo }: CreateP
           )}
 
           <LogoCard logo={logo} onLogo={onLogo} plan={plan} />
+
+          <LookCard style={style} onStyle={onStyle} ecl={ecl} onEcl={onEcl} />
         </div>
 
         <div className="flex flex-col gap-4">
