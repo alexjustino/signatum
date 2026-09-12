@@ -54,6 +54,11 @@ seriously.
   the screen says so; the name decides nothing and is used for that sentence alone. A file's name
   is also never a path: it is reduced to a label before it is stored, and a name Windows reserves
   is refused.
+- **The scene is serialised, never assembled from strings the person typed.** The SVG the window
+  shows and the host rasterises is built by the domain from booleans and numbers; a colour has to
+  be a six-digit hex value before it reaches the markup, and the one text inside it — the title
+  that names what the code does — is escaped for XML. The scene carries no script, no reference
+  and no image; the logo is composed by the host from its own stored bytes.
 - **Payloads are escaped to their format.** vCard, MECARD and Wi-Fi each have reserved
   characters, and a name with a semicolon must not become a second field. In a `mailto:` the name
   before the @ is percent-encoded exactly as the subject and the body are, so a `?` inside an

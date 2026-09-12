@@ -150,6 +150,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   can spare.
 - **Smaller by choice, never larger.** The largest size the budget allows is what is offered, and
   a smaller logo can be asked for. There is no way to ask for a bigger one.
+- **The code's two colours, and a gate that says when they will not do.** A code no longer has to
+  be black on white: both colours can be chosen, and they are the colours of the print rather than
+  of the application's theme — identical in a light window and a dark one, because paper has no
+  theme. Before the code is built, the pair is measured the way accessibility measures text against
+  its background, and a pair that is too close is refused with the contrast it reached and the 4.5
+  a camera needs. A code lighter than the plate it sits on is refused as well, however strong the
+  contrast: phone cameras look for a dark code on a light background, and several will not turn the
+  picture over to find one. Both refusals arrive while the look is being chosen — a sentence about
+  the colours, rather than a failed verification afterwards with nothing to point at.
+- **Rounded modules, dots, and softened finders.** The little squares a code is made of can be
+  drawn square, with softened corners, or as separate dots, and the three large squares in the
+  corners can have their corners softened too — modestly, because the decoder that checks every
+  code finds the grid by those corners, and a ring rounded further, or a circle, is a code it
+  cannot read. What it cannot read is not offered. What does not change shape is the part a camera
+  navigates by: the lines of alternating modules between the corners, the small alignment squares,
+  the strip that records how the code was drawn. A scanner finds the grid by measuring those runs,
+  and a row of dots is not a run — so they stay square whatever the rest of the code looks like.
+  Every one of the nine combinations of module and corner shape is drawn, rasterised and read back
+  by an independent decoder on every run of the test suite, and a code nobody restyled is drawn
+  exactly as it was before, to the byte.
+- **The blank margin around the code, and a warning where it stops working.** The standard asks for
+  four modules of clear space on every side, which is what a code is given. Ask for less and the
+  screen says that under four modules is where most scans fail; ask for none and it says a camera
+  needs a blank margin to find the code at all. It is a warning and never a refusal — somebody who
+  knows the page the code is going onto may have a reason — and what decides whether a code may
+  leave is still the decoder that reads it back.
 - **The application shell.** Four destinations — Create, Diagnostics, Settings and About — in
   the Windows 11 visual language, following the accent colour chosen for the desktop, in light
   or dark by choice or by the system. The theme is remembered between sessions.

@@ -30,6 +30,7 @@ part that matters most later — the cost we accepted.
 | [022](#adr-022) | Three card formats, and a density warning at a nominal size                      | Accepted                      |
 | [023](#adr-023) | The logo is composed by the host into the bytes the gate decodes                 | Accepted                      |
 | [024](#adr-024) | The middle alignment pattern may sit under the plate                             | Proposed                      |
+| [025](#adr-025) | A look is gated before the scan gate, and function patterns are never reshaped   | Accepted                      |
 
 ---
 
@@ -834,3 +835,91 @@ flips, every code on those twenty versions jumps to the next free version and it
 smaller at the same printed size — which the module-size warning ([ADR-015](#adr-015)) then has
 to say out loud, because somebody who printed at 25 mm yesterday is printing denser modules
 today.
+
+## ADR-025 — A look is gated before the scan gate, and function patterns are never reshaped {#adr-025}
+
+**Status: Accepted.**
+
+**Context.** A look is where somebody's taste meets a camera's tolerance, and both colours and
+shapes can produce a code that is perfectly legible to a rasteriser and not to a phone. Grey on a
+lighter grey separates at full precision in a clean raster and disappears under a restaurant's
+lighting. A light code on a dark plate is something the encoder is entirely happy to draw and most
+cameras will not look for. A grid of dots is still a grid of modules to a decoder given the grid —
+but finding the grid is the part that comes first. [ADR-010](#adr-010) already says nothing leaves
+that a decoder did not read back; the difficulty is that the gate answers about one artefact under
+laboratory conditions (SPEC §9, R2), and it answers late — by then the person has chosen a look and
+has no way of knowing which part of it was the mistake.
+
+**Decision.** Three rules, all of them in the domain — `src/domain/style.ts` and
+`src/domain/scene.ts` — and all of them decided before the host is asked for anything.
+
+1. **Colours pass a contrast gate before the code is built.** The two print colours must be at
+   least `MIN_CONTRAST = 4.5` apart on the WCAG 2 contrast ratio, computed from sRGB relative
+   luminance, and the code must be the darker of the two. A look that fails is refused, in the
+   domain, with a sentence that names which of the two rules it broke and, for contrast, the ratio
+   it reached against the one it needed. Nothing is rasterised, nothing is decoded, nothing is
+   offered for export.
+2. **Shapes apply to data modules, and never to the patterns a decoder navigates by.** A module
+   shape (square, rounded, dot) is drawn for data modules only; the three finder patterns take
+   their own shape (square, or rounded with a corner radius of 0.75 module on the ring) and are
+   drawn as three opaque shapes each — the ring in the code colour, the gap in the plate colour,
+   the heart in the code colour — so that a rounded finder is a finder and not a decorated
+   square. A circular finder is not offered, and the rounding is modest, on measurement: the
+   host's decoder derives the grid's perspective from the finder's corners, and against it a ring
+   rounded past a radius of one module reads at no size, a circle at none — every module shape
+   read at every size. A shape the gate would never let out is not a choice. The timing patterns, the
+   alignment patterns, the format information and the version information stay square whatever the
+   data modules are, taken from the same function-pattern map the placement engine uses
+   ([ADR-013](#adr-013)) — asked for without the exception [ADR-024](#adr-024) grants that engine,
+   because where a plate is allowed over the middle alignment pattern those modules are gone
+   already, and where there is no plate the pattern is drawn square like every other.
+3. **A quiet zone under four modules is a warning, not a refusal.** Four is the number the
+   standard asks for and the number the product defaults to; under it the domain returns a sentence
+   — a different one when there is no quiet zone at all — and the code is still built.
+
+**Why 4.5.** It is the threshold WCAG sets for text a person has to read, and it is used here as a
+floor rather than as a target: a camera has to separate the two colours _and_ find the grid in
+them, at an angle, at a distance, in whatever light the code was printed into. A threshold known to
+be barely enough for a reader who can lean closer is a reasonable minimum for a reader who cannot.
+Choosing a number of our own would have meant defending it with a proof this repository cannot
+produce; choosing the one the accessibility world already defends means the number can be looked up.
+
+**Why inverted is refused rather than warned.** Most phone cameras binarise the image expecting a
+dark code on a light plate, and several will not attempt a symbol in the other polarity at all —
+including, on some releases, the default camera applications the phone matrix is run against. The
+ratio can be 21:1 and the code still unscannable, which is precisely the case a contrast number
+cannot express, so it is a separate rule with its own sentence.
+
+**Why the function patterns stay square.** A decoder locates the symbol by the three finders, takes
+the grid's origin and pitch from the alternating runs of the timing patterns, refines it on the
+alignment patterns, and reads the format information beside the finders before it reads any data. A
+run of alternating dark and light modules is what those patterns _are_: a row of dots is a row of
+separated discs, with light between every one of them, and a sampler measuring a period on it
+measures the wrong thing. Reshaping them is the one part of a stylised code that attacks the step
+before error correction exists — nothing can be corrected if the grid was never found. Data
+modules, by contrast, are sampled at their centres, which is where a rounded corner or a dot puts
+the ink. The default look is unchanged by all of this: with square modules and square finders the
+scene is byte-identical to the one the product has written since its first slice, down to the
+`shape-rendering` hint, which only becomes `geometricPrecision` when something was actually shaped.
+Every one of the nine combinations of module and finder shape is rasterised and read back by a
+decoder of a different lineage in the rule tests, and the export is verified by the host's decoder
+like any other code.
+
+**Cost accepted: a look the gate would have passed is refused by policy.** A ratio of 4.0 will
+scan, at a sensible size, on a clean print — and this product will not build it. The gate is a
+policy applied to the whole population of codes rather than a verdict about one of them, and a
+policy is blunt by construction. It is paid deliberately: the alternative is a warning that people
+learn to click past, on the one decision whose consequences show up only after printing. The number
+sits in one constant, next to the reason it was chosen, so raising or lowering it later is one
+change, argued once, and a superseding record.
+
+**Cost accepted: a white logo on a white plate is not detected here.** SPEC §6 lists it among the
+mandatory negative cases, and F6 does not answer it. The plate is the background colour by design —
+that is what makes a mark sit clear of the modules instead of on top of them — so a white-on-white
+logo is not a contrast defect in the code's colours, and the scan gate is unaffected either way:
+the modules under the plate were knocked out before anything was drawn ([ADR-013](#adr-013)), and
+the code verifies with or without a visible mark. What is invisible is the logo, and the logo's own
+colours are the host's knowledge, not the domain's — the domain never sees the image bytes
+([ADR-023](#adr-023)). The case therefore belongs where a code is judged as a picture rather than as
+a payload: the Read screen in F10, which already has to say what it sees in an image somebody
+photographed. Written down here so that the gap is a decision and not an oversight.

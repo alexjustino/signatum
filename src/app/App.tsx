@@ -3,10 +3,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { applyAccent, applyTheme, readStoredTheme, storeTheme } from '@/app/theme';
 import { fetchAccentRamp } from '@/data/system';
 import { emptyForm, PAYLOAD_KINDS, type PayloadForm, type PayloadKind } from '@/domain/payload';
+import { DEFAULT_STYLE, type Style } from '@/domain/scene';
 import type { ThemeChoice } from '@/domain/settings';
 import { AboutPage } from '@/features/about/AboutPage';
 import { CreatePage } from '@/features/create/CreatePage';
 import type { ChosenLogo } from '@/features/create/LogoCard';
+import type { EclFloor } from '@/features/create/LookCard';
 import { DiagnosticsPage } from '@/features/diagnostics/DiagnosticsPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { DESTINATION_LABELS, type Destination } from '@/features/shell/destinations';
@@ -45,6 +47,15 @@ export function App() {
   // chose it for their codes, so it survives a change of kind the way the theme
   // survives a change of screen.
   const [logo, setLogo] = useState<ChosenLogo | null>(null);
+  // The look lives here for the same reason: a person who set their colours set
+  // them for their codes, so they survive a change of kind and a trip to
+  // Settings. It starts as the default one — black on white, square, with the
+  // quiet zone the standard asks for.
+  const [style, setStyle] = useState<Style>(DEFAULT_STYLE);
+  // The error-correction floor sits beside the style rather than inside it: the
+  // style is the scene's, and the scene draws a matrix it is never asked to
+  // choose the level for. Absent is "let the engine decide".
+  const [ecl, setEcl] = useState<EclFloor | undefined>(undefined);
   useEffect(() => {
     applyTheme(theme);
     void fetchAccentRamp()
@@ -83,6 +94,10 @@ export function App() {
               onForm={editDraft}
               logo={logo}
               onLogo={setLogo}
+              style={style}
+              onStyle={setStyle}
+              ecl={ecl}
+              onEcl={setEcl}
             />
           )}
           {destination === 'diagnostics' && <DiagnosticsPage />}
