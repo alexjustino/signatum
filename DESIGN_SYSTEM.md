@@ -283,10 +283,10 @@ before** — a primitive built ahead of the screen that needs it is a guess with
   **the export button's gate, not a decoration**: it owns that button's disabled state, it sits
   beside it, and it is announced when it changes. It never shows a state that did not come back
   from a decoder.
-- **The physical-size input** (`PhysicalSizeInput`, F7) — a measurement with its unit,
-  millimetres or inches, the unit inside the control rather than a label beside it, and the
-  **module size read out** beneath it in the same unit. It takes the caution state when the
-  modules fall under the readable threshold, and names the threshold when it does.
+- **The size card** (F7) — not a primitive: a width `Input`, a unit `Select` and a resolution
+  `Select`, composed from the canonical controls, with the **pixels and the module size read out**
+  beneath them in a caption. A width or resolution the domain refuses is named under the control
+  it names, and the dense-code caution keeps naming the threshold from the real printed size.
 - **The logo plate picker** (`LogoPlatePicker`, F4) — the plate shape (none, square, rounded,
   circle), as one control. Every option is reachable and named by keyboard, and the shape is
   never carried by the swatch alone: "Circle" is a word before it is a picture. **Present today

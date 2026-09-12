@@ -64,8 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   small the modules would be at a nominal 25 mm and warns below half a millimetre, where most
   phone cameras stop resolving them at arm's length. It is a warning and never a refusal: the
   printed size is the person's to choose, and what decides whether a code may leave is still the
-  decoder that reads it back. Until the export screen makes the physical size something to choose,
-  25 mm is the size assumed, and the sentence says so.
+  decoder that reads it back. The size the sentence is about is the one chosen on the screen — see
+  _the size is the size it will be printed at_, below.
 - **The Wi-Fi password is carried in the clear, and the screen says so where it is typed.**
   Beneath the password field, in plain words: a saved code keeps this password in the clear on
   this machine. Choose an open network and the field is disabled, and says the code will not carry
@@ -176,6 +176,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   needs a blank margin to find the code at all. It is a warning and never a refusal — somebody who
   knows the page the code is going onto may have a reason — and what decides whether a code may
   leave is still the decoder that reads it back.
+- **The size is the size it will be printed at.** A code is no longer a square of pixels: it is
+  designed for a width on paper — millimetres or inches, from 5 mm to a metre — at a chosen
+  resolution, and every number that follows comes from those two. The screen says how many pixels
+  that is and how wide one module comes out on paper, so the density warning is now about the size
+  the code is actually going to be printed at rather than an assumed 25 mm. A 25 mm code at 300 dpi
+  is 295 pixels square, and it is 25 mm wide in every file that leaves.
+- **Four ways out, and every one of them verified first.** A **PNG** with the resolution written
+  into the file, so the file states its own physical size instead of leaving it to whatever opens it
+  next. An **SVG** at the printed size, carrying the logo, for a layout tool — the same drawing the
+  decoder read, with its width and height in millimetres and nothing else changed. A **PDF** whose
+  page is exactly the size asked for, with the verified image on it edge to edge, which is the
+  answer for a printer. And the **clipboard**, for the code that is going straight into a document.
+  Nothing is rendered a second time between the verdict and the file: what a decoder read back is
+  what is written, and where that could not be literally true — a vector file has no pixels to read
+  — it is written down rather than glossed over.
+- **The clipboard gets the picture, never the text.** Copy puts the verified image on the
+  clipboard and never the payload behind it, because a payload on the clipboard is a paste into the
+  wrong window — into the message somebody was writing, or into a terminal.
+- **How much abuse the code can take, reported and never enforced.** After a code is verified, the
+  same picture is shrunk to half, a third and a quarter of its size, blurred by one, two and three
+  pixels, and squeezed through JPEG at three qualities — and each of the nine is handed back to the
+  decoder. The screen says which of them still read. It is a report and never a gate: it does not
+  block an export and does not change the verdict, because what the gate answers is _does this file
+  read_ and what the margin answers is _how much is left before it does not_ — and a person
+  printing on a menu, a bottle or a bus shelter is the one who knows which of the nine matters.
 - **The application shell.** Four destinations — Create, Diagnostics, Settings and About — in
   the Windows 11 visual language, following the accent colour chosen for the desktop, in light
   or dark by choice or by the system. The theme is remembered between sessions.

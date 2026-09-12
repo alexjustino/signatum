@@ -85,6 +85,14 @@ seriously.
   read and written **only** through paths the person chose in a system dialog; nothing in the
   product enumerates a directory or follows a path it was not handed. Shell execution is not
   granted.
+- **What leaves is an image, and it lands only where a dialog said.** Copying a code puts the
+  **verified image** on the clipboard and never the payload text: a payload on the clipboard is a
+  paste into the wrong window — into the message somebody was writing, or into a terminal — and
+  nothing about a code needs the clipboard to carry it as text. An export writes only through the
+  path a save dialog produced, and the SVG and the PDF (F7) join the PNG under the same three
+  checks the host already applies: the path came from the dialog, its extension is the kind being
+  written, and it is on a local drive — a network path is refused. The bytes written are always a
+  code that read back (ADR-010, ADR-026).
 
 ### What the tests must refuse
 
@@ -112,9 +120,11 @@ can. The database is not encrypted at rest. Full-disk encryption (BitLocker) pro
 rest; nothing protects it from a process running as you.
 
 A compromised interface — a poisoned front-end dependency, say — could ask the host to write a
-verified code over any `.png` on a local drive, because the host trusts the path the interface
-hands it after the save dialog. It cannot make the host write anywhere else: the path has to be
-a local `.png`, never a network path, and the bytes are always a code that read back. The same
+verified code over any file on a local drive whose extension is one this product writes (`.png`,
+and `.svg` and `.pdf` from F7), because the host trusts the path the interface hands it after the
+save dialog. It cannot make the host write anywhere else: the path has to be local and to carry
+the extension of the kind being written, never a network path, and the bytes are always a code
+that read back. The same
 interface could ask the host to read any one file on a local drive as a logo, because the open
 dialog hands it a path and the host reads the path it is given: it is read once, under the size
 cap, normalised, and what comes back is an image or a sentence. A network path is refused on

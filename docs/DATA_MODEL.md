@@ -1,10 +1,11 @@
 # Data model
 
-> **Status: `001_init` landed with F0 and `002_logos` with F4 — schema version 2; the SQL wins
-> over this text.** What has shipped — `workspace`, `verifications` and `logos` — is reproduced
-> below from the migrations themselves, and the migrations are the authority. Everything else
-> named here belongs to a later slice: it is a plan, not a promise, and each table and column is
-> confirmed, or changed, by the migration that introduces it.
+> **Status: `001_init` landed with F0 and `002_logos` with F4 — schema version 2; `003_export_formats`
+> arrives with F7 and takes it to 3. The SQL wins over this text.** What has shipped — `workspace`,
+> `verifications` and `logos` — is reproduced below from the migrations themselves, and the
+> migrations are the authority. Everything else named here belongs to a later slice: it is a plan,
+> not a promise, and each table and column is confirmed, or changed, by the migration that
+> introduces it.
 
 The authoritative schema is `src-tauri/migrations/`. This document explains _why_ it is shaped
 the way it is; the SQL explains what it is.
@@ -159,13 +160,31 @@ It is written with `IS` rather than `=` on purpose. In SQL, `NULL = 'abc'` is no
 with `decoded_sha256` null — precisely the case where the decoder found no code — would be
 accepted by the database. `IS` is the null-safe comparison, and it refuses that row.
 
+**Arriving with F7, in `003_export_formats`** — two nullable columns, because a row written before
+this migration ran cannot honestly claim either of them, and a verification that was not an export
+has no format to record:
+
+| Column   | Type    | Meaning                                                                                       |
+| -------- | ------- | --------------------------------------------------------------------------------------------- |
+| `format` | TEXT    | which way out was asked for: `png`, `svg`, `pdf` or `clipboard`. `NULL` for a row from before |
+| `dpi`    | INTEGER | the resolution the size was designed at — 150, 300, 600 or 1200 (ADR-015)                     |
+
+`width` and `height` already say how many pixels the artefact was; `dpi` is what turns that back
+into a size on paper, and `format` is what makes a row about a PDF distinguishable from a row about
+a PNG of the same code. Until the SQL lands this table is a plan like any other here, and the SQL
+wins over it.
+
+**`scan_margin_json` is not among them.** It was planned here for F7, and F7 does not write it: the
+margin is a report about one render at one moment, shown after a verdict and never stored
+(ADR-027). If a reason to keep it appears — a batch that wants to report per row how close each
+code came — it arrives in a migration of its own.
+
 **Planned for later slices**, when the library gives a verification something to belong to:
 `code_id` (`ON DELETE CASCADE` — a verification has no meaning without its code) and
 `scene_sha256` (the scene that was verified, not the code it belonged to) arrive with `codes` in
-F8, and `scan_margin_json` — how the artefact held up shrunk, blurred and recompressed — with F7.
-From F8 the code's verification is the **latest row whose `scene_sha256` equals the code's current
-scene**, and its `id` is the token the export command must be given; in F0 there is nothing to go
-stale between the check and the export, because the two happen in one call on one artefact.
+F8. From F8 the code's verification is the **latest row whose `scene_sha256` equals the code's
+current scene**, and its `id` is the token the export command must be given; in F0 there is nothing
+to go stale between the check and the export, because the two happen in one call on one artefact.
 
 ## `002_logos`, as shipped
 
@@ -372,8 +391,12 @@ ones.
 
 Numbered, forward-only, each applied inside a transaction that also raises
 `workspace.schema_version` to the version it produces. `001_init` is F0's: `workspace` and
-`verifications`, and nothing else. `002_logos` is F4's, and takes the schema to version 2 — the
-number Diagnostics shows, and the number the running build states.
+`verifications`, and nothing else. `002_logos` is F4's, and takes the schema to version 2.
+`003_export_formats` is F7's, and takes it to 3: `format` and `dpi` on `verifications`, both
+nullable, added with `ALTER TABLE` so the rows already in a person's workspace keep their meaning —
+they recorded a PNG at a fixed pixel size, and a column they were written without says `NULL`
+rather than guessing. Version 3 is then the number Diagnostics shows and the number the running
+build states.
 
 There is no down-migration. A mistake is corrected by a new migration, never by rewriting an
 applied one: an applied migration is history, and that history has already run on somebody's
