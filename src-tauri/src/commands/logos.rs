@@ -15,6 +15,10 @@
 //! # Changelog of this boundary
 //!
 //! - F4: `import_logo`, `list_logos`, `logo_data_url`, `delete_logo`.
+//! - F8: `delete_logo` refuses a logo something is drawn with, and says which
+//!   things — the brand kits and the saved codes, by name. `ON DELETE RESTRICT`
+//!   is the backstop in SQL; the sentence is here, because "it is in use"
+//!   without saying where is a dead end for the person holding the mouse.
 
 use std::path::Path;
 
@@ -24,13 +28,16 @@ use rusqlite::Connection;
 use serde::Serialize;
 use tauri::State;
 
+use crate::db::codes;
 use crate::db::logos::{self, LogoFacts};
-use crate::db::Db;
+use crate::db::{brand_kits, Db};
 use crate::error::{Error, Result};
 use crate::imaging::logo::{normalise_named, NormalisedLogo, MAX_LOGO_BYTES};
 
-/// The longest stored name. A name is a label in a list, not a sentence.
-pub const MAX_NAME_CHARS: usize = 80;
+/// The longest stored name. A name is a label in a list, not a sentence — and
+/// it is the same bound for a logo, a saved code and a brand kit, so it lives
+/// beside the workspace rather than here.
+pub use crate::db::MAX_NAME_CHARS;
 
 /// Names Windows will not give a file, whatever the extension. The console
 /// devices are in the list with the rest: `CONIN$` and `CONOUT$` are not
@@ -108,20 +115,93 @@ pub fn logo_data_url(db: State<'_, Db>, id: String) -> Result<String> {
     Ok(data_url(&logo))
 }
 
-/// Remove a logo.
+/// Remove a logo, unless something is drawn with it.
+///
+/// A logo a brand kit or a saved code carries is not removable, and the refusal
+/// names them: the person is one click from being able to delete it, and a
+/// sentence that does not say which kit to open is a sentence that sends them
+/// looking through all of them.
 ///
 /// # Errors
 ///
+/// [`Error::Refused`] when a brand kit or a saved code is drawn with it;
 /// [`Error::InvalidInput`] when there is no such logo; [`Error::Database`] when
 /// the row could not be deleted.
 #[tauri::command(rename_all = "snake_case")]
 pub fn delete_logo(db: State<'_, Db>, id: String) -> Result<()> {
     let conn = db.0.lock().expect("the database lock was poisoned");
-    if logos::delete(&conn, &id)? {
+    delete_logo_with(&conn, &id)
+}
+
+/// What [`delete_logo`] does once the database is in hand.
+fn delete_logo_with(conn: &Connection, id: &str) -> Result<()> {
+    let kits = brand_kits::names_using_logo(conn, id)?;
+    let saved = codes::names_using_logo(conn, id)?;
+    if let Some(sentence) = in_use(&kits, &saved) {
+        log::info!(
+            "a logo was kept: {} brand kit(s) and {} saved code(s) are drawn with it",
+            kits.len(),
+            saved.len()
+        );
+        return Err(Error::Refused(sentence));
+    }
+
+    if logos::delete(conn, id)? {
         Ok(())
     } else {
         Err(missing())
     }
+}
+
+/// The most names one refusal spells out. Past this the sentence stops being a
+/// sentence, and a count says the rest.
+const MOST_NAMED: usize = 5;
+
+/// The sentence a logo's refusal is, or `None` when nothing is drawn with it.
+///
+/// Pure, and tested in every grammatical shape it can take: one kit or several,
+/// one saved code or several, either part on its own or both together. The
+/// grammar is the point — a refusal a person reads twice is a refusal that has
+/// not explained anything.
+fn in_use(kits: &[String], codes: &[String]) -> Option<String> {
+    let parts: Vec<String> = [
+        phrase("the brand kit", "the brand kits", kits),
+        phrase("the saved code", "the saved codes", codes),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+
+    if parts.is_empty() {
+        return None;
+    }
+    Some(format!("This logo is used by {}.", parts.join(", and by ")))
+}
+
+/// One half of the sentence: a noun that agrees with how many there are, and the
+/// names, quoted, with the last joined by "and".
+fn phrase(one: &str, many: &str, names: &[String]) -> Option<String> {
+    if names.is_empty() {
+        return None;
+    }
+
+    let mut items: Vec<String> = names
+        .iter()
+        .take(MOST_NAMED)
+        .map(|name| format!("\"{name}\""))
+        .collect();
+    if let Some(beyond) = names.len().checked_sub(MOST_NAMED).filter(|rest| *rest > 0) {
+        items.push(format!("{beyond} more"));
+    }
+
+    let listed = match items.split_last() {
+        Some((last, [])) => last.clone(),
+        Some((last, before)) => format!("{} and {last}", before.join(", ")),
+        // `items` holds at least one name: `names` is not empty.
+        None => return None,
+    };
+    let noun = if names.len() == 1 { one } else { many };
+    Some(format!("{noun} {listed}"))
 }
 
 /// What [`import_logo`] does once the database is in hand.
@@ -266,6 +346,8 @@ fn missing() -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::brand_kits::NewBrandKit;
+    use crate::db::codes::NewCode;
     use crate::db::migrations;
 
     fn workspace() -> Connection {
@@ -455,6 +537,153 @@ mod tests {
         assert!(
             listed[0].get("data_url").is_none(),
             "a list does not carry thumbnails"
+        );
+    }
+    fn named(names: &[&str]) -> Vec<String> {
+        names.iter().map(|name| (*name).to_string()).collect()
+    }
+
+    #[test]
+    fn a_logo_nothing_is_drawn_with_has_no_refusal() {
+        assert_eq!(in_use(&[], &[]), None);
+    }
+
+    /// The grammar, one shape at a time. One kit or several, one saved code or
+    /// several, either part alone and both together.
+    #[test]
+    fn the_refusal_names_what_is_drawn_with_the_logo() {
+        for (kits, codes, expected) in [
+            (
+                named(&["Brand"]),
+                named(&[]),
+                "This logo is used by the brand kit \"Brand\".",
+            ),
+            (
+                named(&["Brand", "Winter"]),
+                named(&[]),
+                "This logo is used by the brand kits \"Brand\" and \"Winter\".",
+            ),
+            (
+                named(&["Brand", "Winter", "Summer"]),
+                named(&[]),
+                "This logo is used by the brand kits \"Brand\", \"Winter\" and \"Summer\".",
+            ),
+            (
+                named(&[]),
+                named(&["Menu"]),
+                "This logo is used by the saved code \"Menu\".",
+            ),
+            (
+                named(&[]),
+                named(&["Menu", "Card"]),
+                "This logo is used by the saved codes \"Menu\" and \"Card\".",
+            ),
+            (
+                named(&["Brand"]),
+                named(&["Menu", "Card"]),
+                "This logo is used by the brand kit \"Brand\", and by the saved codes \"Menu\" and \"Card\".",
+            ),
+            (
+                named(&["Brand", "Winter"]),
+                named(&["Menu"]),
+                "This logo is used by the brand kits \"Brand\" and \"Winter\", and by the saved code \"Menu\".",
+            ),
+        ] {
+            assert_eq!(in_use(&kits, &codes).as_deref(), Some(expected));
+        }
+    }
+
+    /// Past five names the sentence stops naming and starts counting — and the
+    /// fifth is still named, because a list of five is still a list.
+    #[test]
+    fn a_long_list_is_cut_and_the_rest_is_counted() {
+        let five = named(&["A", "B", "C", "D", "E"]);
+        assert_eq!(
+            in_use(&five, &[]).as_deref(),
+            Some("This logo is used by the brand kits \"A\", \"B\", \"C\", \"D\" and \"E\".")
+        );
+
+        let six = named(&["A", "B", "C", "D", "E", "F"]);
+        assert_eq!(
+            in_use(&[], &six).as_deref(),
+            Some("This logo is used by the saved codes \"A\", \"B\", \"C\", \"D\", \"E\" and 1 more.")
+        );
+
+        let eight = named(&["A", "B", "C", "D", "E", "F", "G", "H"]);
+        assert_eq!(
+            in_use(&[], &eight).as_deref(),
+            Some("This logo is used by the saved codes \"A\", \"B\", \"C\", \"D\", \"E\" and 3 more.")
+        );
+    }
+
+    /// And the whole path: the refusal is the host's sentence, the logo is still
+    /// there afterwards, and it goes once nothing is drawn with it.
+    #[test]
+    fn a_logo_a_kit_and_a_code_are_drawn_with_is_kept_until_they_are_gone() {
+        let conn = workspace();
+        let scratch = Scratch::new();
+        let path = scratch.holding("brand.png", &a_png());
+        let logo = import_logo_with(&conn, &path).expect("import");
+
+        let kit = brand_kits::insert(
+            &conn,
+            &NewBrandKit {
+                name: "Brand",
+                logo_id: Some(&logo.id),
+                logo_json: Some(r#"{"plate":"circle"}"#),
+                style_json: "{}",
+                size_json: "{}",
+            },
+        )
+        .expect("a kit");
+        let code = codes::insert(
+            &conn,
+            &NewCode {
+                name: "Menu",
+                kind: "link",
+                payload_json: "{}",
+                style_json: "{}",
+                size_json: "{}",
+                logo_id: Some(&logo.id),
+                logo_json: None,
+                scene_sha256: &"a".repeat(64),
+            },
+        )
+        .expect("a code");
+
+        let refused = delete_logo_with(&conn, &logo.id).expect_err("it is in use");
+        assert_eq!(
+            refused.to_string(),
+            "This logo is used by the brand kit \"Brand\", and by the saved code \"Menu\"."
+        );
+        assert!(matches!(refused, Error::Refused(_)));
+        assert_eq!(
+            logos::list(&conn).expect("list").len(),
+            1,
+            "it is still here"
+        );
+
+        brand_kits::delete(&conn, &kit.id).expect("delete the kit");
+        let refused = delete_logo_with(&conn, &logo.id).expect_err("the code still has it");
+        assert_eq!(
+            refused.to_string(),
+            "This logo is used by the saved code \"Menu\"."
+        );
+
+        codes::delete(&conn, &code.id).expect("delete the code");
+        delete_logo_with(&conn, &logo.id).expect("nothing is drawn with it now");
+        assert!(logos::list(&conn).expect("list").is_empty());
+    }
+
+    #[test]
+    fn removing_a_logo_that_is_not_there_is_one_sentence() {
+        let conn = workspace();
+
+        let refused = delete_logo_with(&conn, "not-a-logo").expect_err("no such logo");
+
+        assert_eq!(
+            refused.to_string(),
+            "That logo is no longer in this workspace."
         );
     }
 }

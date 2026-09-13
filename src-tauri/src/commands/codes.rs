@@ -14,6 +14,11 @@
 //! - F4: both commands take an optional `logo` — an identifier and a box in the
 //!   scene's own units. The host draws it onto the pixels before they are
 //!   encoded, so the artefact that was decoded is the artefact that carries it.
+//! - F8: every one of them takes an optional `code_id`, so the record of a
+//!   verification can say which saved code it was of. It is a link and never an
+//!   input: nothing about the artefact is read from the library, and a link to a
+//!   code that has just been deleted is dropped rather than allowed to fail an
+//!   export that did happen.
 //! - F7: the printed size is an input. `export_png` takes a `dpi` and writes it
 //!   into the file; `export_svg`, `export_pdf` and `copy_png` join it, each
 //!   verifying exactly as the PNG does and each recording what it was
@@ -26,6 +31,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
+use crate::db::codes as library;
 use crate::db::logos;
 use crate::db::verifications::{self, VerificationRow};
 use crate::db::Db;
@@ -104,6 +110,10 @@ struct Asked<'a> {
     /// The resolution the artefact is made for. `None` for a preview and for the
     /// scan margin, neither of which is going to be printed.
     dpi: Option<u32>,
+    /// The saved code this is a verification of, when the interface knows of
+    /// one (F8). It is a link on the record and never an input to the render:
+    /// nothing about the artefact is read from the library.
+    code_id: Option<&'a str>,
 }
 
 /// What an export produces, and therefore what its bytes are made of.
@@ -139,9 +149,17 @@ pub fn verify_code(
     payload: String,
     pixel_size: u32,
     logo: Option<LogoRef>,
+    code_id: Option<String>,
 ) -> Result<VerificationReport> {
     let conn = db.0.lock().expect("the database lock was poisoned");
-    verify_code_with(&conn, &svg, &payload, pixel_size, logo.as_ref())
+    verify_code_with(
+        &conn,
+        &svg,
+        &payload,
+        pixel_size,
+        logo.as_ref(),
+        code_id.as_deref(),
+    )
 }
 
 /// Render, decode, compare — and write the PNG only if the decoder agreed.
@@ -160,6 +178,7 @@ pub fn verify_code(
 /// resolution, a drawing, a payload or a path the host will not accept.
 /// [`Error::File`] when the write itself failed.
 #[tauri::command(rename_all = "snake_case")]
+#[allow(clippy::too_many_arguments)]
 pub fn export_png(
     db: State<'_, Db>,
     svg: String,
@@ -168,6 +187,7 @@ pub fn export_png(
     path: String,
     logo: Option<LogoRef>,
     dpi: u32,
+    code_id: Option<String>,
 ) -> Result<ExportReport> {
     let conn = db.0.lock().expect("the database lock was poisoned");
     export_with(
@@ -178,6 +198,7 @@ pub fn export_png(
             pixel_size,
             logo: logo.as_ref(),
             dpi: Some(dpi),
+            code_id: code_id.as_deref(),
         },
         &path,
         Written::Png,
@@ -200,6 +221,7 @@ pub fn export_png(
 /// As [`export_png`], plus [`Error::Render`] when the file could not be composed
 /// from the scene and the stored logo.
 #[tauri::command(rename_all = "snake_case")]
+#[allow(clippy::too_many_arguments)]
 pub fn export_svg(
     db: State<'_, Db>,
     svg: String,
@@ -208,6 +230,7 @@ pub fn export_svg(
     path: String,
     logo: Option<LogoRef>,
     dpi: u32,
+    code_id: Option<String>,
 ) -> Result<ExportReport> {
     let conn = db.0.lock().expect("the database lock was poisoned");
     export_with(
@@ -218,6 +241,7 @@ pub fn export_svg(
             pixel_size,
             logo: logo.as_ref(),
             dpi: Some(dpi),
+            code_id: code_id.as_deref(),
         },
         &path,
         Written::Svg,
@@ -249,6 +273,7 @@ pub fn export_pdf(
     logo: Option<LogoRef>,
     dpi: u32,
     width_mm: f64,
+    code_id: Option<String>,
 ) -> Result<ExportReport> {
     let conn = db.0.lock().expect("the database lock was poisoned");
     export_with(
@@ -259,6 +284,7 @@ pub fn export_pdf(
             pixel_size,
             logo: logo.as_ref(),
             dpi: Some(dpi),
+            code_id: code_id.as_deref(),
         },
         &path,
         Written::Pdf { width_mm },
@@ -284,6 +310,7 @@ pub fn copy_png(
     pixel_size: u32,
     logo: Option<LogoRef>,
     dpi: u32,
+    code_id: Option<String>,
 ) -> Result<VerificationReport> {
     let conn = db.0.lock().expect("the database lock was poisoned");
     copy_png_with(
@@ -294,6 +321,7 @@ pub fn copy_png(
             pixel_size,
             logo: logo.as_ref(),
             dpi: Some(dpi),
+            code_id: code_id.as_deref(),
         },
         clipboard::place,
     )
@@ -317,6 +345,8 @@ pub fn scan_margin(
     pixel_size: u32,
     logo: Option<LogoRef>,
 ) -> Result<ScanMargin> {
+    // The margin is a measurement and writes no row, so there is nothing for a
+    // `code_id` to be recorded on: it is deliberately not an argument here.
     let conn = db.0.lock().expect("the database lock was poisoned");
     scan_margin_with(
         &conn,
@@ -329,6 +359,7 @@ pub fn scan_margin(
             pixel_size: pixel_size.min(MARGIN_MAX_PIXELS),
             logo: logo.as_ref(),
             dpi: None,
+            code_id: None,
         },
     )
 }
@@ -343,6 +374,7 @@ fn verify_code_with(
     payload: &str,
     pixel_size: u32,
     logo: Option<&LogoRef>,
+    code_id: Option<&str>,
 ) -> Result<VerificationReport> {
     let asked = Asked {
         svg,
@@ -350,6 +382,7 @@ fn verify_code_with(
         pixel_size,
         logo,
         dpi: None,
+        code_id,
     };
     check_inputs(&asked)?;
     let logo = load_logo(conn, asked.logo)?;
@@ -363,7 +396,7 @@ fn verify_code_with(
         asked.dpi,
     )?;
     let report = verification.report;
-    record(conn, "verify", &report, None, None, None)?;
+    record(conn, "verify", &report, None, None, None, asked.code_id)?;
 
     Ok(report)
 }
@@ -407,7 +440,15 @@ fn export_with(
             .unwrap_or_else(|| "The code did not read back.".to_string());
         // The destination is not recorded: no file went there, and a row that
         // names a path is a row that says one exists.
-        record(conn, "export", &report, None, asked.dpi, format)?;
+        record(
+            conn,
+            "export",
+            &report,
+            None,
+            asked.dpi,
+            format,
+            asked.code_id,
+        )?;
         log::warn!("an export was refused: {reason}");
         return Err(Error::Refused(reason));
     }
@@ -419,7 +460,15 @@ fn export_with(
     };
 
     let bytes_written = write_atomically(Path::new(path), &bytes)?;
-    record(conn, "export", &report, Some(path), asked.dpi, format)?;
+    record(
+        conn,
+        "export",
+        &report,
+        Some(path),
+        asked.dpi,
+        format,
+        asked.code_id,
+    )?;
     log::info!(
         "exported {bytes_written} bytes as {} verified by {}",
         written.token(),
@@ -456,7 +505,15 @@ fn copy_png_with(
     // Recorded before the clipboard is touched: the verification is a fact
     // already, and whether the system let go of its clipboard is not evidence
     // about the code.
-    record(conn, "export", &report, None, asked.dpi, Some("clipboard"))?;
+    record(
+        conn,
+        "export",
+        &report,
+        None,
+        asked.dpi,
+        Some("clipboard"),
+        asked.code_id,
+    )?;
 
     if !report.verified {
         let reason = report
@@ -613,6 +670,13 @@ fn write_atomically(destination: &Path, bytes: &[u8]) -> Result<u64> {
 }
 
 /// Write the evidence of one attempt.
+///
+/// A `code_id` the library no longer holds is dropped rather than refused. The
+/// verification happened — an independent decoder read pixels and agreed or did
+/// not — and the row saying so must be written even when the library entry it
+/// pointed at was deleted a moment earlier. Letting the foreign key refuse it
+/// would turn a recorded fact into a failed export, which is the one thing this
+/// product's record must never do.
 fn record(
     conn: &Connection,
     kind: &str,
@@ -620,7 +684,16 @@ fn record(
     path: Option<&str>,
     dpi: Option<u32>,
     format: Option<&str>,
+    code_id: Option<&str>,
 ) -> Result<()> {
+    let linked = match code_id {
+        Some(id) if !library::exists(conn, id)? => {
+            log::warn!("a verification named a saved code that is no longer in the workspace");
+            None
+        }
+        other => other,
+    };
+
     verifications::record(
         conn,
         &VerificationRow {
@@ -637,6 +710,7 @@ fn record(
             reason: report.reason.as_deref(),
             dpi,
             format,
+            code_id: linked,
         },
     )?;
     Ok(())
@@ -713,6 +787,7 @@ mod tests {
                 pixel_size,
                 logo,
                 dpi: Some(DPI),
+                code_id: None,
             },
             path,
             written,
@@ -762,6 +837,38 @@ mod tests {
             width: side,
             height: side,
         }
+    }
+
+    /// A code in the library, the way `save_code` leaves one there.
+    fn a_saved_code(conn: &Connection) -> String {
+        library::insert(
+            conn,
+            &library::NewCode {
+                name: "Menu",
+                kind: "link",
+                payload_json: "{}",
+                style_json: "{}",
+                size_json: "{}",
+                logo_id: None,
+                logo_json: None,
+                scene_sha256: &"a".repeat(64),
+            },
+        )
+        .expect("save")
+        .id
+    }
+
+    /// Which saved code each recorded verification names, in the order written.
+    fn linked(conn: &Connection) -> Vec<Option<String>> {
+        let mut statement = conn
+            .prepare("SELECT code_id FROM verifications ORDER BY id")
+            .expect("prepare");
+        let found = statement
+            .query_map([], |row| row.get::<_, Option<String>>(0))
+            .expect("query")
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .expect("read back");
+        found
     }
 
     fn kind_of(error: &Error) -> String {
@@ -815,8 +922,8 @@ mod tests {
     #[test]
     fn a_code_that_reads_back_is_verified_and_recorded() {
         let conn = workspace();
-        let report =
-            verify_code_with(&conn, &hello_world_svg(), HELLO_WORLD, 512, None).expect("verify");
+        let report = verify_code_with(&conn, &hello_world_svg(), HELLO_WORLD, 512, None, None)
+            .expect("verify");
 
         assert!(report.verified, "reason: {:?}", report.reason);
         assert_eq!(rows(&conn), vec![("verify".to_string(), 1, None)]);
@@ -1066,17 +1173,26 @@ mod tests {
         let svg = hello_world_svg();
 
         let too_small =
-            verify_code_with(&conn, &svg, HELLO_WORLD, 32, None).expect_err("too small");
+            verify_code_with(&conn, &svg, HELLO_WORLD, 32, None, None).expect_err("too small");
         let too_large =
-            verify_code_with(&conn, &svg, HELLO_WORLD, 8192, None).expect_err("too large");
-        let nothing = verify_code_with(&conn, &svg, "", 512, None).expect_err("nothing to encode");
-        let too_much = verify_code_with(&conn, &svg, &"x".repeat(MAX_PAYLOAD_BYTES + 1), 512, None)
-            .expect_err("too much");
+            verify_code_with(&conn, &svg, HELLO_WORLD, 8192, None, None).expect_err("too large");
+        let nothing =
+            verify_code_with(&conn, &svg, "", 512, None, None).expect_err("nothing to encode");
+        let too_much = verify_code_with(
+            &conn,
+            &svg,
+            &"x".repeat(MAX_PAYLOAD_BYTES + 1),
+            512,
+            None,
+            None,
+        )
+        .expect_err("too much");
         let huge_drawing = verify_code_with(
             &conn,
             &"x".repeat(MAX_SVG_BYTES + 1),
             HELLO_WORLD,
             512,
+            None,
             None,
         )
         .expect_err("drawing too large");
@@ -1108,6 +1224,7 @@ mod tests {
                     pixel_size: 128,
                     logo: None,
                     dpi: Some(dpi),
+                    code_id: None,
                 },
                 &path,
                 Written::Png,
@@ -1174,7 +1291,7 @@ mod tests {
         let conn = workspace();
         let logo = a_stored_logo(&conn);
 
-        let plain = verify_code_with(&conn, &hello_world_svg(), HELLO_WORLD, 512, None)
+        let plain = verify_code_with(&conn, &hello_world_svg(), HELLO_WORLD, 512, None, None)
             .expect("verify without a logo");
         let with_logo = verify_code_with(
             &conn,
@@ -1182,6 +1299,7 @@ mod tests {
             HELLO_WORLD,
             512,
             Some(&centred_logo(&logo, 0.2)),
+            None,
         )
         .expect("verify with a logo");
 
@@ -1234,6 +1352,49 @@ mod tests {
         assert!(!Path::new(&path).exists(), "nothing was written");
     }
 
+    /// A saved code (F8) can be named on the record, so the evidence says which
+    /// library entry it was evidence about.
+    #[test]
+    fn a_verification_can_say_which_saved_code_it_was_of() {
+        let conn = workspace();
+        let saved = a_saved_code(&conn);
+
+        let report = verify_code_with(
+            &conn,
+            &hello_world_svg(),
+            HELLO_WORLD,
+            512,
+            None,
+            Some(&saved),
+        )
+        .expect("verify");
+
+        assert!(report.verified);
+        assert_eq!(linked(&conn), vec![Some(saved)]);
+    }
+
+    /// And a link to a code somebody deleted a moment ago is dropped, not
+    /// obeyed: the verification happened, so the row is written — with nothing
+    /// where the link would have been.
+    #[test]
+    fn a_link_to_a_code_that_is_gone_is_dropped_and_the_row_is_still_written() {
+        let conn = workspace();
+
+        let report = verify_code_with(
+            &conn,
+            &hello_world_svg(),
+            HELLO_WORLD,
+            512,
+            None,
+            Some("not-a-code"),
+        )
+        .expect("the verification still happened");
+
+        assert!(report.verified);
+        assert_eq!(linked(&conn), vec![None]);
+        assert_eq!(rows(&conn).len(), 1, "the evidence is not lost over a link");
+    }
+
     #[test]
     fn a_logo_the_workspace_does_not_have_is_refused() {
         let conn = workspace();
@@ -1250,6 +1411,7 @@ mod tests {
                 width: 4.0,
                 height: 4.0,
             }),
+            None,
         )
         .expect_err("a logo nobody imported must be refused");
 
@@ -1287,6 +1449,7 @@ mod tests {
                 pixel_size: 295,
                 logo: None,
                 dpi: Some(DPI),
+                code_id: None,
             },
             places,
         )
@@ -1320,6 +1483,7 @@ mod tests {
                 pixel_size: 128,
                 logo: None,
                 dpi: Some(DPI),
+                code_id: None,
             },
             will_not_open,
         )
@@ -1345,6 +1509,7 @@ mod tests {
                 pixel_size: 128,
                 logo: None,
                 dpi: Some(DPI),
+                code_id: None,
             },
             must_not_be_called,
         )
@@ -1367,6 +1532,7 @@ mod tests {
                 pixel_size: 512,
                 logo: None,
                 dpi: None,
+                code_id: None,
             },
         )
         .expect("margin");
@@ -1394,6 +1560,7 @@ mod tests {
                 pixel_size: 512,
                 logo: Some(&centred_logo(&logo, 0.6)),
                 dpi: None,
+                code_id: None,
             },
         )
         .expect("margin");

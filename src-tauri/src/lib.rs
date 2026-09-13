@@ -23,6 +23,11 @@
 //!   never passed through (ADR-016) — and is drawn onto the code *before* the
 //!   PNG is encoded, so the artefact the decoder read is the artefact with the
 //!   logo on it.
+//! - F8: the library. A saved code is its fields and the hash of the scene they
+//!   made, never a stored image (ADR-028): opening one rebuilds the scene and
+//!   proves it again. A brand kit is the part of a code that is the same every
+//!   time — a logo, a look and a size — and a logo a kit or a saved code is
+//!   drawn with cannot be deleted from under it: the sentence names which ones.
 //! - F7: the printed size. One code now leaves as four things — a PNG carrying
 //!   its resolution, an SVG carrying its logo, a PDF page of exact millimetres,
 //!   or an image on the clipboard — and every one of them passes the same gate
@@ -86,6 +91,14 @@ pub fn run() {
             commands::logos::list_logos,
             commands::logos::logo_data_url,
             commands::logos::delete_logo,
+            commands::library::save_code,
+            commands::library::list_codes,
+            commands::library::get_code,
+            commands::library::rename_code,
+            commands::library::delete_code,
+            commands::library::save_brand_kit,
+            commands::library::list_brand_kits,
+            commands::library::delete_brand_kit,
         ])
         .run(tauri::generate_context!())
         .expect("Signatum failed to start");

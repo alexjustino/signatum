@@ -165,6 +165,18 @@ pub fn get(conn: &Connection, id: &str) -> Result<Option<(LogoFacts, NormalisedL
     Ok(Some((facts, logo)))
 }
 
+/// Whether a logo is in this workspace, without reading its bytes.
+///
+/// # Errors
+///
+/// [`Error::Database`] when the table could not be read.
+pub fn exists(conn: &Connection, id: &str) -> Result<bool> {
+    let found: i64 = conn.query_row("SELECT count(*) FROM logos WHERE id = ?1", [id], |row| {
+        row.get(0)
+    })?;
+    Ok(found > 0)
+}
+
 /// Remove a logo. `false` when there was none to remove.
 ///
 /// # Errors
@@ -261,6 +273,15 @@ mod tests {
         let conn = workspace();
 
         assert_eq!(get(&conn, "not-a-logo").expect("get"), None);
+        assert!(!exists(&conn, "not-a-logo").expect("exists"));
+    }
+
+    #[test]
+    fn a_stored_logo_is_there_without_reading_its_bytes() {
+        let conn = workspace();
+        let facts = insert(&conn, "brand", &a_logo()).expect("insert");
+
+        assert!(exists(&conn, &facts.id).expect("exists"));
     }
 
     #[test]
