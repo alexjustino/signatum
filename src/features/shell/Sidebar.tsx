@@ -1,4 +1,5 @@
 import {
+  DocumentTable20Regular,
   Info20Regular,
   Library20Regular,
   QrCode20Regular,
@@ -19,6 +20,7 @@ import { DESTINATIONS, DESTINATION_LABELS, type Destination } from '@/features/s
 const ICONS: Record<Destination, ReactNode> = {
   create: <QrCode20Regular />,
   library: <Library20Regular />,
+  batch: <DocumentTable20Regular />,
   diagnostics: <Wrench20Regular />,
   settings: <Settings20Regular />,
   about: <Info20Regular />,

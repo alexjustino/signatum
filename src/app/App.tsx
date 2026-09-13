@@ -8,6 +8,7 @@ import { DEFAULT_STYLE, type Style } from '@/domain/scene';
 import type { ThemeChoice } from '@/domain/settings';
 import { DEFAULT_PRINT_SIZE, type PrintSize } from '@/domain/size';
 import { AboutPage } from '@/features/about/AboutPage';
+import { BatchPage } from '@/features/batch/BatchPage';
 import { CreatePage, type AttachedCode } from '@/features/create/CreatePage';
 import type { ChosenLogo } from '@/features/create/LogoCard';
 import type { EclFloor } from '@/features/create/LookCard';
@@ -65,6 +66,8 @@ export function App() {
   // their codes, not about the link they happened to be typing. It starts at the
   // default — a 25 mm code at print resolution, which is 295 pixels square.
   const [printSize, setPrintSize] = useState<PrintSize>(DEFAULT_PRINT_SIZE);
+  // The batch's rows live here so that leaving the Batch screen and coming back keeps them.
+  const [batchRows, setBatchRows] = useState('');
   // The saved code on screen, when there is one (F8): the row in the library the editor is
   // showing, either because it was opened from there or because it was just written there. It
   // lives here rather than in Create because everything that detaches it lives here.
@@ -203,6 +206,21 @@ export function App() {
             />
           )}
           {destination === 'library' && <LibraryPage onOpen={openSavedCode} />}
+          {/* The batch runs on the look, the size and the logo the editor is holding: one set of
+              decisions for the code on screen and the two hundred beside it. It is given them,
+              never allowed to change them — a screen that quietly edited the editor's style
+              would make the code a person approved and the batch they ran two different
+              things. */}
+          {destination === 'batch' && (
+            <BatchPage
+              style={style}
+              size={printSize}
+              eclFloor={ecl}
+              logo={logo}
+              rows={batchRows}
+              onRows={setBatchRows}
+            />
+          )}
           {destination === 'diagnostics' && <DiagnosticsPage />}
           {destination === 'settings' && <SettingsPage theme={theme} onChoose={chooseTheme} />}
           {destination === 'about' && <AboutPage />}
