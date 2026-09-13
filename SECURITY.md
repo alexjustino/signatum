@@ -74,10 +74,25 @@ seriously.
   internationalised domain is shown as it will resolve — in punycode today, with the Unicode form
   beside it when the Read screen arrives (F10) — so a look-alike domain is
   visible before it is printed rather than after.
-- **Batch files stay in the folder chosen.** File names built from CSV cells are sanitised: no
-  path separator, no `..` and no reserved Windows name reaches the filesystem. The batch
-  **report** is itself a CSV, and it is written with formula injection neutralised — a cell
-  beginning `=`, `+`, `-` or `@` cannot become a formula in whatever opens it.
+- **Batch files stay in the folder chosen, and this is now what the code does (F9, ADR-029).** A
+  file name built from a CSV cell is reduced to one file name before anything is written:
+  normalised, stripped of control characters, every `\ / : * ? " < > |` replaced, leading and
+  trailing dots and spaces removed, `.` and `..` and an empty cell turned into `code`, a name
+  Windows reserves (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`, `CONIN$`, `CONOUT$`,
+  with or without an extension) prefixed, and the whole thing cut to eighty characters and given
+  the row's number in front. The host then makes the containment claim on its own side: the chosen
+  folder is resolved once, and a leaf that is not a single path segment is a **failed row, never a
+  path** — so the rule is written twice, and the claim does not rest on the webview having been
+  correct. Each file is verified by the decoder and written through a staged rename, exactly as a
+  single export is, and a file already in the folder under a row's name is never replaced — the
+  row fails and says so.
+- **The batch report is a CSV, and a report about a hostile list must not be a hostile report.**
+  Every cell is escaped for CSV and neutralised: a cell beginning `=`, `+`, `-`, `@`, a tab or a
+  carriage return is written with a leading apostrophe, so whatever opens the report reads it as
+  text and never as a formula. The report is written beside the codes and never over a report that
+  is already there. The cost is deliberate and visible: a name that is a negative number is written
+  as `'-1`. Rows can also be **pasted** into the screen instead of opened from a file; that door
+  reads nothing from disk — it is text the person already had, parsed by the same parser.
 - **Wi-Fi passwords are stored locally, in the clear, unless the person chooses not to save
   them.** This is a deliberate trade and not an oversight: the screen says so, in plain words,
   where the password is typed. **The choice exists as of the library (ADR-018, ADR-028):** saving a
@@ -88,10 +103,15 @@ seriously.
   that network is in the file. Either way the printed code itself carries the password in plain
   text, because that is what a Wi-Fi code is; what this choice governs is only what the workspace
   keeps afterwards.
-- **Minimum capabilities.** Tauri 2 capabilities are declared explicitly, one by one. Files are
-  read and written **only** through paths the person chose in a system dialog; nothing in the
-  product enumerates a directory or follows a path it was not handed. Shell execution is not
-  granted.
+- **Minimum capabilities, and two doors that read a file.** Tauri 2 capabilities are declared
+  explicitly, one by one. Files are read and written **only** through paths the person chose in a
+  system dialog; nothing in the product enumerates a directory or follows a path it was not handed.
+  Shell execution is not granted. Exactly two host commands read a file, each under its own caps:
+  `import_logo`, which refuses above 20 MiB and hands back a normalised image or a sentence, and —
+  since the batch (F9) — `read_text_file`, which reads the chosen CSV at no more than 2 MiB, as
+  UTF-8 or a refusal, from a local path only, refusing a name Windows reserves for a device before
+  it is opened, and is used by that one screen. A batch's folder is
+  the third thing a dialog hands over, and it is the only place a batch writes.
 - **What leaves is an image, and it lands only where a dialog said.** Copying a code puts the
   **verified image** on the clipboard and never the payload text: a payload on the clipboard is a
   paste into the wrong window — into the message somebody was writing, or into a terminal — and
@@ -131,12 +151,14 @@ verified code over any file on a local drive whose extension is one this product
 and `.svg` and `.pdf` from F7), because the host trusts the path the interface hands it after the
 save dialog. It cannot make the host write anywhere else: the path has to be local and to carry
 the extension of the kind being written, never a network path, and the bytes are always a code
-that read back. The same
-interface could ask the host to read any one file on a local drive as a logo, because the open
-dialog hands it a path and the host reads the path it is given: it is read once, under the size
-cap, normalised, and what comes back is an image or a sentence. A network path is refused on
-both doors. The dialog plugin may only open and save; the interface itself never reads a file,
-and nothing in the product walks a directory.
+that read back. A batch widens that by a folder rather than by a kind: the host writes as many files
+as the run has rows, but only inside the one folder the dialog returned, and only names that are a
+single path segment. The same
+interface could ask the host to read any one file on a local drive — as a logo, or as the text of a
+CSV — because the open dialog hands it a path and the host reads the path it is given: it is read
+once, under the cap for that door, and what comes back is a normalised image, at most 2 MiB of
+UTF-8 text, or a sentence. A network path is refused on every door. The dialog plugin may only open
+and save; the interface itself never reads a file, and nothing in the product walks a directory.
 
 ## Distribution integrity
 

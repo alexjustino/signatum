@@ -4,6 +4,7 @@
 //! drawn, are pure TypeScript in `src/domain/`. Rust owns storage, migrations,
 //! the scan gate's evidence, and the operating system.
 
+pub mod batches;
 pub mod brand_kits;
 pub mod codes;
 pub mod logos;

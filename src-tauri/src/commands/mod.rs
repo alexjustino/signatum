@@ -5,6 +5,7 @@
 //! lives in `imaging`; storage lives in `db`; the operating system lives in
 //! `os`.
 
+pub mod batch;
 pub mod codes;
 pub mod library;
 pub mod logos;

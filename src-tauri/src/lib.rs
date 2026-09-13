@@ -35,6 +35,13 @@
 //!   the verified artefact; `os::clipboard` is the second thing in this crate
 //!   that talks to the system. The scan margin reports how much the artefact
 //!   survives and blocks nothing (ADR-026, ADR-027).
+//! - F9: the batch. One CSV becomes one verified file per line, in the folder
+//!   that was chosen and in no other: the run is the export pipeline in a loop,
+//!   each line rendered, decoded and compared exactly as a single export is, and
+//!   a line that cannot be made is a line of a report rather than the end of the
+//!   run. `read_text_file` is the second and last command that reads a file
+//!   somebody chose; `cancel_batch` is the only piece of state in this host that
+//!   two commands share (ADR-029).
 
 pub mod commands;
 pub mod db;
@@ -72,6 +79,9 @@ pub fn run() {
         .setup(|app| {
             let connection = db::open(app.handle())?;
             app.manage(db::Db(Mutex::new(connection)));
+            // The flag a run reads between lines. Managed rather than passed,
+            // because the command that stops a batch is not the one running it.
+            app.manage(commands::batch::BatchCancel::default());
             log::info!(
                 "workspace opened; Signatum {} ready",
                 env!("CARGO_PKG_VERSION")
@@ -99,6 +109,10 @@ pub fn run() {
             commands::library::save_brand_kit,
             commands::library::list_brand_kits,
             commands::library::delete_brand_kit,
+            commands::batch::read_text_file,
+            commands::batch::run_batch,
+            commands::batch::cancel_batch,
+            commands::batch::write_batch_report,
         ])
         .run(tauri::generate_context!())
         .expect("Signatum failed to start");

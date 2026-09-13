@@ -145,9 +145,25 @@ are using it. And the choice a Wi-Fi password deserves is now a choice: keep it 
 the clear in the workspace file, as the screen says plainly — or clear it, and be asked for it again
 the next time the code is opened.
 
-What it does not do yet: a CSV of links or contacts turned into one verified file per row, with a
-report of the rows it refused; and reading a code back out of an image somebody photographed or was
-sent. Those are the slices that follow.
+F9 has made it a list. A CSV of links or of contact cards — opened from disk, or pasted into the
+screen — becomes one file per row, and every one of them is built by the same pipeline as a code
+typed by hand and read back by the same independent decoder before it is written: two hundred rows
+are two hundred verifications, not one claim repeated. The first line of the file names the columns
+and decides what the batch is, and a `name` column names each file. What that column says is reduced
+to a file name and nothing else — no path separator, no `..`, no name Windows reserves, and the
+row's number in front, so the folder sorts like the file it came from and two people with the same
+name do not overwrite each other. The folder chosen is the only place anything is written, checked
+on the host's side of the boundary and not merely on the way in, and a file already there is never
+replaced. A row that cannot be made — a wrong
+number of fields, an address that is not a link, a card with nobody's name, a logo that will not fit
+— becomes a line in the report with its line number and the reason, and the rest of the list is made
+anyway; the whole plan, with its refusals, is shown before a folder is asked for. The report is
+itself a CSV, written beside the codes and never over one that is already there, with any cell that
+begins `=`, `+`, `-` or `@` written as text so that a report about a hostile list is not the attack
+when it is opened. While it runs, it says how far it has got, and it can be stopped between rows.
+
+What it does not do yet: reading a code back out of an image somebody photographed or was sent. That
+is the slice that follows.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 

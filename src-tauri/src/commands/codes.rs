@@ -84,6 +84,22 @@ pub struct LogoRef {
     pub height: f32,
 }
 
+/// One export attempt as the host itself sees it: the verdict, the evidence
+/// row it wrote, and whether anything reached the disk.
+///
+/// Not a wire shape — it never crosses the command boundary. It exists so a
+/// batch can write a report line pointing at the same verification the export
+/// was decided on, refusals included.
+pub(crate) struct Export {
+    /// What the decoder said.
+    pub report: VerificationReport,
+    /// The `verifications` row written for this attempt.
+    pub verification_id: String,
+    /// How many bytes were written; `None` when the gate refused and nothing
+    /// was.
+    pub bytes_written: Option<u64>,
+}
+
 /// What an export answers with: the verdict, plus where the bytes went.
 #[derive(Debug, Clone, Serialize)]
 pub struct ExportReport {
@@ -102,22 +118,23 @@ pub struct ExportReport {
 /// It is not the wire shape: each command takes flat, snake-case arguments, the
 /// way the interface calls them. This is what they all become one line later, so
 /// that "render, compose, decode, compare, record" exists once.
-struct Asked<'a> {
-    svg: &'a str,
-    payload: &'a str,
-    pixel_size: u32,
-    logo: Option<&'a LogoRef>,
+pub(crate) struct Asked<'a> {
+    pub svg: &'a str,
+    pub payload: &'a str,
+    pub pixel_size: u32,
+    pub logo: Option<&'a LogoRef>,
     /// The resolution the artefact is made for. `None` for a preview and for the
     /// scan margin, neither of which is going to be printed.
-    dpi: Option<u32>,
+    pub dpi: Option<u32>,
     /// The saved code this is a verification of, when the interface knows of
     /// one (F8). It is a link on the record and never an input to the render:
     /// nothing about the artefact is read from the library.
-    code_id: Option<&'a str>,
+    pub code_id: Option<&'a str>,
 }
 
 /// What an export produces, and therefore what its bytes are made of.
-enum Written {
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Written {
     /// The artefact itself, `pHYs` chunk and all.
     Png,
     /// The scene as the domain sized it, with the logo carried inside it.
@@ -129,7 +146,7 @@ enum Written {
 impl Written {
     /// The token the record keeps and the extension the file must have. They are
     /// the same word on purpose: the kind of an export is one idea.
-    fn token(&self) -> &'static str {
+    pub(crate) fn token(&self) -> &'static str {
         match self {
             Written::Png => "png",
             Written::Svg => "svg",
@@ -414,6 +431,33 @@ fn export_with(
     path: &str,
     written: Written,
 ) -> Result<ExportReport> {
+    let done = export_once(conn, asked, path, written)?;
+    match done.bytes_written {
+        Some(bytes_written) => Ok(ExportReport {
+            report: done.report,
+            path: path.to_string(),
+            bytes_written,
+        }),
+        // The refusal was recorded and logged where it happened; a command
+        // turns it into the error a person sees, because for them the export
+        // did not happen and must not look as though it did (ADR-010).
+        None => Err(Error::Refused(refusal(&done.report))),
+    }
+}
+
+/// One export attempt, whatever it ended as, with the evidence row it wrote.
+///
+/// This is the shape the batch needs and a command does not: a refused line of
+/// a run is not an error that ends anything, it is a line of a report saying
+/// why nothing was written — and it still points at the verification that says
+/// so. The order of what happens here is the product's promise, and there is no
+/// path through it that writes bytes the decoder did not answer for.
+pub(crate) fn export_once(
+    conn: &Connection,
+    asked: &Asked,
+    path: &str,
+    written: Written,
+) -> Result<Export> {
     check_inputs(asked)?;
     check_destination(path, written.token())?;
     if let Written::Pdf { width_mm } = written {
@@ -434,13 +478,10 @@ fn export_with(
     let format = Some(written.token());
 
     if !report.verified {
-        let reason = report
-            .reason
-            .clone()
-            .unwrap_or_else(|| "The code did not read back.".to_string());
+        let reason = refusal(&report);
         // The destination is not recorded: no file went there, and a row that
         // names a path is a row that says one exists.
-        record(
+        let verification_id = record(
             conn,
             "export",
             &report,
@@ -450,7 +491,11 @@ fn export_with(
             asked.code_id,
         )?;
         log::warn!("an export was refused: {reason}");
-        return Err(Error::Refused(reason));
+        return Ok(Export {
+            report,
+            verification_id,
+            bytes_written: None,
+        });
     }
 
     let bytes = match written {
@@ -460,7 +505,7 @@ fn export_with(
     };
 
     let bytes_written = write_atomically(Path::new(path), &bytes)?;
-    record(
+    let verification_id = record(
         conn,
         "export",
         &report,
@@ -475,11 +520,20 @@ fn export_with(
         report.decoder
     );
 
-    Ok(ExportReport {
+    Ok(Export {
         report,
-        path: path.to_string(),
-        bytes_written,
+        verification_id,
+        bytes_written: Some(bytes_written),
     })
+}
+
+/// The sentence for a code that did not read back, with a fallback for the
+/// report that somehow carries none: a refusal always owes a reason.
+fn refusal(report: &VerificationReport) -> String {
+    report
+        .reason
+        .clone()
+        .unwrap_or_else(|| "The code did not read back.".to_string())
 }
 
 /// What [`copy_png`] does once the database is in hand, with the placement as an
@@ -610,7 +664,7 @@ fn check_inputs(asked: &Asked) -> Result<()> {
 
 /// The path a person chose in the system's save dialog, checked before it is
 /// used. Absolute, local, and named for the kind of file this export writes.
-fn check_destination(path: &str, extension: &str) -> Result<()> {
+pub(crate) fn check_destination(path: &str, extension: &str) -> Result<()> {
     let destination = Path::new(path);
     if !destination.is_absolute() {
         return Err(Error::InvalidInput(
@@ -643,7 +697,7 @@ fn check_destination(path: &str, extension: &str) -> Result<()> {
 /// A rename within one directory is the closest a filesystem comes to a single
 /// step: either the old file is there or the new one is, and never half of
 /// either. A failed write takes its own leftovers with it.
-fn write_atomically(destination: &Path, bytes: &[u8]) -> Result<u64> {
+pub(crate) fn write_atomically(destination: &Path, bytes: &[u8]) -> Result<u64> {
     let directory = destination
         .parent()
         .ok_or(Error::File("that path has no folder to write into"))?;
@@ -685,7 +739,7 @@ fn record(
     dpi: Option<u32>,
     format: Option<&str>,
     code_id: Option<&str>,
-) -> Result<()> {
+) -> Result<String> {
     let linked = match code_id {
         Some(id) if !library::exists(conn, id)? => {
             log::warn!("a verification named a saved code that is no longer in the workspace");
@@ -694,7 +748,7 @@ fn record(
         other => other,
     };
 
-    verifications::record(
+    let id = verifications::record(
         conn,
         &VerificationRow {
             kind,
@@ -713,7 +767,7 @@ fn record(
             code_id: linked,
         },
     )?;
-    Ok(())
+    Ok(id)
 }
 
 #[cfg(test)]

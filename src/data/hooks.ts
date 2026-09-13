@@ -14,6 +14,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { cancelBatch, readTextFile, runBatch, writeBatchReport } from './batch';
 import { copyPng, exportPdf, exportPng, exportSvg, scanMargin, verifyCode } from './codes';
 import {
   deleteBrandKit,
@@ -216,4 +217,33 @@ export function useDeleteBrandKit() {
       await client.invalidateQueries({ queryKey: keys.logos });
     },
   });
+}
+
+/**
+ * The four batch commands (F9), all mutations.
+ *
+ * Nothing here is cached, and for the reason the scan-gate commands are not: a batch is an act a
+ * person asked for at a moment, against a folder they chose at that moment, and its answer is
+ * about that act. A cache key for it would be a key nobody looks up — and a second run of the
+ * same CSV into the same folder is a different event, not a stale copy of the first.
+ */
+
+/** Read the chosen CSV. The host reads files; this interface never does. */
+export function useReadTextFile() {
+  return useMutation({ mutationFn: readTextFile });
+}
+
+/** Write the planned rows into the chosen folder, each one through the gate. */
+export function useRunBatch() {
+  return useMutation({ mutationFn: runBatch });
+}
+
+/** Stop after the row being written; the rest come back as skipped. */
+export function useCancelBatch() {
+  return useMutation({ mutationFn: cancelBatch });
+}
+
+/** Write the report the domain composed, beside the codes it is about. */
+export function useWriteBatchReport() {
+  return useMutation({ mutationFn: writeBatchReport });
 }

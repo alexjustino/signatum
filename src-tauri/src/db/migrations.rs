@@ -23,6 +23,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "004_library",
         include_str!("../../migrations/004_library.sql"),
     ),
+    (
+        "005_batches",
+        include_str!("../../migrations/005_batches.sql"),
+    ),
 ];
 
 /// Every migration, name and SQL, in the order they apply.
@@ -105,7 +109,7 @@ mod tests {
     /// to somebody whose file is a release behind.
     #[test]
     fn a_workspace_at_any_earlier_version_migrates_to_this_one() {
-        assert_eq!(target_version(), 4, "F8 adds the fourth migration");
+        assert_eq!(target_version(), 5, "F9 adds the fifth migration");
 
         for stop_at in 0..=target_version() {
             let conn = memory();
@@ -125,7 +129,7 @@ mod tests {
             apply(&conn).expect("migrate the rest of the way");
 
             assert_eq!(current_version(&conn), target_version());
-            for table in ["logos", "codes", "brand_kits"] {
+            for table in ["logos", "codes", "brand_kits", "batches", "batch_rows"] {
                 let rows: i64 = conn
                     .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))
                     .unwrap_or_else(|error| panic!("`{table}` is missing at head: {error}"));
@@ -181,7 +185,15 @@ mod tests {
         let conn = memory();
         apply(&conn).expect("migrate");
 
-        for table in ["workspace", "verifications", "logos", "codes", "brand_kits"] {
+        for table in [
+            "workspace",
+            "verifications",
+            "logos",
+            "codes",
+            "brand_kits",
+            "batches",
+            "batch_rows",
+        ] {
             let found: i64 = conn
                 .query_row(
                     "SELECT count(*) FROM sqlite_master WHERE name = ?1",
