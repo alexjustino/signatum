@@ -246,9 +246,9 @@ first — not inline in the feature.
 `Resizer` · `VirtualList`
 
 Present today, because a screen uses them: `Button`, `Input`, `TextArea`, `Select`, `Checkbox`,
-`Card`, `TabStrip`, `InfoBar`, `EmptyState`, `Modal` and `ConfirmDialog`, beside this product's own
-`CodePreview`, `ScanGateStatus` and `LogoPlatePicker`. Each of the rest arrives with the slice that
-first needs it, and arrives _here_, never inline in a feature.
+`Card`, `TabStrip`, `ProgressBar`, `InfoBar`, `EmptyState`, `Modal` and `ConfirmDialog`, beside this
+product's own `CodePreview`, `ScanGateStatus` and `LogoPlatePicker`. Each of the rest arrives with
+the slice that first needs it, and arrives _here_, never inline in a feature.
 
 `TextArea` arrived with F2, for the fields that hold more than one line — a message, a body, plain
 text. It is an `Input` that grew: both take their surface from `fieldSurface.ts`, so a single-line
@@ -267,6 +267,25 @@ each shape and an `Input` for each colour and for the margin. A shape is offered
 than by a row of pictures, for the reason the plate picker is — "Circle" is a word before it is a
 picture — and grouping those controls together is a `Card`, not a new control. A slice that needs
 nothing new is the list working.
+
+**F9 brings one control off the list and adds nothing beside it.** `ProgressBar` arrives, because a
+run that writes two hundred files is the first thing in this product long enough to watch. All the
+rest of the batch screen is already here: a `Button` for each dialog, a `Select` for the format, a
+`Card` for each step, an `InfoBar` for a run that did not start, an `EmptyState` before there is a
+plan, and a `TextArea` for rows that arrive without a dialog. Pasting is a door of the product and
+not a way in for the tests (ADR-029): the box is labelled like any other field — _"Rows"_ — it is
+the same control the message and note fields use, and what it holds goes through exactly the parser
+a file goes through.
+
+**`ProgressBar` is a real `<progress>`, its label is required, and the numbers live in a caption
+beside it.** A bar assembled from two `div`s is a picture of a bar: the native element is what a
+screen reader announces as progress, what `value` and `max` mean something to, and what the platform
+draws without being told. It takes a `label` — a moving rectangle with no name says nothing about
+_which_ job is moving — and under it a caption says the count in the words of the thing being
+counted: "137 of 200", which is what a person acts on, where a percentage is what a person converts.
+The bar is shown from the moment the run starts rather than from the first event, because a bar at
+zero is the truth about a batch that has just begun. Indeterminate progress is not a state this
+product has: the plan is known before the first file is written.
 
 **`Modal` and `ConfirmDialog` arrive with F8**, the slice that first has something to destroy. Both
 are copied from the sibling products' implementations rather than reinvented, which is what makes a
@@ -308,9 +327,20 @@ before** — a primitive built ahead of the screen that needs it is a guess with
   and placed by percentages of the code's own `viewBox` so that the screen and the host draw it
   in the same box (ADR-023). Nothing a file brought in is ever injected into the SVG this product
   renders.
-- **The batch report table** (`BatchReportTable`, F9) — a summary that **opens onto its rows**:
-  the figure is a button, pressing it lists the rows it counted, and a row that could not be
-  made shows its line number and its reason. A batch total nobody can decompose is a claim.
+- **The batch plan and the batch report** (F9) — not a primitive, and it is worth saying why,
+  because this document planned one under the name `BatchReportTable`. What shipped is a plain
+  `table` inside the batch feature for the plan, and a plain list for the rows a run did not write:
+  a component with one caller and a name that promises reuse is a promise nothing keeps, and it
+  moves to `src/ui/` on the day a second screen needs it. The **rules** are not optional, though,
+  and they are the ones a primitive would have carried. _A number can be opened_ (§2) is met here
+  by opening it in advance: the counts — "197 written · 2 refused · 1 failed" — are shown with
+  every row they are about underneath them, each with its line number and the sentence that says
+  what happened to it. Nothing is hidden behind a press, because on this screen the rows that did
+  not become files are the reason a person came back to it. The table and the list each carry
+  their own accessible name, for the reason `TabStrip` does. The counts sit in the live region and
+  the rows sit outside it, so what is announced is the summary and not two hundred lines somebody
+  is about to read at their own pace (§7). And a list the screen truncates says so, because the
+  written report keeps every line the table cut (§2, _a view says what it left out_).
 
 ### Asking "are you sure"
 

@@ -25,8 +25,8 @@ the way it is; the SQL explains what it is.
 >
 > A **brand kit** is a logo, colours and a style, applied to a new code in one click.
 >
-> A **batch** is one CSV turned into files, with a report of every row that says what happened
-> to it.
+> A **batch** is one list — a CSV, or rows pasted in — turned into files, with a report of every
+> row that says what happened to it.
 
 ## Tables
 
@@ -37,8 +37,8 @@ the way it is; the SQL explains what it is.
 | `logos`         | the normalised logo, its hash and what normalisation changed      | F4, shipped  |
 | `codes`         | a payload, a style and a size — one row per saved code            | F8, arriving |
 | `brand_kits`    | a logo, a look and a size, named                                  | F8, arriving |
-| `batches`       | one run over one CSV                                              | F9, proposal |
-| `batch_rows`    | the report: one append-only row per line of that CSV              | F9, proposal |
+| `batches`       | one run over one list of rows                                     | F9, arriving |
+| `batch_rows`    | the report: one append-only row per row that run tried            | F9, arriving |
 
 `codes` is the library's table, and the library is F8 — where it arrives, in `004_library.sql`,
 together with `brand_kits`. Until then F0 to F7 make codes and prove them without keeping them, on
@@ -175,8 +175,9 @@ a PNG of the same code. Both landed with F7, in the SQL above.
 
 **`scan_margin_json` is not among them.** It was planned here for F7, and F7 does not write it: the
 margin is a report about one render at one moment, shown after a verdict and never stored
-(ADR-027). If a reason to keep it appears — a batch that wants to report per row how close each
-code came — it arrives in a migration of its own.
+(ADR-027). The batch was the reason it might have been kept, and F9 did not keep it either: the
+report says whether each row was written and why not, which is what a person acts on. If a reason
+to keep it appears, it arrives in a migration of its own.
 
 **Arriving with F8, in `004_library.sql`** — one nullable column, so that an attempt can say which
 saved code it was about:
@@ -333,48 +334,99 @@ size behind would be applied and then corrected by hand every time.
 `name` is `UNIQUE` because a kit is chosen from a list by its name. Two kits called _Brand_ is a
 list where one of the two is a mistake nobody can see.
 
-## `batches`
+## `batches` — arrives with F9
 
-| Column             | Type    | Meaning                                                                             |
-| ------------------ | ------- | ----------------------------------------------------------------------------------- |
-| `id`               | TEXT    | UUID v7                                                                             |
-| `source_name`      | TEXT    | the CSV's file name, sanitised                                                      |
-| `source_sha256`    | TEXT    | of the file as read, so a report can be matched to the file it came from            |
-| `payload_kind`     | TEXT    | what every row of this batch was read as                                            |
-| `output_dir`       | TEXT    | the folder the person chose in the dialog. Every file written is inside it          |
-| `template_code_id` | TEXT    | the code whose style was applied, `NULL` once it is deleted (`ON DELETE SET NULL`)  |
-| `brand_kit_id`     | TEXT    | the kit applied, if any (`ON DELETE SET NULL`)                                      |
-| `row_count`        | INTEGER | data rows read from the CSV                                                         |
-| `written_count`    | INTEGER | files written and verified                                                          |
-| `refused_count`    | INTEGER | rows that produced no file                                                          |
-| `started_at`       | TEXT    |                                                                                     |
-| `finished_at`      | TEXT    | `NULL` while it runs                                                                |
-| `outcome`          | TEXT    | `completed`, `completed_with_refusals`, `failed` or `stopped`; `NULL` while it runs |
+One run, in `005_batches.sql`. A batch is the Create pipeline in a loop
+([ADR-029](architecture/ADR.md#adr-029)): every row is rendered, decoded and compared exactly as a
+single export is, and writes its own `verifications` row. What this table adds is the **run** — what
+was asked for, where it was written, and how it ended. Where this text and the migration disagree,
+the SQL is right.
 
-## `batch_rows` — the report
+| Column        | Type    | Meaning                                                              |
+| ------------- | ------- | -------------------------------------------------------------------- |
+| `id`          | TEXT    | UUID v7                                                              |
+| `created_at`  | TEXT    | when the run started                                                 |
+| `folder`      | TEXT    | the folder the person chose in the dialog. Every file is inside it   |
+| `format`      | TEXT    | `png` or `svg` — one format for the whole run, chosen once           |
+| `dpi`         | INTEGER | the resolution the size was designed at; `NULL` for a run of vectors |
+| `rows_total`  | INTEGER | rows the run was handed — the ones the plan could make               |
+| `written`     | INTEGER | files written and verified                                           |
+| `refused`     | INTEGER | rows the gate would not let out                                      |
+| `failed`      | INTEGER | rows the host could not write                                        |
+| `skipped`     | INTEGER | rows the run never reached, because it was cancelled                 |
+| `finished_at` | TEXT    | `NULL` while it runs                                                 |
 
-**Append-only.** Two triggers refuse `UPDATE` and `DELETE`; no command edits a row; a batch with
-rows cannot be deleted.
+The counts are written once, when the run ends, from rows that already exist — a summary of the
+report and not a second opinion about it.
 
-| Column            | Type    | Meaning                                                                                                         |
-| ----------------- | ------- | --------------------------------------------------------------------------------------------------------------- |
-| `id`              | INTEGER | autoincrement — the report's own order                                                                          |
-| `batch_id`        | TEXT    | `ON DELETE RESTRICT`                                                                                            |
-| `row_number`      | INTEGER | the line number **as the person sees it in the file**, header counted                                           |
-| `status`          | TEXT    | `written`, `refused` or `skipped`                                                                               |
-| `reason`          | TEXT    | one sentence for anything that is not `written` — which cell, and what was wrong with it                        |
-| `output_filename` | TEXT    | the sanitised file name, with no path: the folder is the batch's (`output_dir`). Empty when nothing was written |
-| `verification_id` | TEXT    | the row that proved the file (`verifications.id`); `NULL` when no file was written                              |
-| `written_at`      | TEXT    |                                                                                                                 |
+**Four things changed between the plan above and the migration.** `source_name` and `source_sha256`
+are gone: rows can be **pasted** as well as opened from a file (ADR-029), so there is not always a
+file to name, and a copy of somebody's file name and hash would be a record about a document this
+product does not keep. `payload_kind` is gone because by the time the host is running a batch there
+is no kind left to record — the domain planned every row and what crosses the boundary is a drawing
+and a payload, which is the whole point of planning in the domain. `template_code_id` and
+`brand_kit_id` are gone: a batch takes the look, the size and the logo the Create screen is carrying
+at that moment, and applying a kit copies it rather than pointing at it (ADR-028), so there was no
+row to point at. And `outcome` is gone as a word, because the five numbers beside it already say it:
+a run with `refused > 0` completed with refusals, a run with `skipped > 0` was stopped, and a stored
+adjective is the field that eventually disagrees with the counts it summarises. `started_at` is here
+as `created_at`, the name every other table uses, and `output_dir` as `folder`, the word the command
+and the screen both use.
 
-The report itself is exported as a CSV with formula injection neutralised (`=`, `+`, `-`, `@`) —
-a report about hostile input must not be hostile output (SPEC §5).
+## `batch_rows` — the report, arrives with F9
+
+**Append-only.** One trigger refuses `UPDATE` outright. A second refuses `DELETE` **while the batch
+is still there**, which is what makes deleting a whole run possible without making a report
+editable: during the cascade the parent is already gone, so the rows follow it; a row deleted on its
+own, out of a report that still exists, is refused.
+
+| Column            | Type    | Meaning                                                                              |
+| ----------------- | ------- | ------------------------------------------------------------------------------------ |
+| `id`              | TEXT    | UUID v7                                                                              |
+| `batch_id`        | TEXT    | the run this line belongs to (`ON DELETE CASCADE`)                                   |
+| `line`            | INTEGER | the line number **as the person sees it in the file**, header counted                |
+| `file`            | TEXT    | the sanitised file name, with no path: the folder is the run's (`folder`)            |
+| `status`          | TEXT    | `written`, `refused`, `failed` or `skipped`                                          |
+| `reason`          | TEXT    | one sentence for anything that is not `written`; `NULL` when there is nothing to say |
+| `verification_id` | TEXT    | the row that proved the file (`verifications.id`); `NULL` when no file was written   |
+
+**The four statuses are the four things that can happen to a row, and the domain names them**
+(`RowStatus` in `src/domain/batch.ts`): `written` is a file a decoder read back; `refused` is a code
+the gate would not let out; `failed` is a row the host could not write — a name that was not a
+single path segment, a disk that said no; `skipped` is a row the run never reached, because it was
+cancelled. The plan for this table listed three; `failed` is the distinction worth having, because a
+code that did not read back and a file the filesystem refused are two different sentences to the
+person holding the report.
+
+`line` is the order, so the row's own key does not have to be: `id` is a UUID v7 like every other
+table's, and the index is `(batch_id, line)`. `written_at` is not here — the run has its own two
+timestamps, and a clock per row would be a third reading of the same minute. `verification_id` is
+`ON DELETE SET NULL` for the reason `verifications.code_id` is: the report row is the fact that a
+line was written or refused, and it outlives the evidence row it points at rather than vanishing
+with it. Nothing in this product deletes a verification, which is just as well, because `SET NULL`
+would be an `UPDATE` on a report row and the trigger above would refuse it.
+
+**The report file carries one word more than the table does.** Rows that never reached the host — a
+malformed line, a link that is not a link, a header the parser refused — are the domain's own
+problems, and `reportCsv` writes them as `not made`, with the line number and the reason. So the CSV
+beside the codes accounts for **every line of the file**, while the table accounts for every row the
+run actually tried. It is written with formula injection neutralised (`=`, `+`, `-`, `@`, a tab, a
+carriage return): a report about hostile input must not be hostile output (SPEC §5,
+[ADR-029](architecture/ADR.md#adr-029)).
+
+**`verifications.batch_id` is not among the columns this slice adds.** The relation is held once,
+here, on `batch_rows.verification_id`: a report row points at the proof that made its file, and the
+run a verification belonged to is read back through the report it is in. Both directions together
+would be one relation stored twice, which is the failure mode this document refuses elsewhere,
+because the second copy is the one that eventually disagrees. If listing a run's verifications
+without joining `batch_rows` ever earns a column, it arrives in a migration of its own.
 
 ## Conventions
 
-**Identifiers** are UUID v7, which sort by creation time. `batch_rows` is the single exception:
-its key is an autoincrement integer, because the report's order _is_ its sequence and nothing
-else should decide it. **Timestamps** are UTC, ISO 8601 with milliseconds and a trailing `Z`;
+**Identifiers** are UUID v7, which sort by creation time — `batch_rows` included, where the plan
+asked for an autoincrement integer: the report's order is the line number it already carries, so
+the key does not have to carry it a second time. **Timestamps** are UTC, ISO 8601 with milliseconds
+and a trailing `Z`;
 local wall-clock time is never stored. **Hashes** are lowercase hexadecimal SHA-256, of the bytes
 as stored or as written, never of an intermediate. **JSON columns** hold shapes the domain
 validates (ADR-003); SQLite is not asked to understand them, and the host refuses unknown fields
@@ -449,8 +501,10 @@ nullable, added with `ALTER TABLE` so the rows already in a person's workspace k
 they recorded a PNG at a fixed pixel size, and a column they were written without says `NULL`
 rather than guessing. `004_library` is F8's, and takes it to 4: `codes`, `brand_kits`, and `code_id`
 on `verifications`, nullable for the same reason — a row written before the library existed was
-about a code that was never saved. Version 4 is then the number Diagnostics shows and the number the
-running build states.
+about a code that was never saved. `005_batches` is F9's, and takes it to 5: `batches`, `batch_rows`
+and the two triggers that make the report append-only — a migration that only adds tables, so a
+workspace from before the batch existed simply gains them. Version 5 is then the number Diagnostics
+shows and the number the running build states.
 
 There is no down-migration. A mistake is corrected by a new migration, never by rewriting an
 applied one: an applied migration is history, and that history has already run on somebody's

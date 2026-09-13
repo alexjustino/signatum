@@ -34,6 +34,7 @@ part that matters most later — the cost we accepted.
 | [026](#adr-026) | What is written is what was verified, with one named exception                   | Accepted                      |
 | [027](#adr-027) | The scan margin is a report, never a gate                                        | Accepted                      |
 | [028](#adr-028) | A saved code is its fields and the name of its scene, never an image             | Accepted                      |
+| [029](#adr-029) | A batch is the Create pipeline in a loop, written only inside the chosen folder  | Accepted                      |
 
 ---
 
@@ -1139,3 +1140,116 @@ and size, and editing the kit afterwards changes nothing that was already made. 
 behaviour the screen promises — one click sets the look — and it means there is no lineage to show
 a person who wonders why their older codes did not follow the kit. Recorded here so that the
 question has an answer.
+
+---
+
+## ADR-029 — A batch is the Create pipeline in a loop, and the host writes only inside the chosen folder {#adr-029}
+
+**Status: Accepted.**
+
+**Context.** Until F9 every code was made by a person watching it: typed into a form, refused with a
+sentence they read, exported to a path they chose in a dialog. A batch takes the person out of the
+middle of that — a file somebody else wrote decides what is built, what it is called and how many
+times it happens — and it does so with two inputs this product already calls hostile. The **cells**
+are strings from a colleague's spreadsheet or an export out of an HR system, and one of them names a
+file; the **report** is then opened in the spreadsheet those cells came from. Both halves have a
+known way to go wrong: a cell that is a path escapes the folder that was chosen, and a cell that
+begins with `=` is a formula in whatever opens the report. There is a quieter way to go wrong as
+well, and it is the one that would cost the most — a "batch mode" that goes faster by proving less,
+so that two hundred files leave under a claim that was tested on one of them.
+
+**Decision.** A batch is the Create pipeline run in a loop, and nothing in it is a shortcut.
+
+- **Every row is planned by the same three functions one code is.** `planBatch` in
+  `src/domain/batch.ts` calls `buildPayload` → `planCode` → `renderScene` per row, with the look,
+  the size, the error-correction floor and the logo the Create screen is carrying at that moment. So
+  a batch **cannot make a code the screen could not**: the same builders and the same escaping
+  ([ADR-021](#adr-021)), the same placement engine and its refusals ([ADR-013](#adr-013)), the same
+  automatic error correction with a logo ([ADR-017](#adr-017)), the same contrast gate
+  ([ADR-025](#adr-025)). A second rendering path for volume would be a second product, and the first
+  defect it shipped would ship two hundred times.
+- **A row that fails is a problem by line, and the loop goes on.** A refusal becomes
+  `RowProblem { line, reason }`, carrying the domain's own sentence and the line **as the person
+  sees it in the file** — counted through quoted fields, so a note with a line break in it does not
+  shift every number after it. A row with the wrong number of fields, a link that is not a link, a
+  card with no name, a logo that will not fit at that size: each is one line of the report, and none
+  of them is a stop. The caps are the other half of that promise — 10 000 rows, 64 KiB per row,
+  2 MiB per file — each refused with a sentence rather than by slowing to a halt.
+- **The header decides what the batch is.** A `url` column makes a batch of links; `given_name` or
+  `family_name` makes a batch of contact cards; anything else is refused before a row is read, with
+  the sentence that names the columns it would have accepted. Guessing the kind from the cells would
+  let the same file mean different things on different days.
+- **A file name comes from a `name` column, or from the name the payload gives itself.** It then
+  goes through `sanitiseFileStem`:
+  normalised to NFC, stripped of control characters, every `\ / : * ? " < > |` replaced by `-`,
+  runs of dots and of hyphens collapsed, spaces collapsed, leading and trailing dots and spaces
+  trimmed, `.` and `..` and the empty string
+  turned into `code`, a name Windows reserves (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`,
+  `LPT1`–`LPT9`, `CONIN$`, `CONOUT$`, with or without an extension) prefixed with `code-`, and cut
+  to 80 characters. `fileNameFor` then prefixes the row number — `007-Ana Souza` — so the folder
+  sorts in the order of the file it came from and two people with one name do not overwrite each
+  other; a name already taken takes a `-2`. `../../evil` becomes plain `evil`: the separators were
+  the danger and they are gone, and two dots in a row are collapsed even inside a name, so the
+  domain never hands the host a leaf the host would refuse.
+- **The host verifies each row exactly like an export, and writes it the same way.** Every file is
+  rasterised, decoded by the independent decoder and compared byte for byte before it is written
+  ([ADR-010](#adr-010)), and what is written is what was decoded ([ADR-026](#adr-026)), through a
+  temporary name renamed into place. Two hundred files are two hundred verifications; a row that
+  does not read back is `refused` in the report and there is no file for it. A file already in the
+  folder under a row's name is **never replaced**: that row fails with a sentence and the file
+  stays, so a list run twice into one folder is a report of failed rows, not a folder of replaced
+  files. One run at a time: a second `run_batch` while one is going is refused, so Cancel always
+  means the run on screen.
+- **The folder chosen is the only place written.** The host canonicalises that folder once, and
+  checks each leaf again on its own side of the boundary — one segment, no separator, no `..` — so a
+  leaf that is not one segment is a **failed row, never a path**. The domain's sanitising and the
+  host's check are deliberately the same rule written twice: the domain's is what makes a usable
+  name, the host's is what makes the containment claim, and a claim that depends on the webview
+  having been correct is not a claim.
+- **The report is built by the domain and only written by the host.** `reportCsv` produces the whole
+  file — `line,name,file,status,reason`, CRLF, in line order, one line per planned row and one per
+  problem — with every cell escaped for CSV **and** neutralised by `csvCell`: a cell beginning `=`,
+  `+`, `-`, `@`, a tab or a carriage return is prefixed with an apostrophe, so a spreadsheet reads
+  it as text (the OWASP rule). The host writes that string beside the codes, through the same staged
+  rename, and **never over a report that is already there** — a second run lands beside the first,
+  not on top of it. CSV is written in exactly one place in this repository, which is what makes it
+  possible to say it is safe.
+- **The rows of a batch are append-only.** `batch_rows` refuses `UPDATE` outright and refuses
+  `DELETE` while the batch is still there; deleting the whole run takes its rows with it, which is
+  the one deletion that is not a rewrite of a report ([`DATA_MODEL.md`](../DATA_MODEL.md)). This is
+  the reasoning behind the verification rows, applied to a run instead of a code: the report is
+  evidence, and evidence that can be edited is not evidence.
+- **Reading the CSV is the host's job, under a cap.** `read_text_file` is the second door in this
+  product that reads a file a person chose in a dialog, after `import_logo`: at most 2 MiB, UTF-8 or
+  a refusal, a local path only, and used by this screen alone. The interface still never reads a
+  file itself — it hands over the path the dialog produced and receives text
+  ([`SECURITY.md`](../../SECURITY.md)).
+
+**Why the plan is shown before anything is written.** The person sees what the file would produce —
+how many rows can be made, what each one will be called, and every problem by line — before they
+choose a folder. A batch that asked for the folder first would put its refusals after the writing,
+which is the order in which nobody reads them.
+
+**Cost accepted: a negative number in a name cell is written as `'-1` in the report.** The rule that
+neutralises `=HYPERLINK(...)` cannot tell a formula from a minus sign, because the spreadsheet
+cannot either until it has evaluated it. So a row named `-1` is reported as `'-1`, and somebody
+reading the report sees an apostrophe that was not in their data. It is the right side to be wrong
+on: the apostrophe is visible and harmless, and the alternative is a report about hostile input that
+is itself the attack. It is tested with `=HYPERLINK`, `+cmd`, `@SUM` and a plain `-1`, so the cost
+is asserted rather than remembered.
+
+**Second cost: 10 000 rows, and the whole plan is in memory.** The plan is materialised before a
+single file is written — every row's scene, drawn and held — because the screen shows the plan first
+and the host is handed rows that were already proved plannable. That is what makes the cap a number
+rather than an intention: a longer list is split into two runs. Streaming the plan would buy an
+unbounded batch at the price of the thing that makes this one honest, which is that every refusal is
+known before the folder is chosen.
+
+**Third cost: the paste door exists because a test cannot open a dialog, and it is a product feature
+anyway.** The end-to-end suite drives the real binary ([ADR-008](#adr-008)), and a native file
+dialog is outside what WebDriver can operate, so rows have to be able to arrive without one. Rather
+than a hidden hatch the suite uses and nobody else has — a second way in, exercised only by tests,
+is a second product — the screen takes pasted rows in a plain `TextArea`, for everybody, and says
+so. It reads nothing: the text was already in the person's clipboard, and it goes through the same
+parser the file does. The cost is one more place a batch can start from; the gain is that the path
+the tests prove is the path people use.

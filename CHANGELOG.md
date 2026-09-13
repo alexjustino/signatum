@@ -228,9 +228,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   password with this code", ticked by default, with the plain sentence beside it: kept, the password
   is in the clear in the workspace file on this machine. Clear it and the code is saved without the
   password, and reopening it asks for the password again before the code can be checked or exported.
-- **The application shell.** Five destinations — Create, Library, Diagnostics, Settings and About —
-  in the Windows 11 visual language, following the accent colour chosen for the desktop, in light
-  or dark by choice or by the system. The theme is remembered between sessions.
+- **A list becomes codes: one verified file per row.** A CSV of links or of contact cards — chosen
+  from disk, or pasted straight into the screen — is turned into one file per row, each one built by
+  exactly the pipeline the Create screen uses and each one read back by the independent decoder
+  before it is written. The first line of the file names the columns, and it decides what the batch
+  is: a `url` column makes links, `given_name` and `family_name` make cards, and a file whose
+  first line says neither is refused with the sentence that names what it needed. The look, the size
+  and the logo are the ones on the Create screen, so a batch of two hundred cards looks like the one
+  card that was designed.
+- **Every row that could not be made is a line in a report, and never a stop.** A row with the wrong
+  number of fields, an address that is not a link, a card with nobody's name on it, a logo that will
+  not fit at that size: each is reported with its line number — the line as it is in the file, even
+  when a note in a cell runs over several lines — and the rest of the list is made anyway. The plan
+  is shown before a folder is chosen, so the count of what can and cannot be made is read before
+  anything is written rather than after.
+- **File names from a spreadsheet, made safe.** A `name` column names each file, or the code names
+  itself when there is none. What arrives is reduced to one file name and nothing else: no path
+  separator, no `..`, no control character, no name Windows reserves, at most eighty characters, and
+  prefixed with the row's number so the folder sorts in the order of the file it came from and two
+  people with the same name do not overwrite each other.
+- **The folder chosen is the only place anything is written.** The folder is resolved once and every
+  file is checked to be inside it before it is written; a row whose name is not a plain file name is
+  reported as failed and never followed as a path. Each file is written through a temporary name
+  renamed into place, so a half-written code never exists at a path somebody chose, and a file
+  already in the folder under a row's name is never replaced — that row is reported instead.
+- **The report is a CSV that cannot become a formula.** Every row and every problem, in line order,
+  with the file's name, what happened to it and why — written beside the codes, never over a report
+  that is already there. A cell beginning `=`, `+`, `-` or `@` is written as text, so a report about
+  a hostile list is not itself the attack when it is opened in a spreadsheet. The cost is
+  visible and deliberate: a name that is a negative number is written with a leading apostrophe.
+- **It says where it is, and it can be stopped.** A counter moves as the rows are written — "137 of
+  200" — and Cancel stops the run between rows: what was written stays written, and the rest is
+  reported as skipped rather than quietly missing.
+- **The application shell.** Six destinations — Create, Library, Batch, Diagnostics, Settings and
+  About — in the Windows 11 visual language, following the accent colour chosen for the desktop, in
+  light or dark by choice or by the system. The theme is remembered between sessions.
 - **The workspace file.** One SQLite database created on first launch and migrated forward,
   never rewritten backwards; Diagnostics says where it is, how large it is and which schema
   version it holds.
