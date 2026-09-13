@@ -129,9 +129,25 @@ pixels for a decoder to read — it is written down rather than glossed over. Al
 the code is also shrunk, blurred and recompressed nine ways and read again, so the screen can say
 how much abuse it has left in it: a report, and never a gate.
 
-What it does not do yet: an error-correction level chosen for you rather than raised by hand; and
-no code is saved — close the window and the code is gone, though the logos imported stay in the
-workspace. Those are the slices that follow.
+F8 has given the product a memory. A code that has passed the gate can be saved under a name and
+reopened later from a library of its own — after closing the window, after an update — with the
+fields, the colours and shapes, the printed size and resolution, the logo and its plate all as they
+were. What is kept is what was typed rather than the encoded string, and the name of the drawing the
+code made: never a stored picture. So reopening a code rebuilds it by the same rules and hands it to
+the decoder again, rather than trusting a verdict from months ago, and a correction to the way a
+format is escaped reaches every code already saved. If a later version of the product would draw a
+saved code differently, the screen says so instead of quietly showing something else under the old
+name. Codes can be renamed, and deleting one asks first. A **brand kit** saves a logo, the colours,
+the shapes, the margin, the error-correction floor and the printed size together, and applies all of
+them to a new code in one click — a kit changes how a code looks and never what it says. A logo that
+a kit or a saved code is using cannot be deleted, and the refusal names the kits and the codes that
+are using it. And the choice a Wi-Fi password deserves is now a choice: keep it with the code, in
+the clear in the workspace file, as the screen says plainly — or clear it, and be asked for it again
+the next time the code is opened.
+
+What it does not do yet: a CSV of links or contacts turned into one verified file per row, with a
+report of the rows it refused; and reading a code back out of an image somebody photographed or was
+sent. Those are the slices that follow.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 
