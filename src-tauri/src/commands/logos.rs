@@ -43,7 +43,7 @@ pub use crate::db::MAX_NAME_CHARS;
 /// devices are in the list with the rest: `CONIN$` and `CONOUT$` are not
 /// spelled like the others, and a list that leaves out the two that look
 /// different is a list somebody wrote from memory.
-const RESERVED: [&str; 24] = [
+pub(crate) const RESERVED: [&str; 24] = [
     "con", "prn", "aux", "nul", "conin$", "conout$", "com1", "com2", "com3", "com4", "com5",
     "com6", "com7", "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8",
     "lpt9",
