@@ -100,6 +100,17 @@ export class Element {
 }
 
 /** WebDriver key code points. */
+/**
+ * An XPath 1.0 string literal for any text: XPath has no escape character, so a text that holds
+ * both kinds of quote is spliced with `concat()`.
+ */
+export function xpathLiteral(text: string): string {
+  if (!text.includes('"')) return `"${text}"`;
+  if (!text.includes("'")) return `'${text}'`;
+  const parts = text.split('"').map((part) => `"${part}"`);
+  return `concat(${parts.join(", '\"', ")})`;
+}
+
 export const Keys = {
   ENTER: '',
   ESCAPE: '',
@@ -253,12 +264,11 @@ export class Driver {
 
   /** Wait for an element whose visible text contains `text`. */
   waitForText(text: string, timeoutMs = 10_000): Promise<Element> {
-    const escaped = text.replace(/"/g, '\\"');
     return this.waitFor(
       `text "${text}"`,
       async () => {
         const matches = await this.findAllByXPath(
-          `//*[contains(normalize-space(.), "${escaped}")]`,
+          `//*[contains(normalize-space(.), ${xpathLiteral(text)})]`,
         );
         // The deepest match is the one that actually holds the text.
         for (const candidate of matches.reverse()) {
@@ -272,14 +282,13 @@ export class Driver {
 
   /** Wait until no element contains `text`. */
   async waitForGone(text: string, timeoutMs = 10_000): Promise<void> {
-    const escaped = text.replace(/"/g, '\\"');
     await this.waitFor(
       `"${text}" to disappear`,
       async () => {
         // Live regions hold the last announcement for a few seconds; what they
         // say is not what the screen shows.
         const matches = await this.findAllByXPath(
-          `//*[contains(normalize-space(text()), "${escaped}")][not(ancestor-or-self::*[@aria-live])]`,
+          `//*[contains(normalize-space(text()), ${xpathLiteral(text)})][not(ancestor-or-self::*[@aria-live])]`,
         );
         return matches.length === 0 ? true : null;
       },
