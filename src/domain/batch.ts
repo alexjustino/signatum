@@ -229,6 +229,11 @@ export function sanitiseFileStem(raw: string): string {
   // eslint-disable-next-line no-control-regex
   stem = stem.replace(/[\u0000-\u001f\u007f]/g, '');
   stem = stem.replace(/[\\/:*?"<>|]/g, '-');
+  // Two dots in a row never survive, even inside a name: the host refuses `..` anywhere in a
+  // leaf, so the domain must never hand it one. The hyphens the separators became are then
+  // collapsed and trimmed, so `../../evil` comes out as plain `evil`.
+  stem = stem.replace(/\.{2,}/g, '-');
+  stem = stem.replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '');
   stem = stem.replace(/\s+/g, ' ').trim();
   stem = stem.replace(/^[. ]+|[. ]+$/g, '');
   if (stem.length > MAX_FILE_STEM) stem = stem.slice(0, MAX_FILE_STEM).replace(/[. ]+$/g, '');

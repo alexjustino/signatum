@@ -87,10 +87,10 @@ describe('kindOfHeader and formOfRow', () => {
 describe('file names', () => {
   it('sanitises what a cell says into one safe path segment', () => {
     // The leading dots go; the dots inside are just dots, with no separator to give them meaning.
-    expect(sanitiseFileStem('../../evil')).toBe('-..-evil');
-    expect(sanitiseFileStem('..\\evil')).toBe('-evil');
-    expect(sanitiseFileStem('C:\\x')).toBe('C--x');
-    expect(sanitiseFileStem('\\\\server\\share')).toBe('--server-share');
+    expect(sanitiseFileStem('../../evil')).toBe('evil');
+    expect(sanitiseFileStem('..\\evil')).toBe('evil');
+    expect(sanitiseFileStem('C:\\x')).toBe('C-x');
+    expect(sanitiseFileStem('\\\\server\\share')).toBe('server-share');
     expect(sanitiseFileStem('a/b')).toBe('a-b');
     expect(sanitiseFileStem('CON')).toBe('code-CON');
     expect(sanitiseFileStem('con.txt')).toBe('code-con.txt');
@@ -122,6 +122,8 @@ describe('file names', () => {
       expect(stem).not.toMatch(/[\\/]/);
       expect(stem).not.toBe('.');
       expect(stem).not.toBe('..');
+      expect(stem).not.toContain('..');
+      expect(stem.startsWith('-') || stem.endsWith('-')).toBe(false);
       expect(stem.length).toBeGreaterThan(0);
       expect(['con', 'nul', 'lpt9']).not.toContain(stem.split('.')[0]?.toLowerCase());
     }
