@@ -15,6 +15,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { copyPng, exportPdf, exportPng, exportSvg, scanMargin, verifyCode } from './codes';
+import {
+  deleteBrandKit,
+  deleteCode,
+  getCode,
+  listBrandKits,
+  listCodes,
+  renameCode,
+  saveBrandKit,
+  saveCode,
+} from './library';
 import { deleteLogo, importLogo, listLogos, logoDataUrl } from './logos';
 import { fetchAccentRamp, fetchSystemInfo } from './system';
 
@@ -24,6 +34,10 @@ export const keys = {
   logos: ['logos'] as const,
   /** Under the logos key on purpose: forgetting a logo forgets its bytes too. */
   logoDataUrl: (id: string) => ['logos', id, 'data-url'] as const,
+  codes: ['codes'] as const,
+  /** Under the codes key: renaming or forgetting one has to reach the list as well. */
+  code: (id: string) => ['codes', id] as const,
+  brandKits: ['brand-kits'] as const,
 };
 
 /** What the running binary says about itself. Read once: it does not change. */
@@ -96,9 +110,19 @@ export function useLogos() {
 /**
  * The stored bytes of one logo, for showing it. They never change for a given
  * id — the store writes a logo once — so this is fetched at most once a window.
+ *
+ * `null` is "there is no logo here": a saved code without one is a row that asks
+ * nothing of the store, and the question is not asked rather than asked about
+ * nothing. Written as a disabled query rather than as a second hook, because a
+ * hook that is sometimes called is the crash `rules-of-hooks` exists to prevent.
  */
-export function useLogoDataUrl(id: string) {
-  return useQuery({ queryKey: keys.logoDataUrl(id), queryFn: () => logoDataUrl(id) });
+export function useLogoDataUrl(id: string | null) {
+  return useQuery({
+    queryKey: keys.logoDataUrl(id ?? 'none'),
+    // Never runs while `enabled` is false; the branch is for the type, not for the host.
+    queryFn: () => (id === null ? Promise.resolve(null) : logoDataUrl(id)),
+    enabled: id !== null,
+  });
 }
 
 /**
@@ -120,5 +144,76 @@ export function useDeleteLogo() {
   return useMutation({
     mutationFn: deleteLogo,
     onSuccess: () => client.invalidateQueries({ queryKey: keys.logos }),
+  });
+}
+
+/**
+ * The saved codes (SPEC §2.7).
+ *
+ * Read once and invalidated by the three commands that change them, rather than polled like the
+ * logos: this window is the only thing that writes the library, so a timer would be a claim
+ * about a writer that does not exist.
+ */
+export function useCodes() {
+  return useQuery({ queryKey: keys.codes, queryFn: listCodes });
+}
+
+/** One saved code in full: the fields a row draws its preview from, and Open loads. */
+export function useCode(id: string) {
+  return useQuery({ queryKey: keys.code(id), queryFn: () => getCode(id) });
+}
+
+/** Keep the code on screen. The list says so without being asked again. */
+export function useSaveCode() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: saveCode,
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.codes }),
+  });
+}
+
+/** Give a saved code another name. */
+export function useRenameCode() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: renameCode,
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.codes }),
+  });
+}
+
+/** Forget a saved code — and with it whatever a row of it was showing. */
+export function useDeleteCode() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: deleteCode,
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.codes }),
+  });
+}
+
+/** The brand kits: a look, a size and a logo, each under a name. */
+export function useBrandKits() {
+  return useQuery({ queryKey: keys.brandKits, queryFn: listBrandKits });
+}
+
+export function useSaveBrandKit() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: saveBrandKit,
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.brandKits }),
+  });
+}
+
+/**
+ * Forget a brand kit. The logos are invalidated with it: a kit was one of the reasons the store
+ * refused to forget a logo, and the row that offers to forget it has to stop saying so.
+ */
+export function useDeleteBrandKit() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: deleteBrandKit,
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: keys.brandKits });
+      await client.invalidateQueries({ queryKey: keys.logos });
+    },
   });
 }

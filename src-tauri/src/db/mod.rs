@@ -4,6 +4,8 @@
 //! drawn, are pure TypeScript in `src/domain/`. Rust owns storage, migrations,
 //! the scan gate's evidence, and the operating system.
 
+pub mod brand_kits;
+pub mod codes;
 pub mod logos;
 pub mod migrations;
 pub mod verifications;
@@ -28,6 +30,15 @@ pub const DATA_DIR_ENV: &str = "SIGNATUM_DATA_DIR";
 
 /// The workspace file name.
 pub const DATABASE_FILE: &str = "signatum.sqlite3";
+
+/// The longest name any row in this workspace keeps.
+///
+/// One number for a logo's label, a saved code's name and a brand kit's name,
+/// because they are the same idea — the word a person picks a thing by in a
+/// list — and two numbers for one idea eventually disagree. The `CHECK`
+/// constraints in `004_library.sql` spell it out in SQL; if this changes, they
+/// change with it, in a migration.
+pub const MAX_NAME_CHARS: usize = 80;
 
 /// Resolve the workspace file: `%APPDATA%/io.github.alexjustino.signatum/signatum.sqlite3`,
 /// or `$SIGNATUM_DATA_DIR/signatum.sqlite3` when the variable is set.
@@ -73,4 +84,48 @@ pub fn now() -> String {
 /// order readable in the file without a second column.
 pub fn new_id() -> String {
     uuid::Uuid::now_v7().to_string()
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The path the product actually takes: a file on disk, opened the way
+    /// start-up opens it — WAL, foreign keys on, migrations applied. Every other
+    /// test in this crate migrates an in-memory database, which is the same SQL
+    /// and not the same file.
+    #[test]
+    fn a_real_file_is_opened_migrated_and_enforcing_its_foreign_keys() {
+        let directory = std::env::temp_dir().join(format!("signatum-{}", new_id()));
+        std::fs::create_dir_all(&directory).expect("scratch directory");
+        let path = directory.join(DATABASE_FILE);
+
+        let conn = open_at(&path).expect("open a new workspace");
+        assert_eq!(
+            migrations::current_version(&conn),
+            migrations::target_version()
+        );
+        let enforcing: i64 = conn
+            .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+            .expect("read the pragma back");
+        assert_eq!(enforcing, 1, "a workspace that does not enforce its keys");
+        let orphan = conn.execute(
+            "INSERT INTO codes
+               (id, created_at, updated_at, name, kind, payload_json, style_json, size_json,
+                logo_id, scene_sha256)
+             VALUES ('a', 't', 't', 'Menu', 'link', '{}', '{}', '{}', 'not-a-logo', ?1)",
+            ["a".repeat(64)],
+        );
+        assert!(orphan.is_err(), "on disk as much as in memory");
+
+        drop(conn);
+        let again = open_at(&path).expect("open it a second time");
+        assert_eq!(
+            migrations::current_version(&again),
+            migrations::target_version(),
+            "opening an already migrated workspace changes nothing"
+        );
+
+        drop(again);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
 }

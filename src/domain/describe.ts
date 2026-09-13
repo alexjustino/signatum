@@ -80,3 +80,18 @@ export interface ScanVariant {
 export function describeVariant({ label, verified }: ScanVariant): string {
   return `${label} — ${verified ? 'reads' : 'fails'}`;
 }
+
+/**
+ * What a reopened code says about itself (ADR-028).
+ *
+ * A saved code is its fields and the name of the scene they made, never a stored picture, so
+ * the scene is rebuilt on opening and hashed again. Almost always the two digests agree and the
+ * sentence says so. When they do not, something between the two renders changed — a newer
+ * version of this product drawing the same fields differently — and that is the stated cost of
+ * storing fields instead of an image, so it is said out loud rather than discovered on paper.
+ */
+export function describeReopen(matches: boolean): string {
+  return matches
+    ? 'Reopened exactly as it was saved.'
+    : 'This code rebuilds differently from when it was saved; check it before you print.';
+}

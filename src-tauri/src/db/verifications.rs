@@ -43,6 +43,10 @@ pub struct VerificationRow<'a> {
     /// What the export was: `png`, `svg`, `pdf` or `clipboard`. `None` for a
     /// preview, which wrote nothing anywhere.
     pub format: Option<&'a str>,
+    /// The saved code this was a verification of, when there is one (F8).
+    /// `None` for a code that has never been saved — which is most of them,
+    /// because a code is proved long before anybody decides to keep it.
+    pub code_id: Option<&'a str>,
 }
 
 /// Write one verification and return its identifier.
@@ -55,8 +59,8 @@ pub fn record(conn: &Connection, row: &VerificationRow) -> Result<String> {
     conn.execute(
         "INSERT INTO verifications
            (id, created_at, kind, decoder, verified, payload_sha256, decoded_sha256,
-            artefact_sha256, width, height, duration_ms, path, reason, dpi, format)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            artefact_sha256, width, height, duration_ms, path, reason, dpi, format, code_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
         rusqlite::params![
             id,
             now(),
@@ -73,6 +77,7 @@ pub fn record(conn: &Connection, row: &VerificationRow) -> Result<String> {
             row.reason,
             row.dpi,
             row.format,
+            row.code_id,
         ],
     )?;
     Ok(id)
@@ -109,6 +114,7 @@ mod tests {
                 reason: None,
                 dpi: Some(300),
                 format: Some("png"),
+                code_id: None,
             },
         )
         .expect("record");
@@ -154,6 +160,7 @@ mod tests {
                 reason: Some("The decoder found no code."),
                 dpi: None,
                 format: None,
+                code_id: None,
             },
         )
         .expect("record");
@@ -186,6 +193,7 @@ mod tests {
                 reason: None,
                 dpi: None,
                 format: None,
+                code_id: None,
             },
         );
         assert!(

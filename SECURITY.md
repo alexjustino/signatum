@@ -80,7 +80,14 @@ seriously.
   beginning `=`, `+`, `-` or `@` cannot become a formula in whatever opens it.
 - **Wi-Fi passwords are stored locally, in the clear, unless the person chooses not to save
   them.** This is a deliberate trade and not an oversight: the screen says so, in plain words,
-  where the password is typed.
+  where the password is typed. **The choice exists as of the library (ADR-018, ADR-028):** saving a
+  Wi-Fi code offers "Save the password with this code", and it is what the tick means. Kept, the
+  password is written into the workspace database as plain text, beside everything else in it —
+  anybody who can read that file can read it, and the file is not encrypted at rest. Cleared, the
+  code is saved without the password and asks for it again when it is reopened, so nothing about
+  that network is in the file. Either way the printed code itself carries the password in plain
+  text, because that is what a Wi-Fi code is; what this choice governs is only what the workspace
+  keeps afterwards.
 - **Minimum capabilities.** Tauri 2 capabilities are declared explicitly, one by one. Files are
   read and written **only** through paths the person chose in a system dialog; nothing in the
   product enumerates a directory or follows a path it was not handed. Shell execution is not

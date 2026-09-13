@@ -57,6 +57,13 @@ export interface VerifyRequest {
    * included, which is the only reading worth having.
    */
   logo?: LogoPlacement | null;
+  /**
+   * The saved code this is about, when the code on screen came from the library or was just
+   * written to it (F8). The host records it beside the verification so that a row in the library
+   * can be traced to the readings taken of it — including the refused ones, which is the half of
+   * the history worth keeping. Absent for a code that exists only in this window.
+   */
+  codeId?: string | null;
 }
 
 export interface ExportRequest extends VerifyRequest {
@@ -129,12 +136,14 @@ export async function verifyCode({
   payload,
   pixelSize,
   logo = null,
+  codeId = null,
 }: VerifyRequest): Promise<VerificationReport> {
   const raw = await invoke<RawVerificationReport>('verify_code', {
     svg,
     payload,
     pixel_size: pixelSize,
     logo: placementArg(logo),
+    code_id: codeId,
   });
   return report(raw);
 }
@@ -147,6 +156,7 @@ export async function exportPng({
   path,
   logo = null,
   dpi,
+  codeId = null,
 }: ExportRequest): Promise<ExportReport> {
   const raw = await invoke<RawExportReport>('export_png', {
     svg,
@@ -155,6 +165,7 @@ export async function exportPng({
     path,
     logo: placementArg(logo),
     dpi,
+    code_id: codeId,
   });
   return { ...report(raw), path: raw.path, bytesWritten: raw.bytes_written };
 }
@@ -175,6 +186,7 @@ export async function exportSvg({
   path,
   logo = null,
   dpi,
+  codeId = null,
 }: ExportRequest): Promise<ExportReport> {
   const raw = await invoke<RawExportReport>('export_svg', {
     svg,
@@ -183,6 +195,7 @@ export async function exportSvg({
     path,
     logo: placementArg(logo),
     dpi,
+    code_id: codeId,
   });
   return { ...report(raw), path: raw.path, bytesWritten: raw.bytes_written };
 }
@@ -200,6 +213,7 @@ export async function exportPdf({
   logo = null,
   dpi,
   widthMm,
+  codeId = null,
 }: ExportPdfRequest): Promise<ExportReport> {
   const raw = await invoke<RawExportReport>('export_pdf', {
     svg,
@@ -209,6 +223,7 @@ export async function exportPdf({
     logo: placementArg(logo),
     dpi,
     width_mm: widthMm,
+    code_id: codeId,
   });
   return { ...report(raw), path: raw.path, bytesWritten: raw.bytes_written };
 }
@@ -223,6 +238,7 @@ export async function copyPng({
   pixelSize,
   logo = null,
   dpi,
+  codeId = null,
 }: CopyRequest): Promise<VerificationReport> {
   const raw = await invoke<RawVerificationReport>('copy_png', {
     svg,
@@ -230,6 +246,7 @@ export async function copyPng({
     pixel_size: pixelSize,
     logo: placementArg(logo),
     dpi,
+    code_id: codeId,
   });
   return report(raw);
 }
@@ -245,6 +262,8 @@ export async function scanMargin({
   pixelSize,
   logo = null,
 }: VerifyRequest): Promise<ScanMargin> {
+  // The saved code's id is deliberately not forwarded: the margin is a report about the picture
+  // on screen, never a reading recorded against a row in the library (ADR-027).
   const raw = await invoke<RawScanMargin>('scan_margin', {
     svg,
     payload,

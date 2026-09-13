@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 
 import { applyAccent } from '@/app/theme';
 import { describeError } from '@/data/errors';
-import { useAccentRamp, useSystemInfo } from '@/data/hooks';
+import { useAccentRamp, useBrandKits, useCodes, useSystemInfo } from '@/data/hooks';
 import { Card } from '@/ui/Card';
 import { InfoBar } from '@/ui/InfoBar';
 
@@ -17,6 +17,8 @@ import { InfoBar } from '@/ui/InfoBar';
 export function DiagnosticsPage() {
   const info = useSystemInfo();
   const accent = useAccentRamp();
+  const codes = useCodes();
+  const kits = useBrandKits();
   const ramp = accent.data ?? null;
 
   // Reading the ramp here is also the moment to apply it: a person who opens
@@ -69,6 +71,13 @@ export function DiagnosticsPage() {
         )}
       </Card>
 
+      <Card title="Library" description="What this workspace is keeping for you.">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-body">
+          <Row label="Saved codes" value={counted(codes.data?.length, codes.isError)} />
+          <Row label="Brand kits" value={counted(kits.data?.length, kits.isError)} />
+        </dl>
+      </Card>
+
       <Card title="Accent" description="The ramp Windows gave for your accent colour.">
         <div className="flex overflow-hidden rounded-md border border-stroke-subtle">
           {ramp
@@ -98,6 +107,17 @@ export function DiagnosticsPage() {
       </Card>
     </div>
   );
+}
+
+/**
+ * A count, or what is true instead of one.
+ *
+ * A number that could not be read must not be shown as zero: an empty library and an unanswered
+ * question look identical, and only one of them is a fact (DESIGN_SYSTEM §2).
+ */
+function counted(total: number | undefined, failed: boolean): string {
+  if (failed) return 'could not be read';
+  return total === undefined ? 'reading…' : total.toLocaleString();
 }
 
 function Row({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {

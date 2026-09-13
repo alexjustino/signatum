@@ -1,4 +1,4 @@
-import { Image20Regular } from '@fluentui/react-icons';
+import { Delete16Regular, Image20Regular } from '@fluentui/react-icons';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useState } from 'react';
 
@@ -126,103 +126,124 @@ export function LogoCard({
   };
 
   /**
-   * Take the logo out of the code — and out of the store with it, because a
-   * logo nobody is using is a file this product has no reason to keep.
+   * Take the logo out of the code, and only out of the code.
+   *
+   * It used to delete the file as well, on the grounds that a logo nobody is using is a file
+   * this product has no reason to keep. F8 made that wrong: a brand kit or a saved code may be
+   * the thing using it, the store refuses to forget a logo they reference, and a refusal in the
+   * middle of taking a mark off a code is a failure report about something nobody asked for.
+   * Forgetting the file is its own control, on the row of logos already used.
    */
-  const remove = async () => {
+  const remove = () => {
     if (logo === null) return;
     setProblem(null);
-    const { id, name } = logo.info;
+    const { name } = logo.info;
     onLogo(null);
+    announce(`${name} was removed; the code is being checked again.`);
+  };
+
+  /**
+   * Forget a stored logo.
+   *
+   * The store refuses when a brand kit or a saved code still references it, and names them
+   * (DESIGN_SYSTEM §10): the sentence is the host's and it is shown as it arrived, because
+   * "which kit" is the only thing a person needs in order to act.
+   */
+  const forgetStored = async (id: string, name: string) => {
+    setProblem(null);
     try {
       await forget(id);
-      announce(`${name} was removed; the code is being checked again.`);
+      announce(`${name} is no longer in this workspace.`);
     } catch (error) {
-      setProblem({
-        title: 'The logo was taken out of the code, but not deleted',
-        text: describeError(error),
-      });
+      setProblem({ title: 'That logo is still in use', text: describeError(error) });
     }
   };
 
   return (
     <Card title="Logo">
-      {logo === null ? (
-        <div className="flex flex-col gap-3">
-          <p className="text-body text-fg-secondary">
-            A logo sits in the middle of the code; the code is checked with it in place.
-          </p>
-          <div>
-            <Button
-              icon={<Image20Regular />}
-              disabled={importing || adopting}
-              onClick={() => void choose()}
-            >
-              Choose a logo…
-            </Button>
-          </div>
-          <UsedLogos
-            state={logos}
-            disabled={importing || adopting}
-            onUse={(info, bytes) => void adopt(info, bytes)}
-          />
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-start gap-3">
-            <span className="flex shrink-0 items-center justify-center rounded-md border border-stroke-subtle bg-card p-1">
-              {logo.info.dataUrl !== null ? (
-                <img
-                  src={logo.info.dataUrl}
-                  alt={logo.info.name}
-                  className="max-h-24 max-w-24 object-contain"
-                />
-              ) : (
-                <span className="px-2 text-caption text-fg-tertiary">No preview</span>
-              )}
-            </span>
-            <div className="flex min-w-0 flex-col gap-1">
-              <p className="truncate text-body text-fg">{logo.info.name}</p>
-              <p className="text-caption text-fg-secondary">
-                {logo.info.format.toUpperCase()} · {logo.info.width}×{logo.info.height}
-              </p>
-              {logo.info.note !== null && (
-                <p className="text-caption text-fg-tertiary">{logo.info.note}</p>
-              )}
+      <div className="flex flex-col gap-3">
+        {logo === null ? (
+          <>
+            <p className="text-body text-fg-secondary">
+              A logo sits in the middle of the code; the code is checked with it in place.
+            </p>
+            <div>
+              <Button
+                icon={<Image20Regular />}
+                disabled={importing || adopting}
+                onClick={() => void choose()}
+              >
+                Choose a logo…
+              </Button>
             </div>
-          </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-start gap-3">
+              <span className="flex shrink-0 items-center justify-center rounded-md border border-stroke-subtle bg-card p-1">
+                {logo.info.dataUrl !== null ? (
+                  <img
+                    src={logo.info.dataUrl}
+                    alt={logo.info.name}
+                    className="max-h-24 max-w-24 object-contain"
+                  />
+                ) : (
+                  <span className="px-2 text-caption text-fg-tertiary">No preview</span>
+                )}
+              </span>
+              <div className="flex min-w-0 flex-col gap-1">
+                <p className="truncate text-body text-fg">{logo.info.name}</p>
+                <p className="text-caption text-fg-secondary">
+                  {logo.info.format.toUpperCase()} · {logo.info.width}×{logo.info.height}
+                </p>
+                {logo.info.note !== null && (
+                  <p className="text-caption text-fg-tertiary">{logo.info.note}</p>
+                )}
+              </div>
+            </div>
 
-          <LogoPlatePicker
-            value={logo.plate}
-            onChange={(plate) => onLogo({ ...logo, plate })}
-            disabled={deleting}
-          />
-
-          <label className="flex flex-col gap-1">
-            <span className="text-caption font-semibold text-fg-secondary">Size</span>
-            <Select
-              aria-label="Size"
-              value={logo.size}
+            <LogoPlatePicker
+              value={logo.plate}
+              onChange={(plate) => onLogo({ ...logo, plate })}
               disabled={deleting}
-              onChange={(event) => onLogo({ ...logo, size: event.target.value as LogoSize })}
-            >
-              {LOGO_SIZES.map((size) => (
-                <option key={size} value={size}>
-                  {LOGO_SIZE_LABELS[size]}
-                </option>
-              ))}
-            </Select>
-          </label>
+            />
 
-          {planLine !== null && <p className="text-caption text-fg-secondary">{planLine}</p>}
+            <label className="flex flex-col gap-1">
+              <span className="text-caption font-semibold text-fg-secondary">Size</span>
+              <Select
+                aria-label="Size"
+                value={logo.size}
+                disabled={deleting}
+                onChange={(event) => onLogo({ ...logo, size: event.target.value as LogoSize })}
+              >
+                {LOGO_SIZES.map((size) => (
+                  <option key={size} value={size}>
+                    {LOGO_SIZE_LABELS[size]}
+                  </option>
+                ))}
+              </Select>
+            </label>
 
-          <div>
-            <Button appearance="subtle" disabled={deleting} onClick={() => void remove()}>
-              Remove
-            </Button>
-          </div>
-        </div>
-      )}
+            {planLine !== null && <p className="text-caption text-fg-secondary">{planLine}</p>}
+
+            <div>
+              <Button appearance="subtle" onClick={remove}>
+                Remove
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* The logos already in this workspace, whether or not one is on the code: choosing
+            another is one click, and forgetting one is its own control beside it (F8). */}
+        <UsedLogos
+          state={logos}
+          disabled={importing || adopting}
+          deleting={deleting}
+          onUse={(info, bytes) => void adopt(info, bytes)}
+          onForget={(info) => void forgetStored(info.id, info.name)}
+        />
+      </div>
 
       {problem !== null && (
         <div className="mt-3">
@@ -245,11 +266,16 @@ export function LogoCard({
 function UsedLogos({
   state,
   disabled,
+  deleting,
   onUse,
+  onForget,
 }: {
   state: ReturnType<typeof useLogos>;
   disabled: boolean;
+  /** True while the store is being asked to forget one; the row waits rather than races. */
+  deleting: boolean;
   onUse: (info: LogoInfo, bytes?: string) => void;
+  onForget: (info: LogoInfo) => void;
 }) {
   if (state.isPending) {
     return <p className="text-caption text-fg-secondary">Looking for logos you have used…</p>;
@@ -266,10 +292,23 @@ function UsedLogos({
   return (
     <div className="flex flex-col gap-2">
       <p className="text-caption text-fg-secondary">Logos you have used</p>
-      <ul className="flex flex-wrap gap-2">
+      <ul aria-label="Logos you have used" className="flex flex-wrap gap-2">
         {state.data.map((info) => (
-          <li key={info.id}>
+          <li key={info.id} className="flex items-center gap-1">
             <UsedLogo info={info} disabled={disabled} onUse={onUse} />
+            {/* Taking a mark off a code and forgetting the file are two different decisions,
+                so they are two different controls (F8). */}
+            <Button
+              appearance="subtle"
+              /* An icon alone is never the only cue (DESIGN_SYSTEM §2): the name is the
+                 accessible name and the pointer tooltip, both. */
+              aria-label={`Forget ${info.name}`}
+              title={`Forget ${info.name}`}
+              icon={<Delete16Regular />}
+              disabled={disabled || deleting}
+              className="px-2"
+              onClick={() => onForget(info)}
+            />
           </li>
         ))}
       </ul>
@@ -292,6 +331,9 @@ function UsedLogo({
   onUse: (info: LogoInfo, bytes?: string) => void;
 }) {
   const bytes = useLogoDataUrl(info.id);
+  // The hook answers `null` for a row with no logo at all; here there always is one, so the
+  // only two states are "arrived" and "not yet".
+  const dataUrl = bytes.data ?? undefined;
   return (
     <Button
       appearance="subtle"
@@ -300,12 +342,12 @@ function UsedLogo({
       /* Taller than a control, never shorter: the thumbnail sets the height and
          the density token remains the floor. */
       className="h-auto min-h-(--density-control) p-1"
-      onClick={() => onUse(info, bytes.data)}
+      onClick={() => onUse(info, dataUrl)}
     >
-      {bytes.data === undefined ? (
+      {dataUrl === undefined ? (
         <span className="max-w-24 truncate text-caption text-fg-secondary">{info.name}</span>
       ) : (
-        <img src={bytes.data} alt={info.name} className="max-h-12 max-w-12 object-contain" />
+        <img src={dataUrl} alt={info.name} className="max-h-12 max-w-12 object-contain" />
       )}
     </Button>
   );

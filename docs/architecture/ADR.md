@@ -33,6 +33,7 @@ part that matters most later — the cost we accepted.
 | [025](#adr-025) | A look is gated before the scan gate, and function patterns are never reshaped   | Accepted                      |
 | [026](#adr-026) | What is written is what was verified, with one named exception                   | Accepted                      |
 | [027](#adr-027) | The scan margin is a report, never a gate                                        | Accepted                      |
+| [028](#adr-028) | A saved code is its fields and the name of its scene, never an image             | Accepted                      |
 
 ---
 
@@ -1049,3 +1050,92 @@ therefore written and read as an indication, in the same breath as the thing tha
 decides: the phone matrix, two phones at the printed size, per release (SPEC §6). A smaller second
 cost: nine decodes cost what nine decodes cost, so the margin is asked for after the verdict and
 is never on the path between a verdict and a file.
+
+## ADR-028 — A saved code is its fields and the name of its scene, never an image {#adr-028}
+
+**Status: Accepted.**
+
+**Context.** Until F8 a code existed only while the window was open: typed, verified, written out,
+and gone when the window closed. A library changes what the product is responsible for — a row in
+a file somebody will open again in six months, after an update, after an escaping rule has been
+corrected. There are three plausible things to keep, and two of them are traps. Keeping the
+**rendered image** is the first: it reopens instantly, it can never be proved again, and it carries
+whatever defect the encoder had on the day it was drawn — a picture of a code is not a code.
+Keeping the **encoded string** is the second, and it is the more tempting one, because those are
+the exact bytes a decoder read back — and it freezes every escaping bug in this product's history
+into the person's own data, where a fix cannot reach it without a migration nobody could write
+honestly.
+
+**Decision.** A saved code is **the fields the person typed, the look, the size, which logo, and
+the name of the scene it made** — nothing else. A brand kit is the same minus the payload.
+
+- **The payload is stored as the form, never as the encoded string.** `payload_json` holds the
+  `PayloadForm` the domain validated — SSID, given name, subject, latitude — and the `WIFI:`,
+  `mailto:` or vCard string is produced by the builder again every time the code is rendered
+  ([ADR-021](#adr-021), `DATA_MODEL.md`). So a corrected escaping rule reaches **every code already
+  in the library**, with no data migration and nothing to re-derive. It follows that re-encoding can
+  change the payload's hash and therefore invalidate a verification row written under the old rule.
+  That is not a defect to be worked around: a code built by rules that have since been corrected has
+  not been proved under the corrected ones, and the product says so instead of carrying the old
+  verdict forward.
+- **The scene's name is its SHA-256, computed in the domain.** `sceneHash` in
+  `src/domain/library.ts` hashes the scene's SVG with `src/domain/sha256.ts`, a plain FIPS 180-4
+  implementation that is part of the pure layer. The name of the scene is decided **where the scene
+  is made**: the domain draws it, so the domain can say what it is, without a command round-trip and
+  without the asynchronous, browser-only `crypto.subtle`. It is pinned twice — to the standard's own
+  vectors and to the platform's digest, on the lengths where padding goes wrong.
+- **Opening a code rebuilds it and asks the gate again.** The stored fields go back through the same
+  builder, encoder, placement engine and scene renderer, and the hash of the rebuilt scene is
+  compared with the stored one. Then the code is verified again, by the host's decoder, exactly as a
+  code typed from nothing is ([ADR-010](#adr-010)) — the stored verification is never the export's
+  token. **A saved code is not trusted, it is re-proven**, which is the only reading of "reopened
+  exactly as it was" (SPEC §2.7) that a product making this product's claim is allowed to use.
+- **A brand kit carries a look, a size and a logo, and never a payload.** `applyKit` returns what to
+  set — style, error-correction floor, printed size, logo — and the form on screen is untouched. A
+  kit that could carry a payload would be a code by another name, and applying it would silently
+  replace what somebody had typed.
+- **A logo in use is not deleted, and the refusal names what is using it.** `logo_id` is
+  `ON DELETE RESTRICT` from both `codes` and `brand_kits`, and the host turns the constraint into a
+  sentence that **names the kits and the saved codes** standing in the way. `CASCADE` would take
+  them with it; `SET NULL` would leave a kit that quietly looks different the next time it is
+  applied, which is the worst of the three because nobody sees it happen.
+- **The Wi-Fi opt-out [ADR-018](#adr-018) promised is this slice's.** `redactForSave` blanks the
+  password when the person clears "Save the password with this code", and the row is stored without
+  it; every other kind is returned untouched. A redacted code still reopens, into the form it was
+  saved from, and the screen asks for the password again before the gate can pass — `reopens`
+  returns the builder's own refusal, so the sentence is the one the Wi-Fi form would have shown
+  anyway. Kept, it is in the clear in the workspace file, and `SECURITY.md` says so in those words.
+
+**Why the hash at all, rather than comparing the fields.** Two forms can be equal and produce
+different scenes — a different encoder version, a different mask after a knock-out, a constant
+changed in the placement engine. The scene is what the person saw and what the decoder read, so the
+scene is the thing worth naming, and a 64-character name is cheap to store and exact to compare.
+It is also what F8's proof of done is stated in (SPEC §7): the code reopens after a restart with
+the **identical** scene, hashed, not with a scene that looks the same.
+
+**Cost accepted: a code saved under an older build may rebuild to a different scene, and the product
+has to say so.** Every one of the rules above points the same way — the library follows the code
+rather than freezing it — so an improvement to the encoder, the placement engine or the style layer
+can change the drawing a stored row produces. When the rebuilt scene's hash does not match the
+stored one, the mismatch is **shown, never hidden and never silently overwritten**: the code is the
+one the fields describe, it is verified again like any other, and the person is told that what they
+are looking at is not byte-identical to what was saved. The alternative — keeping the image, or
+keeping the encoded string — buys a match that means nothing, because it is a match against bytes
+this product would no longer produce.
+
+**Second cost: SHA-256 now exists twice in this repository.** The host already hashes with `sha2`
+([ADR-019](#adr-019)), and the domain may not reach for it ([ADR-003](#adr-003)), so the pure layer
+carries its own implementation of a standard that is not ours to get wrong. The two never hash the
+same bytes — the host names payloads and artefacts, the domain names scenes — so the risk is not
+that they disagree but that one of them is quietly incorrect, which a hash cannot show by looking
+wrong. It is held down the only way it can be: pinned to the vectors in FIPS 180-4 and to the
+platform's own digest, on the lengths where padding goes wrong. The alternative was a command
+round-trip in the middle of the render loop, which is a worse trade: the scene would be named by a
+process that did not draw it.
+
+**Third cost: applying a kit copies, it does not subscribe.** The planned `codes.brand_kit_id` is
+not in the migration. A kit is a starting point, so what it sets is copied into the code's own look
+and size, and editing the kit afterwards changes nothing that was already made. That is the
+behaviour the screen promises — one click sets the look — and it means there is no lineage to show
+a person who wonders why their older codes did not follow the kit. Recorded here so that the
+question has an answer.

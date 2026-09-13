@@ -201,8 +201,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   block an export and does not change the verdict, because what the gate answers is _does this file
   read_ and what the margin answers is _how much is left before it does not_ — and a person
   printing on a menu, a bottle or a bus shelter is the one who knows which of the nine matters.
-- **The application shell.** Four destinations — Create, Diagnostics, Settings and About — in
-  the Windows 11 visual language, following the accent colour chosen for the desktop, in light
+- **A library, so a code can be made again.** Codes are kept in the workspace and listed in their
+  own place in the window: what each one is called, what kind it is, the one line that says what
+  scanning it does, when it was saved, and a small drawing of the code itself — drawn again from
+  what was saved, never a stored picture. Open one and everything comes back: the fields, the
+  colours and shapes, the printed size and resolution, the logo and its plate.
+- **Only a code that scanned can be saved.** Save appears beside the ways out and is available on
+  the same terms they are: a code that has not been read back by the decoder is not saved, for the
+  same reason it is not exported. What is kept is what was typed rather than what was encoded — so a
+  correction to the way a format is escaped reaches every code already in the library — and the name
+  of the drawing it made, which is how reopening it can prove it is the same code rather than assume
+  it.
+- **Reopened exactly, and proved again rather than trusted.** A saved code is rebuilt from its
+  fields by the same rules that made it and checked against the drawing that was saved, then handed
+  to the decoder again like a code typed from nothing. If a later version of the product would draw
+  it differently, the screen says so instead of quietly showing something else under the old name.
+- **Naming, renaming and deleting.** A code is named when it is saved — with a name suggested from
+  what it carries, the web address, the person's name, the network — and can be renamed afterwards.
+  Deleting one asks first, in a dialog that names what is about to go.
+- **Brand kits: a look saved once and applied in one click.** A logo, the two colours, the shapes,
+  the margin, the error-correction floor and the printed size can be saved together under a name and
+  applied to any new code. A kit never carries a payload: applying one changes how a code looks and
+  never what it says. A logo that a kit or a saved code is using cannot be deleted, and the refusal
+  names the kits and the codes that are using it, so it is a sentence somebody can act on.
+- **The choice about a Wi-Fi password is now a choice.** Saving a Wi-Fi code offers "Save the
+  password with this code", ticked by default, with the plain sentence beside it: kept, the password
+  is in the clear in the workspace file on this machine. Clear it and the code is saved without the
+  password, and reopening it asks for the password again before the code can be checked or exported.
+- **The application shell.** Five destinations — Create, Library, Diagnostics, Settings and About —
+  in the Windows 11 visual language, following the accent colour chosen for the desktop, in light
   or dark by choice or by the system. The theme is remembered between sessions.
 - **The workspace file.** One SQLite database created on first launch and migrated forward,
   never rewritten backwards; Diagnostics says where it is, how large it is and which schema

@@ -246,9 +246,9 @@ first — not inline in the feature.
 `Resizer` · `VirtualList`
 
 Present today, because a screen uses them: `Button`, `Input`, `TextArea`, `Select`, `Checkbox`,
-`Card`, `TabStrip`, `InfoBar` and `EmptyState`, beside this product's own `CodePreview`,
-`ScanGateStatus` and `LogoPlatePicker`. Each of the rest arrives with the slice that first needs
-it, and arrives _here_, never inline in a feature.
+`Card`, `TabStrip`, `InfoBar`, `EmptyState`, `Modal` and `ConfirmDialog`, beside this product's own
+`CodePreview`, `ScanGateStatus` and `LogoPlatePicker`. Each of the rest arrives with the slice that
+first needs it, and arrives _here_, never inline in a feature.
 
 `TextArea` arrived with F2, for the fields that hold more than one line — a message, a body, plain
 text. It is an `Input` that grew: both take their surface from `fieldSurface.ts`, so a single-line
@@ -267,6 +267,15 @@ each shape and an `Input` for each colour and for the margin. A shape is offered
 than by a row of pictures, for the reason the plate picker is — "Circle" is a word before it is a
 picture — and grouping those controls together is a `Card`, not a new control. A slice that needs
 nothing new is the list working.
+
+**`Modal` and `ConfirmDialog` arrive with F8**, the slice that first has something to destroy. Both
+are copied from the sibling products' implementations rather than reinvented, which is what makes a
+dialog in this product behave like a dialog in those: `role="dialog"` with `aria-modal`, named by
+its own heading, focus moved in on open and given back to whatever opened it on close, Tab held
+inside it by `useFocusTrap` (§7), and Escape closing it. `ConfirmDialog` is `Modal` with the one
+question it exists to ask — see below. Nothing else in F8 is new: the library's list, its rows and
+its empty state are a `Card`, a `Button`, an `EmptyState` and the product's own `CodePreview`, and a
+brand kit is chosen with a `Select`.
 
 ### What this product adds to the list
 
@@ -309,6 +318,13 @@ before** — a primitive built ahead of the screen that needs it is a guess with
 a destructive action takes the danger tone — with the wording carrying the consequence too,
 never colour alone. `window.confirm` is not themed, not keyboard-consistent, and blocks the
 window's own event loop; it does not appear in this codebase.
+
+F8 is where this first has a subject: deleting a saved code or a brand kit. The dialog names the one
+being deleted, by the name the person gave it, and the confirming button says **Delete** — not "OK",
+which says nothing about what is about to happen. A logo still in use is not a confirmation at all
+but a refusal: it is shown where the removal was asked for, in the sentence the host returned,
+naming the kits and codes that are using it. A dialog asks a question, and there is nothing here to
+ask.
 
 ## 9. The window
 
