@@ -36,7 +36,7 @@ describe('describeBytes', () => {
 
   it('shows an internationalised host both ways', () => {
     const read = describeBytes(bytes('https://xn--bcher-kva.example/'));
-    expect(read.summary).toBe('Opens xn--bcher-kva.example');
+    expect(read.summary).toBe('Opens bücher.example (xn--bcher-kva.example)');
     expect(read.details).toEqual(['Shown as bücher.example, resolves as xn--bcher-kva.example.']);
   });
 

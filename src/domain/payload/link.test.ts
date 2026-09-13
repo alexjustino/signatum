@@ -44,7 +44,9 @@ describe('parseLink', () => {
 describe('describeLink', () => {
   it('names the host the phone will open', () => {
     expect(describeLink('https://example.com/some/path')).toBe('Opens example.com');
-    expect(describeLink('https://xn--bcher-kva.example/')).toBe('Opens xn--bcher-kva.example');
+    expect(describeLink('https://xn--bcher-kva.example/')).toBe(
+      'Opens bücher.example (xn--bcher-kva.example)',
+    );
   });
 
   it('degrades to a sentence rather than throwing', () => {

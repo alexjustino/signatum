@@ -5,9 +5,12 @@
  * Only `http` and `https` are links (SPEC §5): a `javascript:` or `file:` URL is not a link a
  * phone should open, and a `mailto:` is the e-mail kind, not this one. The URL is normalised by
  * the WHATWG parser, so what the code carries is what a browser would resolve — including the
- * punycode form of an internationalised host, which is what the "Opens …" line names, so that a
- * look-alike domain is visible before it is printed. The Unicode form beside it arrives with the Read screen (F10).
+ * punycode form of an internationalised host. The "Opens …" line names the host as a person
+ * reads it *and* as it will resolve when the two differ — `bücher.example (xn--bcher-kva.example)`
+ * — so that a look-alike domain is visible before it is printed (SPEC §5).
  */
+
+import { unicodeHost } from '../punycode';
 
 export type LinkResult =
   | {
@@ -59,8 +62,18 @@ export function parseLink(input: string): LinkResult {
  */
 export function describeLink(url: string): string {
   try {
-    return `Opens ${new URL(url).hostname}`;
+    return `Opens ${bothForms(new URL(url).hostname)}`;
   } catch {
     return 'Opens a link';
   }
+}
+
+/**
+ * A host as a person reads it, with the form it resolves as beside it when they differ:
+ * `example.com` stays `example.com`; `xn--bcher-kva.example` is said as
+ * `bücher.example (xn--bcher-kva.example)`. Shared by the link and the e-mail summaries.
+ */
+export function bothForms(host: string): string {
+  const forms = unicodeHost(host);
+  return forms.differs ? `${forms.unicode} (${forms.punycode})` : host;
 }
