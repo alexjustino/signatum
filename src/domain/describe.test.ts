@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeCode, describeGate, describePlan, describeVariant, gateState } from './describe';
+import {
+  describeCode,
+  describeGate,
+  describePlan,
+  describeReopen,
+  describeVariant,
+  gateState,
+} from './describe';
 import { planCode, type Plan } from './placement';
 
 const verified = { verified: true, reason: null, decoder: 'rqrr 0.9.0' };
@@ -90,5 +97,21 @@ describe('describeVariant', () => {
       expect(describeVariant({ label, verified: true })).toMatch(/ — reads$/);
       expect(describeVariant({ label, verified: false })).toMatch(/ — fails$/);
     }
+  });
+});
+
+describe('describeReopen', () => {
+  it('says the reopened code is the one that was saved', () => {
+    expect(describeReopen(true)).toBe('Reopened exactly as it was saved.');
+  });
+
+  it('says so when the rebuilt scene is not the saved one, and what to do about it', () => {
+    const sentence = describeReopen(false);
+    expect(sentence).toBe(
+      'This code rebuilds differently from when it was saved; check it before you print.',
+    );
+    // The cost of storing fields instead of a picture (ADR-028) is said out loud, and the
+    // sentence asks for the one action that protects the person: look before printing.
+    expect(sentence).toMatch(/check it before you print/);
   });
 });
