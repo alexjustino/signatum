@@ -8,6 +8,7 @@ import {
   Location20Regular,
   Mail20Regular,
   QrCode24Regular,
+  Save20Regular,
   TextDescription20Regular,
   Wifi120Regular,
 } from '@fluentui/react-icons';
@@ -21,13 +22,20 @@ import {
   useExportPdf,
   useExportPng,
   useExportSvg,
+  useSaveCode,
   useScanMargin,
   useVerifyCode,
 } from '@/data/hooks';
 import type { LogoPlacement } from '@/data/logos';
 import { densityAdvice, densityWarning } from '@/domain/density';
-import { describeCode, gateState, type GateReport, type ScanVariant } from '@/domain/describe';
-import { logoFraction } from '@/domain/logo';
+import {
+  describeCode,
+  describeReopen,
+  gateState,
+  type GateReport,
+  type ScanVariant,
+} from '@/domain/describe';
+import { checkName, defaultName, redactForSave, sceneHash } from '@/domain/library';
 import {
   buildPayload,
   emptyForm,
@@ -36,23 +44,26 @@ import {
   type PayloadForm,
   type PayloadKind,
 } from '@/domain/payload';
-import { planCode, type Plan } from '@/domain/placement';
-import type { Ecl } from '@/domain/qr/encode';
-import { renderScene, type Style } from '@/domain/scene';
+import type { Plan } from '@/domain/placement';
+import type { Style } from '@/domain/scene';
 import { checkPrintSize, pixelsFor, sizedSvg, toMillimetres, type PrintSize } from '@/domain/size';
 import { checkContrast } from '@/domain/style';
 import { announce } from '@/ui/announce';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
+import { Checkbox } from '@/ui/Checkbox';
 import { CodePreview } from '@/ui/CodePreview';
 import { EmptyState } from '@/ui/EmptyState';
 import { InfoBar } from '@/ui/InfoBar';
+import { Input } from '@/ui/Input';
 import { ScanGateStatus } from '@/ui/ScanGateStatus';
 import { TabStrip } from '@/ui/TabStrip';
 
+import { BrandKitCard } from './BrandKitCard';
 import { PayloadFields } from './forms/PayloadFields';
 import { LogoCard, type ChosenLogo } from './LogoCard';
 import { LookCard, type EclFloor } from './LookCard';
+import { planFor, sceneFor } from './plan';
 import { ScanMarginCard } from './ScanMarginCard';
 import { SizeCard } from './SizeCard';
 
@@ -80,26 +91,6 @@ import { SizeCard } from './SizeCard';
  * verified. The margin never blocks an export (ADR-027).
  */
 const MARGIN_MS = 400;
-
-/**
- * The error-correction level for a code with nothing in the middle of it, when
- * nobody has asked for more. `M` is the ordinary choice.
- *
- * A code that carries a logo is not decided here at all: the placement engine
- * starts at `H`, the highest, because something is about to cover modules the
- * decoder still has to do without, and falls back to `Q` only when the content
- * will not fit at `H` (spec §2.4). What a person may choose in the Look card is
- * a *floor*, never a ceiling — the engine's own choice can only be raised, so
- * nobody can trade away the thing that makes their code survive the logo.
- */
-const ECL: Ecl = 'M';
-
-/**
- * Modules of plate around the logo on every side. One module is what separates
- * the mark from the modules it sits among; the engine charges it to the
- * error-correction budget like everything else under the plate.
- */
-const PLATE_PADDING = 1;
 
 /**
  * Long enough that a decoder is not asked about every keystroke, short enough
@@ -175,6 +166,32 @@ interface Margin {
   variants: ScanVariant[] | null;
   /** Why it could not be measured, when it could not. Never a refusal. */
   failure: string | null;
+}
+
+/**
+ * The saved code this screen is currently showing (F8).
+ *
+ * It is an identity, not a copy: the row in the library that the code on screen came from, or
+ * that it was just written to. It is carried so that the scan gate and the exports can name the
+ * saved code they are about — a verification row that references it (ADR-028) — and so that a
+ * reopened code can say whether the scene it rebuilt is the scene that was saved.
+ *
+ * Anything a person changes afterwards detaches it, in the shell: what is on screen is then no
+ * longer the code that was saved, and claiming otherwise would be the one thing this product
+ * exists not to do.
+ */
+export interface AttachedCode {
+  id: string;
+  /** The digest of the scene at save time; the rebuilt scene must hash the same. */
+  sceneSha256: string;
+  /** True when it arrived from the library rather than from a save on this screen. */
+  opened: boolean;
+}
+
+/** What has been kept, and the code it was kept from. */
+interface Kept {
+  key: string;
+  name: string;
 }
 
 /** The three files this screen writes. The clipboard is the fourth way out, without a path. */
@@ -274,6 +291,12 @@ interface CreatePageProps {
    */
   printSize: PrintSize;
   onPrintSize: (size: PrintSize) => void;
+  /**
+   * The saved code on screen, when there is one: opened from the library, or written from here.
+   * The shell owns it because the shell owns everything a change of it would detach.
+   */
+  attached: AttachedCode | null;
+  onAttach: (attached: AttachedCode) => void;
 }
 
 export function CreatePage({
@@ -289,6 +312,8 @@ export function CreatePage({
   onEcl,
   printSize,
   onPrintSize,
+  attached,
+  onAttach,
 }: CreatePageProps) {
   const result = useMemo(() => buildPayload(form), [form]);
   const payload = result.ok ? result.payload : null;
@@ -320,31 +345,13 @@ export function CreatePage({
    * this content cannot carry comes back as a refusal with the sentence to
    * show, never as a smaller logo nobody asked for.
    */
-  const plan = useMemo<Plan | null>(() => {
-    if (!result.ok) return null;
-    if (logo === null) {
-      return planCode(result.payload, {
-        logo: false,
-        // Without a logo the floor is the level, and `M` is the ordinary
-        // choice for a code with nothing covering it.
-        ecl: ecl ?? ECL,
-        quietZone: style.quietZone,
-      });
-    }
-    const fraction = logoFraction(logo.size);
-    return planCode(result.payload, {
-      logo: true,
-      quietZone: style.quietZone,
-      padding: PLATE_PADDING,
-      // Left out when nobody chose one: the engine starts at H with a logo and
-      // never goes below Q, and a floor passed here can only raise that.
-      ...(ecl === undefined ? {} : { ecl }),
-      // Left out rather than passed as nothing: "Largest" is the absence of a
-      // limit, and the engine reads a missing share as "as large as the budget
-      // allows".
-      ...(fraction === undefined ? {} : { fraction }),
-    });
-  }, [result, logo, style.quietZone, ecl]);
+  const plan = useMemo<Plan | null>(
+    () =>
+      result.ok
+        ? planFor(result.payload, { logoSize: logo?.size ?? null, quietZone: style.quietZone, ecl })
+        : null,
+    [result, logo, style.quietZone, ecl],
+  );
 
   /**
    * Whether the two colours are far enough apart, and the right way round, for
@@ -384,34 +391,13 @@ export function CreatePage({
   // A look the contrast rule refused is not drawn at all: a picture of a code
   // no camera can read is a promise this product does not make, and the reason
   // is said where every other refusal is said.
-  const scene = useMemo(() => {
-    if (plan === null || !plan.ok || !contrastOk || !sizeOk)
-      return { svg: null, side: null, failure: null };
-    try {
-      const rendered = renderScene(
-        plan.matrix,
-        style,
-        name,
-        logo !== null && plan.box !== null
-          ? {
-              box: plan.box,
-              plate: logo.plate,
-              padding: PLATE_PADDING,
-              // The plate is the background: a logo sits in a clearing of the
-              // colour the code is printed on, not of a colour nobody chose.
-              colour: style.background,
-            }
-          : undefined,
-      );
-      return { svg: rendered.svg, side: rendered.side, failure: null };
-    } catch (error) {
-      return {
-        svg: null,
-        side: null,
-        failure: error instanceof Error ? error.message : 'This could not be made into a code.',
-      };
-    }
-  }, [plan, logo, name, style, contrastOk, sizeOk]);
+  const scene = useMemo(
+    () =>
+      plan === null || !plan.ok || !contrastOk || !sizeOk
+        ? { svg: null, side: null, failure: null }
+        : sceneFor(plan, style, name, logo?.plate ?? null),
+    [plan, logo, name, style, contrastOk, sizeOk],
+  );
   const svg = scene.svg;
 
   // The placement, in the shape the host takes. It is the plan's own box, so
@@ -436,6 +422,16 @@ export function CreatePage({
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [written, setWritten] = useState<Written | null>(null);
   const [margin, setMargin] = useState<Margin | null>(null);
+  /** The name being typed, or null while nobody is saving anything. */
+  const [naming, setNaming] = useState<string | null>(null);
+  /**
+   * Whether a Wi-Fi password is kept with the code (ADR-018). Ticked, because the code a person
+   * just verified carries the password already and a saved code that cannot be reopened is a
+   * surprise; the sentence beside it says what keeping it costs, and unticking is one click.
+   */
+  const [keepPassword, setKeepPassword] = useState(true);
+  const [kept, setKept] = useState<Kept | null>(null);
+  const [saveProblem, setSaveProblem] = useState<string | null>(null);
 
   const { mutateAsync: verify } = useVerifyCode();
   const { mutateAsync: writePng, isPending: writingPng } = useExportPng();
@@ -443,6 +439,15 @@ export function CreatePage({
   const { mutateAsync: writePdf, isPending: writingPdf } = useExportPdf();
   const { mutateAsync: copyToClipboard, isPending: copying } = useCopyPng();
   const { mutateAsync: measure } = useScanMargin();
+  const { mutateAsync: keep, isPending: saving } = useSaveCode();
+
+  /**
+   * The saved code the gate and the exports are about, when the code on screen is one. It is
+   * read before the gate is asked anything, because it is one of the things the gate is asked
+   * about; the shell clears it the moment anything is changed, so it is never a claim about a
+   * different artefact.
+   */
+  const codeId = attached?.id ?? null;
   // One busy state for the row: four ways out of the same code, one at a time.
   const exporting = writingPng || writingSvg || writingPdf || copying;
 
@@ -468,7 +473,7 @@ export function CreatePage({
     if (svg === null || payload === null || artefact === null) return;
 
     const timer = window.setTimeout(() => {
-      verify({ svg, payload, pixelSize: pixels, logo: placement })
+      verify({ svg, payload, pixelSize: pixels, logo: placement, codeId })
         .then((next) => setAnswer({ key: artefact, report: next, failure: null }))
         .catch((error: unknown) =>
           // Not a verdict: the decoder never answered. The gate stays at "not
@@ -479,7 +484,7 @@ export function CreatePage({
     }, DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [artefact, svg, payload, placement, pixels, verify]);
+  }, [artefact, svg, payload, placement, pixels, verify, codeId]);
 
   // The gate owns the export button. Nothing else is allowed to enable it.
   const gate = gateState(report, inFlight);
@@ -535,7 +540,14 @@ export function CreatePage({
       });
       if (path === null) return;
 
-      const asked = { payload, pixelSize: pixels, path, logo: placement, dpi: printSize.dpi };
+      const asked = {
+        payload,
+        pixelSize: pixels,
+        path,
+        logo: placement,
+        dpi: printSize.dpi,
+        codeId,
+      };
       const done =
         kind === 'png'
           ? await writePng({ ...asked, svg })
@@ -580,6 +592,7 @@ export function CreatePage({
         pixelSize: pixels,
         logo: placement,
         dpi: printSize.dpi,
+        codeId,
       });
       setWritten({
         key: artefact,
@@ -605,6 +618,65 @@ export function CreatePage({
    * is said in the card rather than anywhere near the export button (ADR-027).
    */
   const marginNow = margin !== null && margin.key === artefact ? margin : null;
+
+  /**
+   * What a reopened code says about itself (ADR-028): the scene was rebuilt from the stored
+   * fields, so it is hashed and compared with the digest that was stored beside them. It is said
+   * for a code that was *opened*; a code saved a moment ago on this screen has nothing to prove.
+   */
+  const reopened = useMemo(() => {
+    if (attached === null || !attached.opened || svg === null) return null;
+    return describeReopen(sceneHash(svg) === attached.sceneSha256);
+  }, [attached, svg]);
+
+  // A sentence that appears without a click is said, not only shown (DESIGN_SYSTEM §7).
+  useEffect(() => {
+    if (reopened !== null) announce(reopened);
+  }, [reopened]);
+
+  /** The logo as the library keeps it: which one, on what plate, at what size — never bytes. */
+  const logoReference =
+    logo === null ? null : { id: logo.info.id, plate: logo.plate, size: logo.size };
+
+  /**
+   * Keep this code, under a name.
+   *
+   * A saved code is a verified code (ADR-010): the button is enabled by the gate like every other
+   * way out of this screen. What is written is the *fields*, never a picture — with the digest of
+   * the scene they made, so reopening can prove it rebuilt the same one (ADR-028). The form is
+   * handed to the domain first, which is where a Wi-Fi password the person chose not to keep is
+   * blanked (ADR-018).
+   */
+  const keepCode = async () => {
+    // The gate, once, for every route into this action — the button and the Return key alike.
+    if (!verified || naming === null || svg === null || artefact === null) return;
+    const checked = checkName(naming);
+    if (!checked.ok) {
+      setSaveProblem(checked.reason);
+      return;
+    }
+    setSaveProblem(null);
+    try {
+      const saved = await keep({
+        name: checked.name,
+        form: redactForSave(form, keepPassword),
+        style,
+        eclFloor: ecl,
+        size: printSize,
+        logo: logoReference,
+        sceneSha256: sceneHash(svg),
+      });
+      setNaming(null);
+      setKept({ key: artefact, name: saved.name });
+      onAttach({ id: saved.id, sceneSha256: saved.sceneSha256, opened: false });
+      announce(`Saved as ${saved.name}`);
+    } catch (error) {
+      setSaveProblem(describeError(error));
+    }
+  };
+
+  /** Only about the code on screen — like every other answer this screen holds. */
+  const keptNow = kept !== null && kept.key === artefact ? kept : null;
 
   // The domain words the empty case too ("Type a link to see its code."), and
   // that is a prompt rather than a rejection: it is not coloured like one.
@@ -670,6 +742,19 @@ export function CreatePage({
 
           <LookCard style={style} onStyle={onStyle} ecl={ecl} onEcl={onEcl} />
 
+          {/* A kit is the look, the size and the logo under a name — so it sits under the
+              card that makes the look, and above the one that sets the size it carries. */}
+          <BrandKitCard
+            style={style}
+            onStyle={onStyle}
+            ecl={ecl}
+            onEcl={onEcl}
+            printSize={printSize}
+            onPrintSize={onPrintSize}
+            logo={logo}
+            onLogo={onLogo}
+          />
+
           <SizeCard size={printSize} onSize={onPrintSize} side={scene.side} />
         </div>
 
@@ -706,6 +791,10 @@ export function CreatePage({
             }
           />
 
+          {/* What a reopened code proves about itself: the same fields rebuilt the same scene,
+              or they did not and the person is told before they print it (ADR-028). */}
+          {reopened !== null && <p className="text-caption text-fg-secondary">{reopened}</p>}
+
           {density !== null && (
             <InfoBar severity="caution" title="Dense code">
               {density}
@@ -726,6 +815,19 @@ export function CreatePage({
               the other three are the same action in another format, not lesser
               ones (DESIGN_SYSTEM §8). */}
           <div className="flex flex-wrap gap-2">
+            {/* Keeping a code is the fifth way out of it, and behind the same gate: a saved
+                code is a verified code (ADR-010). It sits first because it is the one that
+                does not leave the workspace. */}
+            <Button
+              icon={<Save20Regular />}
+              disabled={!verified || exporting || saving}
+              onClick={() => {
+                setSaveProblem(null);
+                setNaming(naming === null ? defaultName(form) : null);
+              }}
+            >
+              Save…
+            </Button>
             <Button
               appearance="accent"
               icon={<ArrowDownload20Regular />}
@@ -756,6 +858,76 @@ export function CreatePage({
               Copy
             </Button>
           </div>
+
+          {/* Naming what is being kept happens here rather than in a dialog: the code it is
+              about is on screen, and a dialog over it would hide the thing being named. */}
+          {naming !== null && (
+            <div className="flex flex-col gap-3 rounded-xl border border-stroke-subtle bg-card p-4 shadow-card">
+              <label className="flex flex-col gap-1">
+                <span className="text-caption font-semibold text-fg-secondary">Name</span>
+                <Input
+                  aria-label="Name"
+                  value={naming}
+                  autoFocus
+                  spellCheck={false}
+                  autoComplete="off"
+                  onChange={(event) => setNaming(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') void keepCode();
+                    if (event.key === 'Escape') setNaming(null);
+                  }}
+                />
+              </label>
+
+              {/* The opt-out ADR-018 promised, where the decision is made. The sentence is the
+                  one the Wi-Fi form says beside the password, because it is the same fact. */}
+              {form.kind === 'wifi' && form.security !== 'nopass' && (
+                <div className="flex flex-col gap-1">
+                  <label className="flex items-center gap-2">
+                    <Checkbox
+                      label="Save the password with this code"
+                      checked={keepPassword}
+                      onChange={setKeepPassword}
+                    />
+                    <span className="text-body text-fg">Save the password with this code</span>
+                  </label>
+                  <p className="text-caption text-fg-secondary">
+                    Saved codes keep this password in the clear on this machine.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                {/* The gate owns this button too: the form can be left open while the code
+                    underneath it changes, and a code that stopped verifying stops being
+                    saveable at that moment (ADR-010). */}
+                <Button
+                  appearance="accent"
+                  disabled={!verified || saving}
+                  onClick={() => void keepCode()}
+                >
+                  Save code
+                </Button>
+                <Button
+                  disabled={saving}
+                  onClick={() => {
+                    setNaming(null);
+                    setSaveProblem(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+
+              {saveProblem !== null && (
+                <InfoBar severity="danger" title="Nothing was saved">
+                  {saveProblem}
+                </InfoBar>
+              )}
+            </div>
+          )}
+
+          {keptNow !== null && <InfoBar severity="success" title={`Saved as ${keptNow.name}`} />}
 
           {message !== null && (
             <InfoBar

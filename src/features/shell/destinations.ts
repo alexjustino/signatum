@@ -7,13 +7,20 @@
  * region — without importing a component to read a label.
  */
 
-export type Destination = 'create' | 'diagnostics' | 'settings' | 'about';
+export type Destination = 'create' | 'library' | 'diagnostics' | 'settings' | 'about';
 
 /** The order of the rail. */
-export const DESTINATIONS: readonly Destination[] = ['create', 'diagnostics', 'settings', 'about'];
+export const DESTINATIONS: readonly Destination[] = [
+  'create',
+  'library',
+  'diagnostics',
+  'settings',
+  'about',
+];
 
 export const DESTINATION_LABELS: Record<Destination, string> = {
   create: 'Create',
+  library: 'Library',
   diagnostics: 'Diagnostics',
   settings: 'Settings',
   about: 'About',

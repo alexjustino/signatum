@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import type { EclFloor } from '@/domain/library';
 import { DEFAULT_STYLE, isColour, type Style } from '@/domain/scene';
 import {
   contrastRatio,
@@ -56,8 +57,12 @@ type ColourKey = 'foreground' | 'background';
  * floor: the engine may go higher — with a logo it starts at H — and `L` is not
  * offered at all, because a level that leaves a code with almost no redundancy
  * is not a choice this product hands to somebody printing one.
+ *
+ * The type is the domain's — the library stores it, so it is declared where the
+ * thing that is stored is declared — and re-exported here because this card is
+ * where a person meets it.
  */
-export type EclFloor = 'M' | 'Q' | 'H';
+export type { EclFloor };
 
 /**
  * The levels, as a person meets them. "Automatic" is the absence of a floor:

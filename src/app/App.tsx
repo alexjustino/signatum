@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { applyAccent, applyTheme, readStoredTheme, storeTheme } from '@/app/theme';
+import type { SavedCode } from '@/data/library';
 import { fetchAccentRamp } from '@/data/system';
 import { emptyForm, PAYLOAD_KINDS, type PayloadForm, type PayloadKind } from '@/domain/payload';
 import { DEFAULT_STYLE, type Style } from '@/domain/scene';
 import type { ThemeChoice } from '@/domain/settings';
 import { DEFAULT_PRINT_SIZE, type PrintSize } from '@/domain/size';
 import { AboutPage } from '@/features/about/AboutPage';
-import { CreatePage } from '@/features/create/CreatePage';
+import { CreatePage, type AttachedCode } from '@/features/create/CreatePage';
 import type { ChosenLogo } from '@/features/create/LogoCard';
 import type { EclFloor } from '@/features/create/LookCard';
+import { resolveLogo } from '@/features/create/resolveLogo';
 import { DiagnosticsPage } from '@/features/diagnostics/DiagnosticsPage';
+import { LibraryPage } from '@/features/library/LibraryPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { DESTINATION_LABELS, type Destination } from '@/features/shell/destinations';
 import { Sidebar } from '@/features/shell/Sidebar';
@@ -62,6 +65,10 @@ export function App() {
   // their codes, not about the link they happened to be typing. It starts at the
   // default — a 25 mm code at print resolution, which is 295 pixels square.
   const [printSize, setPrintSize] = useState<PrintSize>(DEFAULT_PRINT_SIZE);
+  // The saved code on screen, when there is one (F8): the row in the library the editor is
+  // showing, either because it was opened from there or because it was just written there. It
+  // lives here rather than in Create because everything that detaches it lives here.
+  const [attached, setAttached] = useState<AttachedCode | null>(null);
   useEffect(() => {
     applyTheme(theme);
     void fetchAccentRamp()
@@ -74,13 +81,98 @@ export function App() {
     setTheme(next);
   }, []);
 
+  /**
+   * Every change a person makes detaches the saved code.
+   *
+   * A saved code is a set of fields and the digest of the scene they made. The moment one of
+   * those fields changes, what is on screen is no longer that code — so the verification rows
+   * and the exports stop claiming it is, and the "reopened exactly as it was saved" sentence
+   * goes away with it. It is one line in six setters rather than one clever effect, because a
+   * rule about *what changed* belongs where the change happens.
+   */
+  const detach = useCallback(() => setAttached(null), []);
+
   // A form knows its own kind, so the draft it replaces is the one it is.
   const editDraft = useCallback(
-    (next: PayloadForm) => setDrafts((all) => ({ ...all, [next.kind]: next })),
-    [],
+    (next: PayloadForm) => {
+      detach();
+      setDrafts((all) => ({ ...all, [next.kind]: next }));
+    },
+    [detach],
+  );
+
+  const chooseKind = useCallback(
+    (next: PayloadKind) => {
+      detach();
+      setKind(next);
+    },
+    [detach],
+  );
+
+  const chooseLogo = useCallback(
+    (next: ChosenLogo | null) => {
+      detach();
+      setLogo(next);
+    },
+    [detach],
+  );
+
+  const chooseStyle = useCallback(
+    (next: Style) => {
+      detach();
+      setStyle(next);
+    },
+    [detach],
+  );
+
+  const chooseEcl = useCallback(
+    (next: EclFloor | undefined) => {
+      detach();
+      setEcl(next);
+    },
+    [detach],
+  );
+
+  const choosePrintSize = useCallback(
+    (next: PrintSize) => {
+      detach();
+      setPrintSize(next);
+    },
+    [detach],
   );
 
   const go = useCallback((next: Destination) => setDestination(next), []);
+
+  /**
+   * Open a saved code: the fields, the look, the floor, the size and the logo go back where they
+   * came from, and the editor is where the person lands — with the gate about to verify it again,
+   * because a code that was verified yesterday has had nothing said about it today.
+   *
+   * The logo is the one part that has to be fetched: the library keeps a reference and the editor
+   * needs the bytes. A reference the store can no longer answer is reported rather than dropped —
+   * opening a code without the mark it was saved with would be a different code under the saved
+   * one's name.
+   */
+  const openSavedCode = useCallback(
+    async (saved: SavedCode): Promise<{ ok: true } | { ok: false; reason: string }> => {
+      if (saved.logo !== null) {
+        const resolved = await resolveLogo(saved.logo);
+        if (!resolved.ok) return resolved;
+        setLogo(resolved.logo);
+      } else {
+        setLogo(null);
+      }
+      setKind(saved.form.kind);
+      setDrafts((all) => ({ ...all, [saved.form.kind]: saved.form }));
+      setStyle(saved.style);
+      setEcl(saved.eclFloor);
+      setPrintSize(saved.size);
+      setAttached({ id: saved.id, sceneSha256: saved.sceneSha256, opened: true });
+      setDestination('create');
+      return { ok: true };
+    },
+    [],
+  );
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg">
@@ -95,19 +187,22 @@ export function App() {
           {destination === 'create' && (
             <CreatePage
               kind={kind}
-              onKind={setKind}
+              onKind={chooseKind}
               form={drafts[kind]}
               onForm={editDraft}
               logo={logo}
-              onLogo={setLogo}
+              onLogo={chooseLogo}
               style={style}
-              onStyle={setStyle}
+              onStyle={chooseStyle}
               ecl={ecl}
-              onEcl={setEcl}
+              onEcl={chooseEcl}
               printSize={printSize}
-              onPrintSize={setPrintSize}
+              onPrintSize={choosePrintSize}
+              attached={attached}
+              onAttach={setAttached}
             />
           )}
+          {destination === 'library' && <LibraryPage onOpen={openSavedCode} />}
           {destination === 'diagnostics' && <DiagnosticsPage />}
           {destination === 'settings' && <SettingsPage theme={theme} onChoose={chooseTheme} />}
           {destination === 'about' && <AboutPage />}
