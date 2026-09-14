@@ -1,6 +1,6 @@
 [package]
 name = "signatum"
-version = "0.1.0"
+version = "1.0.0"
 description = "A code you can hold up to a phone, proven readable before it is saved"
 authors = ["Alex Justino"]
 license = "Apache-2.0"
