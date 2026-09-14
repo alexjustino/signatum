@@ -260,9 +260,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **It says where it is, and it can be stopped.** A counter moves as the rows are written — "137 of
   200" — and Cancel stops the run between rows: what was written stays written, and the rest is
   reported as skipped rather than quietly missing.
-- **The application shell.** Six destinations — Create, Library, Batch, Diagnostics, Settings and
-  About — in the Windows 11 visual language, following the accent colour chosen for the desktop, in
-  light or dark by choice or by the system. The theme is remembered between sessions.
+- **A code somebody else made, read back.** Open a photograph or a screenshot of a QR code — from a
+  file, or pasted straight from the clipboard — and the product says what is in it: the content, one
+  line saying what scanning would do, and how the code was built — version, error-correction level,
+  mask and the number of modules across. The image is shown with every code found outlined on it, so
+  it is obvious which code is being described when there is more than one. What reads it is **the
+  same decoder that stands in front of every export**, so what Read says a code holds is what the
+  gate would have accepted, and an image with nothing in it says exactly that rather than guessing.
+  A photograph that is bright at one corner and in shadow at the other gets one second attempt with
+  the exposure adjusted, and when that is what found the code the screen says so.
+- **What it says, said in the words the product uses to make one.** A link read out of a photograph
+  is described by the same sentence the Create screen writes for a link it is making — "Opens
+  example.com", "Joins Office-5G", "Adds Ana Souza to contacts" — because both come from the same
+  function. A domain written in another script is shown as a person reads it **and** as it will
+  resolve, so a look-alike domain is visible in a code somebody was sent, not only in one they are
+  about to print. A Wi-Fi code's password is masked until it is revealed. Content that is not text
+  at all is shown as hexadecimal with a note, never as a string that would misrepresent it.
+- **"Would it scan at 20 mm?", answered before anything is printed.** Type a width and the screen
+  says how large one module would be at that size and whether it reads, is tight or is too small for
+  most cameras — the arithmetic behind the warning the Create screen already gives, pointed at
+  somebody else's code. It is an estimate about a print that does not exist yet, and it decides
+  nothing.
+- **Nothing that is read is kept.** No row, no file, no history, no list of recent images, and the
+  location of the file is not kept either: the product reads the image, says what it found, and has
+  nothing left afterwards. A link found in an image is shown and never followed — nothing is opened,
+  resolved or previewed. What a person wants to keep goes through the door that already exists:
+  **Make a code like this** carries the content over to the Create screen, for a link or a text in
+  this release, where saving is a decision they take. An SVG is not read here — a vector file is not
+  a photograph — and the refusal points at the door that does take one: open it as a logo.
+- **The application shell.** Seven destinations — Create, Library, Batch, Read, Diagnostics,
+  Settings and About — in the Windows 11 visual language, following the accent colour chosen for the
+  desktop, in light or dark by choice or by the system. The theme is remembered between sessions.
 - **The workspace file.** One SQLite database created on first launch and migrated forward,
   never rewritten backwards; Diagnostics says where it is, how large it is and which schema
   version it holds.

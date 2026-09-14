@@ -182,8 +182,8 @@ opened, and holds:
   address cannot become a second field either.
 - **Links are shown as they will resolve.** Only `http` and `https` (and the payload kinds' own
   schemes: `mailto`, `tel`, `SMSTO`, `geo`, `WIFI`); an internationalised domain is shown in
-  Unicode **and** punycode (the punycode form since F2, the Unicode form beside it with the Read screen, F10), so a
-  look-alike domain is visible before it is printed.
+  Unicode **and** punycode — `bücher.example (xn--bcher-kva.example)` — on the Create screen and
+  on Read alike (F10), so a look-alike domain is visible before it is printed.
 - **Batch files stay in the folder chosen.** File names built from CSV cells are sanitised; no path
   separator, no `..`, no reserved Windows name reaches the filesystem. The batch **report** is
   itself a CSV and is written with formula injection neutralised (`=`, `+`, `-`, `@`).

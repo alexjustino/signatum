@@ -341,6 +341,41 @@ before** — a primitive built ahead of the screen that needs it is a guess with
   the rows sit outside it, so what is announced is the summary and not two hundred lines somebody
   is about to read at their own pace (§7). And a list the screen truncates says so, because the
   written report keeps every line the table cut (§2, _a view says what it left out_).
+- **The outline over somebody else's picture** (F10) — not a primitive either, and it follows the
+  logo overlay's rule from the other direction. The image a person opened is an `<img>`, shown as it
+  is; where the codes were found is an `<svg>` laid over it, one polygon per code, drawn from the
+  four corners the decoder reported. The corners are in the **source picture's own pixels**, so the
+  overlay's `viewBox` is the width and height the reading reports — the picture the host decoded,
+  and not the natural size of the smaller copy being shown — and the polygons need no arithmetic on
+  this side: the browser scales the drawing exactly as it scales the picture, at any window size and
+  at any zoom, and an outline cannot drift off the code it is about. The overlay is `aria-hidden`,
+  takes no pointer events and is never a target — it is a drawing _about_ the picture, not a control
+  over it — which means it says nothing to anybody who is not looking at it. So **the caption under
+  the image carries the count**, in words: "1200 × 900 px · 2 codes · 41 ms", and each code's own card
+  names which one it is. Nothing from the opened file is ever injected into an SVG this product
+  renders; the picture stays an `<img>` and the outline is markup this product wrote from four
+  numbers.
+- **Revealing a secret is a press, and hiding it is the default** (F10) — a Wi-Fi password read out
+  of somebody's photograph is shown as dots until it is asked for, because a screen can be shared,
+  projected or simply overlooked, and the person who opened the image does not yet know what is in
+  it. The control is a `Button` named for what it will do — **Reveal** becoming **Hide** — beside
+  the field it governs and never instead of it; it carries `aria-pressed` so its state is a fact and
+  not an appearance, and the announcement is that the password is shown or hidden, never the
+  password itself. The masked form is text, not an image of text. The secret never appears in an
+  accessible name, a `title` or a tooltip, where it would be read out by a screen reader that was
+  never asked, and a revealed password goes back to dots when the image is closed or another one is
+  opened: the state belongs to the moment, not to the screen. This is the shape any secret in this
+  product takes from here on, not a Read speciality.
+- **A verdict is a word from a closed list, coloured by token, and the sentence carries the
+  meaning** (F10) — _reads_, _tight_ and _too small_ are the three answers to "would it scan at this
+  size", and there is no fourth (§2, _one word, one meaning_). The word is coloured from
+  `--color-success`, `--color-caution` and `--color-danger` in `tokens.css` — never a literal, never
+  the theme's accent, which belongs to the person's desktop and not to a judgement — and the colour
+  is **redundant by construction**: the sentence beside it says the whole thing in words, "At 20 mm
+  the modules are 0.44 mm — tight; a good camera reads it up close", so a reader who sees no colour
+  at all loses nothing (§2, _severity is never colour alone_). The sentence is written once, in the
+  domain, and the screen shows what it is given: a verdict the interface phrased itself would be a
+  second opinion about somebody's print, and this product has one.
 
 ### Asking "are you sure"
 

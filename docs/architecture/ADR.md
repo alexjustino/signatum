@@ -35,6 +35,7 @@ part that matters most later — the cost we accepted.
 | [027](#adr-027) | The scan margin is a report, never a gate                                        | Accepted                      |
 | [028](#adr-028) | A saved code is its fields and the name of its scene, never an image             | Accepted                      |
 | [029](#adr-029) | A batch is the Create pipeline in a loop, written only inside the chosen folder  | Accepted                      |
+| [030](#adr-030) | Read is the gate's own decoder on somebody else's pixels, and nothing is stored  | Accepted                      |
 
 ---
 
@@ -1253,3 +1254,120 @@ is a second product — the screen takes pasted rows in a plain `TextArea`, for 
 so. It reads nothing: the text was already in the person's clipboard, and it goes through the same
 parser the file does. The cost is one more place a batch can start from; the gain is that the path
 the tests prove is the path people use.
+
+---
+
+## ADR-030 — Read is the gate's own decoder on somebody else's pixels, and nothing read is stored {#adr-030}
+
+**Status: Accepted.**
+
+**Context.** Everything up to F10 was a code this product made: drawn by its own encoder, rasterised
+by its own host, and read back under laboratory conditions by a decoder that shares no lineage with
+the encoder ([ADR-010](#adr-010), [ADR-011](#adr-011)). F10 turns that around. The pixels now arrive
+from somebody else's camera — a menu photographed at an angle under a yellow lamp, a screenshot
+pasted out of a chat, a sticker printed by a press nobody here owns — and the product has to say
+what the code holds, what scanning it would do, how it was built, and whether it would still read at
+a printed size. Two temptations come with those pixels, and both are the kind that only become
+visible months later. The first is a **second decoder**, more forgiving than the gate's and tuned
+for photographs, so that Read answers more often. The second is a **history** — a list of what was
+read, because it is cheap to keep and looks like a feature.
+
+**Decision.** Read is the gate's decoder, pointed at an image somebody put in front of it, and it
+keeps nothing.
+
+- **The same decoder, and no second lineage.** `read_image` prepares the luma of the opened image
+  and hands it to the same `rqrr` ([ADR-019](#adr-019)) that stands behind the scan gate in
+  `src-tauri/src/imaging/decode.rs`. So **what Read says a code holds is what the gate would have
+  accepted**, and what Read cannot read is what the gate would have refused. That sentence is only
+  true while there is exactly one decoder in this product, which is why there is one. A reader more
+  generous than the gate would be a second opinion nobody could act on: the screen would name a
+  payload that this product would then refuse to export.
+- **Two doors, and neither of them is the product going looking.** A reading starts from a file the
+  person chose in a dialog, or from an image already on their clipboard — which is how a screenshot
+  arrives, and pasting one should not require saving it first. The clipboard door reads nothing from
+  disk: it takes an image that was already in the person's hands, exactly as the batch screen takes
+  pasted rows ([ADR-029](#adr-029)), and it takes an image only. Neither door is a watcher, a folder
+  scan or a history: the product looks at what it was handed, once, when it was handed it.
+- **One second pass, and the screen says it happened.** Photographs fail for one dull reason more
+  often than all the others together — a single global threshold cannot hold a page that is bright
+  at one corner and in shadow at the other. So when the first pass finds no grid at all, and only
+  then, the host retries once on an adaptively thresholded copy (Bradley's method, the window an
+  eighth of the short side). When that second pass is what found the code, the screen says so —
+  _"Found after adjusting the exposure."_ — because a person who is told that knows their photograph
+  was marginal, and a person who is not told believes their print is fine. An improvement made
+  silently is the thing this product refuses everywhere else
+  ([`DESIGN_SYSTEM.md`](../../DESIGN_SYSTEM.md) §10), and exposure is no exception.
+- **The meaning of the bytes is the domain's, in the sentences Create already uses.** The host
+  reports pixels and structure — the bytes, the version, the error-correction level, the mask, the
+  modules per side, where the corners sit — and stops there. What those bytes _mean_ is
+  `describeBytes` in `src/domain/read.ts`, which recognises this product's own kinds by their
+  grammar and answers in the product's own words: _"Opens example.com"_, _"Joins Office-5G"_, _"Adds
+  Ana Souza to contacts"_. `describeLink` is the very function the Create screen's summary comes
+  from ([ADR-021](#adr-021)), not a copy of it, so **a code that was read and a code that was made
+  are described by one sentence, written once**. Bytes that are not text are shown as hexadecimal
+  with a note, never as a lossy string that would quietly misrepresent them.
+- **"Would it scan at 20 mm" is arithmetic, and it is never a verdict about the file.**
+  `wouldScanAt` divides the printed width by the modules across and reads the answer off the
+  thresholds that already exist in `src/domain/density.ts`: half a millimetre a module reads, four
+  tenths to a half is tight, below that is too small for most cameras. It is an estimate about a
+  print that does not exist yet, made from a photograph of one that does, and it decides nothing —
+  the standing this product already gives the scan margin ([ADR-027](#adr-027)). The host is not
+  asked the question at all: it reports the module count, and the arithmetic stays where the
+  thresholds are. **The count divided into is the one the Create screen's warning uses — the symbol
+  and the quiet zone that will be printed around it** — while the host reports the symbol alone
+  (`side_modules`, 17 + 4 × version, which is what the detector measured), so the quiet zone is
+  added before the question is asked. The two counts differ by eight modules, and taking the wrong
+  one is a silent error of roughly a fifth in the module size — about the width of the gap between
+  _tight_ and _too small_ — which is why the seam between two components that are each correct is
+  written down here rather than left to be discovered.
+- **Nothing read is stored.** No row, no file, no history, no thumbnail, no list of recent images —
+  and therefore no migration: F10 adds nothing to the schema ([`DATA_MODEL.md`](../DATA_MODEL.md)).
+  A photograph somebody opened is theirs, and so is what was in it; the product reads it, says what
+  it found, and has nothing left when the screen is left. The path is not kept either, because where
+  a file sits is itself a fact about somebody's machine. What a person wants kept has a door
+  already: _Make a code like this_ builds it on the Create screen, where saving is a decision they
+  take.
+- **SVG is refused for reading.** A vector file has no pixels a camera produced; a code in one is
+  markup this product would be parsing rather than decoding, and those are not the same question.
+  The refusal names the other door rather than being a dead end — _"Read works on photographs and
+  screenshots; open an SVG as a logo instead."_ The hostile-SVG rules ([ADR-016](#adr-016)) stay
+  exactly where they are, at the logo import, which is the one place in this product that parses
+  one.
+- **What is read is data, and it is never acted on.** A link found in an image is **shown, never
+  followed** — not opened, not resolved, not previewed, not checked for existence
+  ([ADR-006](#adr-006)); the product has no network, and reading somebody's photograph is not where
+  it grows one. A Wi-Fi payload is shown with its password **masked until it is revealed**, because
+  a screen may be shared or overlooked and the person who opened the image does not yet know what is
+  in it ([ADR-018](#adr-018)). An internationalised host is shown **in Unicode beside its punycode**
+  — _bücher.example (xn--bcher-kva.example)_ — by `src/domain/punycode.ts`, a decode-only RFC 3492
+  implementation in the pure layer, pinned to the RFC's own sample and to the pairs a person will
+  meet. The product still never encodes a host itself: the WHATWG parser does that on the way in.
+  This is the line SPEC §5 has carried since F2 with half of it owed, and it is now true in both
+  places it is claimed — on the Create screen and on this one — because both call the same function.
+- **"Make a code like this" carries a link or a text, and says so plainly.** This slice prefills the
+  Create form for those two kinds only. An e-mail, a Wi-Fi network, a place or a contact card read
+  out of a photograph is described in full and its content can be copied, but it does not yet reopen
+  as a filled form: turning a parsed vCard back into thirteen validated fields is the builders'
+  inverse, and an inverse written quickly is an escaping bug pointed the other way. It is a
+  follow-up, named here so that the gap is a decision rather than an omission somebody discovers.
+
+**Cost accepted: a photograph this decoder cannot read is reported as "no code", never as a guess.**
+A damaged print, a code at a steep angle, one under a glare, one folded along the crease of a menu —
+for any of these the answer may be _"No QR code was found in this image"_ where a phone held in
+front of the real thing would have read it. That is the price of the first bullet, and it is the
+right price: the alternative is a decoder chosen for how often it answers rather than for whether
+its answer means anything, and on the day the two decoders disagree the product would have no
+position to state. A code-like pattern that is found but does not decode is reported as exactly that
+— something in the image that looked like a code and did not come back — so that "nothing here" and
+"something here I could not read" stay two different sentences.
+
+**Second cost: the decoding ceiling is 2,048 pixels on the long side.** The opened file meets the
+caps the logo import already makes its claims on ([`SECURITY.md`](../../SECURITY.md)) — refused
+above 20 MiB, dimensions read from the header and capped before a pixel is decoded, the format
+decided by the bytes and never by the name — with one difference: a photograph is **not** reduced to
+the logo importer's 1,024 pixels, because a code needs its pixels to be decoded at all. The ceiling
+is 2,048, which holds a twelve-megapixel phone photograph at about half its width, and a code
+occupying a small corner of a very large frame can fall below the modules per pixel the decoder
+needs and be reported as not found. The number is a compromise with the memory one open file may
+cost a webview-fronted desktop product, and the person whose photograph fails has the remedy the
+product cannot have: take it again, closer.

@@ -162,8 +162,26 @@ itself a CSV, written beside the codes and never over one that is already there,
 begins `=`, `+`, `-` or `@` written as text so that a report about a hostile list is not the attack
 when it is opened. While it runs, it says how far it has got, and it can be stopped between rows.
 
-What it does not do yet: reading a code back out of an image somebody photographed or was sent. That
-is the slice that follows.
+F10 has pointed the product the other way: it now reads codes it did not make. Open a photograph or
+a screenshot — a menu on a table, a sticker on a bottle, an image pasted out of a chat — and the
+screen says what the code holds, what scanning it would do, and how it was built: version,
+error-correction level, mask and modules across, with every code found outlined on the image itself.
+What reads it is **the same decoder that stands in front of every export**, so what Read says a code
+holds is what the gate would have accepted, and an image with nothing in it is told it has nothing
+rather than given a guess; a photograph lit unevenly gets one second attempt with the exposure
+adjusted, and the screen says when that is what found it. What the bytes mean is written by the same
+functions the Create screen uses, so a code that was read and a code that was made are described in
+one voice — including a domain in another script, shown as a person reads it beside the form it
+resolves as, which makes true on both screens the claim this file has made since the first slice. A
+Wi-Fi password is masked until it is revealed, a link found in an image is shown and never followed,
+and "would it scan at 20 mm" is answered as what it is: arithmetic about a print that does not exist
+yet, deciding nothing. Nothing that is read is kept — no row, no file, no history, not even where
+the image was — because a photograph somebody opened is theirs; what they want to keep goes to the
+Create screen through **Make a code like this**, where saving is a decision they take.
+
+What is left before 1.0.0 is not another feature: a pass of Fluent polish and accessibility across
+every screen in both themes, and the release itself — an installer that runs on a clean machine, and
+the phone matrix on real cameras.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 
