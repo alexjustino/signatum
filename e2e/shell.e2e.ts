@@ -30,12 +30,21 @@ describe('shell', () => {
     const { driver } = session;
     const buttons = await driver.findAll('nav[aria-label="Main"] button');
     const labels = await Promise.all(buttons.map((b) => b.text()));
-    expect(labels).toEqual(['Create', 'Library', 'Batch', 'Diagnostics', 'Settings', 'About']);
+    expect(labels).toEqual([
+      'Create',
+      'Library',
+      'Batch',
+      'Read',
+      'Diagnostics',
+      'Settings',
+      'About',
+    ]);
   });
 
   it.each([
     ['Library', 'h1'],
     ['Batch', 'h1'],
+    ['Read', 'h1'],
     ['Settings', 'h1'],
     ['Diagnostics', 'h1'],
     ['About', 'h1'],
