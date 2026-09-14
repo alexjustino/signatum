@@ -48,6 +48,21 @@ const QUIET_ZONES: ReadonlyArray<{ modules: number; label: string }> = [
   { modules: 0, label: 'None' },
 ];
 
+/**
+ * The margins on offer, and the one in force when it is not one of them.
+ *
+ * The scene will draw any whole number of modules from 0 to 16, so a quiet zone can arrive here
+ * from somewhere this card never offered it: a workspace default, a saved code, a brand kit. A
+ * `Select` whose value matches no option renders empty — a control that shows nothing about the
+ * code it is describing — so the value in force is always one of the options, named the way the
+ * others are.
+ */
+function zonesFor(quietZone: number): ReadonlyArray<{ modules: number; label: string }> {
+  if (QUIET_ZONES.some((option) => option.modules === quietZone)) return QUIET_ZONES;
+  const label = quietZone === 1 ? '1 module' : `${quietZone} modules`;
+  return [...QUIET_ZONES, { modules: quietZone, label }].sort((a, b) => b.modules - a.modules);
+}
+
 /** The two colours of a code, by the name the style gives them. */
 type ColourKey = 'foreground' | 'background';
 
@@ -189,7 +204,7 @@ export function LookCard({
             value={String(style.quietZone)}
             onChange={(event) => onStyle({ ...style, quietZone: Number(event.target.value) })}
           >
-            {QUIET_ZONES.map((option) => (
+            {zonesFor(style.quietZone).map((option) => (
               <option key={option.modules} value={String(option.modules)}>
                 {option.label}
               </option>
@@ -260,18 +275,22 @@ function ColourField({
   return (
     <label className="flex flex-col gap-1">
       <span className="text-caption font-semibold text-fg-secondary">{label}</span>
-      <span className="flex items-center gap-2">
+      <span className="flex items-stretch gap-2">
         {/* The swatch's own colour is the person's print colour, which is the
             one place in the product where a value is not a token (§2). Its
             border, fill and focus are the field's, so it and the hex box read
-            as one control. */}
+            as one control — one height, one baseline, one edge. The colour
+            fills it rather than floating inside it: the browser's own inset is
+            flattened in `global.css`, and `overflow-hidden` keeps the fill
+            inside the field's corners. */}
         <input
           type="color"
           aria-label={`${label} swatch`}
           value={colour}
-          className={['h-(--density-control) w-10 shrink-0 cursor-pointer p-1', FIELD_CHROME].join(
-            ' ',
-          )}
+          className={[
+            'h-(--density-control) w-10 shrink-0 cursor-pointer overflow-hidden p-0',
+            FIELD_CHROME,
+          ].join(' ')}
           onChange={(event) => onText(event.target.value)}
         />
         <Input

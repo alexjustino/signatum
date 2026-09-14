@@ -297,6 +297,12 @@ interface CreatePageProps {
    */
   attached: AttachedCode | null;
   onAttach: (attached: AttachedCode) => void;
+  /**
+   * Whether the Save form starts with "Save the password with this code" ticked — what this
+   * workspace was set to (ADR-018, F11). It is a starting point and never a rule: the tick is
+   * the person's, one code at a time, and the form is where they change it.
+   */
+  keepPasswords: boolean;
 }
 
 export function CreatePage({
@@ -314,6 +320,7 @@ export function CreatePage({
   onPrintSize,
   attached,
   onAttach,
+  keepPasswords,
 }: CreatePageProps) {
   const result = useMemo(() => buildPayload(form), [form]);
   const payload = result.ok ? result.payload : null;
@@ -425,11 +432,12 @@ export function CreatePage({
   /** The name being typed, or null while nobody is saving anything. */
   const [naming, setNaming] = useState<string | null>(null);
   /**
-   * Whether a Wi-Fi password is kept with the code (ADR-018). Ticked, because the code a person
-   * just verified carries the password already and a saved code that cannot be reopened is a
-   * surprise; the sentence beside it says what keeping it costs, and unticking is one click.
+   * Whether a Wi-Fi password is kept with the code (ADR-018). It starts at what this workspace
+   * was set to — ticked out of the box, because the code a person just verified carries the
+   * password already and a saved code that cannot be reopened is a surprise; the sentence
+   * beside it says what keeping it costs, and unticking is one click.
    */
-  const [keepPassword, setKeepPassword] = useState(true);
+  const [keepPassword, setKeepPassword] = useState(keepPasswords);
   const [kept, setKept] = useState<Kept | null>(null);
   const [saveProblem, setSaveProblem] = useState<string | null>(null);
 
@@ -758,7 +766,22 @@ export function CreatePage({
           <SizeCard size={printSize} onSize={onPrintSize} side={scene.side} />
         </div>
 
-        <div className="flex flex-col gap-4">
+        {/* The code, its verdict and the way out stay in view while the cards on the left are
+            edited: a person changing a colour is looking at what it does to the code, and a
+            preview that scrolled away made them scroll back to find out (F11). It becomes its
+            own scrolling region when it outgrows the window — pinned content whose bottom a
+            person can never reach would be worse than content that scrolled — so it is named
+            and reachable by keyboard like the content region itself. The lateral padding is
+            there for the cards' own shadow, which the overflow would otherwise clip. */}
+        <div
+          tabIndex={0}
+          aria-label="The code and how it leaves"
+          className={[
+            'flex flex-col gap-4 self-start',
+            'lg:sticky lg:top-6 lg:max-h-[calc(100dvh-5rem)] lg:overflow-y-auto',
+            'lg:-mx-2 lg:px-2',
+          ].join(' ')}
+        >
           <CodePreview
             name={name}
             svg={svg}
@@ -813,8 +836,14 @@ export function CreatePage({
               row is enabled by the verdict beside it and by nothing else. PNG is
               the accented one because it is what most codes are printed from;
               the other three are the same action in another format, not lesser
-              ones (DESIGN_SYSTEM §8). */}
-          <div className="flex flex-wrap gap-2">
+              ones (DESIGN_SYSTEM §8).
+
+              Two columns rather than a row that wraps (F11). This pane is half of a page that
+              stops at `max-w-5xl`, which is narrower than the five buttons laid end to end at
+              any window size — so a flexible row always wrapped, and wrapped raggedly: three
+              buttons and then two. A grid wraps in the same place every time, the buttons come
+              out the same width, and Copy — the one way out that writes no file — is last. */}
+          <div className="grid grid-cols-2 gap-2">
             {/* Keeping a code is the fifth way out of it, and behind the same gate: a saved
                 code is a verified code (ADR-010). It sits first because it is the one that
                 does not leave the workspace. */}
@@ -850,7 +879,10 @@ export function CreatePage({
             >
               Export PDF…
             </Button>
+            {/* Five peers in two columns leave one alone; the last spans the row on purpose, so
+                the odd one out is a deliberate wide button and not a wrap. */}
             <Button
+              className="col-span-2"
               icon={<Copy20Regular />}
               disabled={!verified || exporting}
               onClick={() => void copy()}

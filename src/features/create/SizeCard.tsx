@@ -172,9 +172,7 @@ export function SizeCard({
             and how wide a module lands on paper. It is arithmetic rather than a
             verdict, so it is never coloured like one; the verdicts are under the
             fields they belong to (DESIGN_SYSTEM §10). */}
-        <p aria-live="polite" className="min-h-5 text-caption text-fg-secondary">
-          {caption}
-        </p>
+        <p className="min-h-5 text-caption text-fg-secondary">{caption}</p>
       </div>
     </Card>
   );

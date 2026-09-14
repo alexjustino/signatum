@@ -10,4 +10,5 @@ pub mod codes;
 pub mod library;
 pub mod logos;
 pub mod read;
+pub mod settings;
 pub mod system;

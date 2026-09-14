@@ -15,12 +15,14 @@ export type { ThemeChoice };
 export type Density = 'comfortable' | 'compact';
 
 /**
- * Where the choice is kept until a settings table arrives with a later slice: in F0 it is
- * the browser's own storage, and nothing else lives there.
+ * The pre-paint copy of the choice, and nothing more.
  *
- * Reading it is the first thing the window does, before the first paint the
- * user sees, so a person who chose dark never gets a flash of light. The domain
- * stays out of this: it says what a theme is, this says where it lives.
+ * Since F11 the theme lives in the settings table with everything else a person chooses. The
+ * browser store keeps a copy because reading the table is a host round trip and the first frame
+ * cannot wait for it: `main.tsx` paints with this, the table answers a moment later and wins,
+ * and the copy is written back for the next start. A store that disagrees with the table is
+ * therefore corrected, never consulted twice. The domain stays out of it: it says what a theme
+ * is, this says where it lives.
  */
 const THEME_KEY = 'signatum.theme';
 

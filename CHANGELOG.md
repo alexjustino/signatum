@@ -288,6 +288,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Make a code like this** carries the content over to the Create screen, for a link or a text in
   this release, where saving is a decision they take. An SVG is not read here — a vector file is not
   a photograph — and the refusal points at the door that does take one: open it as a logo.
+- **Settings now has Defaults, and the Create screen starts from them.** The width a code is
+  designed for, the resolution it is designed at, the quiet zone around it, and whether a Wi-Fi
+  password is kept with a saved code — set once, kept in the workspace, and used as the starting
+  point for the next code rather than typed again every morning. Each control saves as it is
+  changed, with "Saved." under it; there is no Save button to forget to press. A default is a
+  starting point and never a rule: it fills the control, and changing it on one code changes that
+  code and not the setting. The Save form's Wi-Fi checkbox starts from the same choice, so the
+  question about a password is asked once and not once per network.
+- **The choices are kept in the workspace file, and only five of them exist.** The settings live in
+  the same file as the codes, the kits and the logos — so they travel with it — under a closed list
+  of keys the host owns: theme, default width, default resolution, default quiet zone, and whether
+  to keep Wi-Fi passwords. A key that is not on the list is refused, and so is a value outside what
+  it may hold, which is what keeps the table a place for preferences and not a drawer for anything
+  a screen felt like stashing. Nothing in it is a secret: the one setting that mentions passwords
+  holds the word `true` or the word `false`.
+- **Every screen is checked for accessibility, in both themes, on every run.** The suite opens each
+  of the seven screens in the light theme and the dark one and runs the industry's automated
+  checker over it — names on controls, contrast, roles, heading order — and a violation fails the
+  build rather than being counted. Beside it, the product is driven by real key presses: from
+  nothing focused to the export button with the focus ring visible at every stop, a saved code
+  opened from the library without a mouse, and a confirmation dialog that takes focus, keeps it
+  through repeated tabs, and hands it back where it came from when it closes.
 - **The application shell.** Seven destinations — Create, Library, Batch, Read, Diagnostics,
   Settings and About — in the Windows 11 visual language, following the accent colour chosen for the
   desktop, in light or dark by choice or by the system. The theme is remembered between sessions.
@@ -342,5 +364,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   architectural boundary, the security rule, the gates and the pull-request template.
 - Apache-2.0 licence and a NOTICE carrying both trademark statements — the project's own, and
   DENSO WAVE's for "QR Code".
+
+### Changed
+
+- **The preview stays in view while the code is edited.** The Create screen is long — the payload,
+  the logo, the look, the brand kit and the size — and the code, its verdict and the ways out used
+  to scroll off the top while a person worked below. They now stay put beside the form on a wide
+  window: the thing being edited is visible while it is edited, which is what a live preview was
+  for.
+- **The ways out no longer wrap a single button onto a line of its own.** At the window's ordinary
+  width the export row put Copy by itself underneath the others, which reads as a different kind of
+  action rather than the fourth of four. The row is a tidy two-by-two block when it is narrow and a
+  single row when there is room, with Copy last in both.
+- **The navigation reads as what it is: the work, then the rest.** Create, Library, Batch and Read
+  are where codes are made; Diagnostics, Settings and About are about the product. A hairline now
+  separates the two groups — a separator and never a button, so nothing new is added for the
+  keyboard to stop at.
+- **The theme is kept in the workspace instead of the browser's storage.** It is a setting like the
+  others now, in the same file, and it travels with a workspace copied to another machine. It is
+  still read before the first paint, so a person who chose dark never gets a flash of a white
+  window on the way in.
+- **One announcement per verdict, and none per keystroke.** What is read out as a code is edited
+  was audited screen by screen: a verdict that changes is announced once, in the sentence the
+  screen shows; typing is not narrated back to the person doing it.
 
 [Unreleased]: https://github.com/alexjustino/signatum/compare/main...HEAD

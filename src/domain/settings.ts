@@ -1,5 +1,5 @@
 /**
- * The one thing a person chooses in F0: the theme.
+ * The theme: the first thing a person chose in this product, and the shape every choice takes.
  *
  * Pure data with a reader that never throws. A stored value this build does not
  * recognise — written by a newer version, or edited by hand — falls back to the
@@ -8,8 +8,9 @@
  *
  * Where the choice is kept is not decided here. The domain neither reads nor
  * writes it; `app/theme.ts` does that, and hands the raw value to `readTheme`.
- * F0 keeps it in the browser store; the settings table arrives with the slice
- * that needs a second setting.
+ * Since F11 it lives in the workspace's `settings` table with the other choices (ADR-031),
+ * with the browser store kept only as the pre-paint mirror so that no window ever flashes the
+ * wrong theme.
  */
 
 export const THEMES = ['system', 'light', 'dark'] as const;

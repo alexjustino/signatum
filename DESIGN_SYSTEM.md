@@ -154,6 +154,30 @@ component picks one rather than inventing a shadow.
 controls read `--density-row` and `--density-control`; they never hard-code a height. Changing
 one attribute on `<html>` re-sizes the whole product.
 
+### The thing being edited stays in view
+
+A screen where the form is long and the result is at the top is a screen where the result scrolls
+away exactly when it starts to matter. The pane that carries the result — on Create, the code, its
+scan-gate verdict and the ways out — is `lg:sticky lg:top-6 self-start` beside the form, so it
+holds its place while the person works down the column beside it. `self-start` is not optional: a
+grid item stretched to the row's height has nothing left to stick to, and the rule silently does
+nothing. A sticky pane taller than the window would pin its top and put its bottom out of reach, so
+the pane is also a named scroll region — `lg:max-h-[calc(100dvh-5rem)] lg:overflow-y-auto`, with
+`tabIndex={0}` and an `aria-label` that says what it holds — which is one more Tab stop, and worth
+it. It is a wide-window rule only — on a narrow window the two panes are one column and the result
+belongs where the reading order puts it, not pinned over the form.
+
+### A row of actions becomes a grid before it wraps one button alone
+
+A wrapped row that leaves the last button by itself on a second line reads as a different kind of
+action rather than the last of four, and it is the default window width that does it. A row of
+peer actions is `grid grid-cols-2`, and `lg:flex` only where the column can hold the whole row
+without wrapping — Create's export row, five buttons in half of `max-w-5xl`, cannot, so it stays a
+grid at every width, with its fifth button spanning the last row (`col-span-2`) so the odd one out
+is a deliberate wide button and not a wrap. The order is the same either way — the destructive or
+secondary one last, never promoted by the wrap. `flex-wrap` on a row of peers is what this rule
+replaces.
+
 ## 5. Icons
 
 **Fluent UI System Icons**, and only that set. Mixing icon families is immediately visible and
@@ -167,9 +191,12 @@ cannot be undone later without touching every screen.
 
 ### The mark
 
-**Not yet decided — and not invented here.** The product needs a mark in F0, because an
-installer has to carry one, and it is finished in F11 with the rest of the Fluent polish. Until
-then this section states what the mark has to satisfy, not what it looks like:
+**A seal with a check inside it.** The mark is a ring — the signet pressed into wax to prove who
+sent a thing — and, inside it, the check: the proof that the code scans. It is one file,
+`src/assets/mark.svg`, and the same drawing is the window icon, the installer icon and the
+title-bar mark, so there is nothing to keep in step. Two shapes and one accent, on a ground with
+the Windows 11 corner radius. The ring is a circle on purpose: a square ring with a square inside
+would read as a QR finder pattern. What it had to satisfy, and does:
 
 - **Monochrome-capable.** It must read as one colour before it reads as two: a taskbar, an
   installer, a black-and-white print of About and a disabled state will all take it that way.
@@ -229,9 +256,10 @@ component cannot forget it. Nothing animates in a loop.
   `useFocusTrap`.
 
 **Held by gates, not by review:** `src/styles/tokens.test.ts` checks every text-on-surface pair
-in both themes; the end-to-end suite runs axe-core on every screen in both themes, where serious
-and critical are failures, and drives the product by keyboard alone (`docs/SPEC.md` §6, slice
-F11).
+in both themes; the end-to-end suite runs axe-core, every rule on, on every screen in both themes,
+where **any** violation is a failure, and drives the product by keyboard alone with real key
+presses — the rail, the payload, the export button, a saved code opened from the library, and a
+dialog that holds focus and gives it back (`docs/SPEC.md` §6, slice F11).
 
 ## 8. The canonical primitives
 
@@ -376,6 +404,17 @@ before** — a primitive built ahead of the screen that needs it is a guess with
   at all loses nothing (§2, _severity is never colour alone_). The sentence is written once, in the
   domain, and the screen shows what it is given: a verdict the interface phrased itself would be a
   second opinion about somebody's print, and this product has one.
+- **The Defaults card** (F11) — not a primitive either, and the pattern is the part worth keeping.
+  Each control in it is a canonical one — an `Input` for the width, the resolution and the quiet
+  zone, a `Checkbox` for keeping a Wi-Fi password — and **each saves on change**. There is no Save
+  button, because a Save button on a card of independent preferences is a thing to forget to press
+  and a way to lose four changes to one mistake. What a person gets instead is a receipt and a
+  refusal in the same place: **"Saved."** in the caption under the control that changed, and, when
+  the host will not take the value, **the host's own sentence** under that same control — the bound
+  named, in the words the host used, never an interface paraphrase of somebody else's rule (§10).
+  A control the host refused keeps what was typed, so the person can correct it rather than watch
+  it revert. A default is a starting point: it fills the control on the screen that uses it, and
+  changing it there changes that code and not the setting.
 
 ### Asking "are you sure"
 
@@ -404,6 +443,17 @@ automatically via `global.css`.
 **Known gap, tracked rather than hidden.** Snap Layouts — hovering maximise to choose a layout
 — requires native `WM_NCHITTEST` handling that a custom title bar does not get for free.
 Maximising works; the hover flyout does not appear yet.
+
+### The rail
+
+The destinations are ordered **work first, then the product**: Create · Library · Batch · Read,
+then Diagnostics · Settings · About. Between the two groups sits a hairline with
+`role="separator"` — a separator and **never** a disabled button, a heading nobody can reach or an
+empty `div` used as a gap: the grouping has to be a fact for somebody who is listening to the rail
+rather than looking at it, and nothing new may appear in the tab order to say it. Tab order is the
+rail's navigation, as it is everywhere else in this product; after the title bar's three window
+controls, the first Tab lands on the rail's first destination and the current one is a step or two
+away, in reading order — no roving `tabIndex`, nothing that moves under the keyboard.
 
 ## 10. Degrade visibly, never silently
 

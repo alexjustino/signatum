@@ -179,9 +179,23 @@ yet, deciding nothing. Nothing that is read is kept — no row, no file, no hist
 the image was — because a photograph somebody opened is theirs; what they want to keep goes to the
 Create screen through **Make a code like this**, where saving is a decision they take.
 
-What is left before 1.0.0 is not another feature: a pass of Fluent polish and accessibility across
-every screen in both themes, and the release itself — an installer that runs on a clean machine, and
-the phone matrix on real cameras.
+F11 has been the pass over everything already built. The choices a person makes once are now made
+once: a default printed width, a default resolution, a default quiet zone and whether a Wi-Fi
+password is kept with a saved code, set on the Settings screen, kept in the workspace file beside
+the codes themselves, and used as the starting point for the next code. Each control saves as it is
+changed and says so, and a value the product will not take comes back with the limit named, still
+holding what was typed. The theme moved there too, out of the browser's storage, so it travels with
+a workspace copied to another machine — and it is still read before the first paint, so nobody who
+chose dark sees a white window on the way in. On the screens themselves: the code, its verdict and
+the ways out now stay in view while the look is edited below them, the four ways out sit as a block
+instead of leaving Copy alone on a line of its own, and the navigation separates making codes from
+the product's own screens. And it is proved rather than reviewed — every one of the seven screens is
+opened in both themes on every run and checked by the industry's automated accessibility checker,
+where a violation fails the build, then driven by real key presses from an empty window to the
+export button, into the library and through a dialog that has to give the focus back.
+
+What is left before 1.0.0 is not a feature at all: the release itself — an installer that runs on a
+clean machine, F0's proof passing on it, and the phone matrix on real cameras.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 

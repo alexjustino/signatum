@@ -36,6 +36,7 @@ part that matters most later — the cost we accepted.
 | [028](#adr-028) | A saved code is its fields and the name of its scene, never an image             | Accepted                      |
 | [029](#adr-029) | A batch is the Create pipeline in a loop, written only inside the chosen folder  | Accepted                      |
 | [030](#adr-030) | Read is the gate's own decoder on somebody else's pixels, and nothing is stored  | Accepted                      |
+| [031](#adr-031) | Settings are a closed list of keys the host owns, and the theme lives there      | Accepted                      |
 
 ---
 
@@ -1371,3 +1372,84 @@ occupying a small corner of a very large frame can fall below the modules per pi
 needs and be reported as not found. The number is a compromise with the memory one open file may
 cost a webview-fronted desktop product, and the person whose photograph fails has the remedy the
 product cannot have: take it again, closer.
+
+## ADR-031 — Settings are a closed list of keys the host owns, and the theme lives there {#adr-031}
+
+**Status: Accepted.**
+
+**Context.** F0 shipped one setting — the theme — in the browser's own storage, with a note beside
+it promising a table on the day a second setting existed ([`DATA_MODEL.md`](../DATA_MODEL.md)).
+F11 is that day. The polish slice adds the choices a person makes once and expects to find again:
+the width and the resolution a code is designed at, the quiet zone around it, and whether a Wi-Fi
+password is kept with a saved code ([ADR-018](#adr-018)). Five preferences is where the shape of
+this has to be decided rather than improvised, because the shape chosen here is the one every later
+preference arrives into, and both of the obvious shapes fail in a way that only becomes visible
+much later.
+
+**Decision.** One table of key and value, and **the list of keys is closed, in the host**.
+
+- **Not a column per preference.** A column is the tidy answer for five settings and the wrong
+  answer for the sixth: every preference a slice adds becomes a migration, applied to everybody's
+  workspace, to record a fact the host already knows — and migrations are forward-only history
+  ([`DATA_MODEL.md`](../DATA_MODEL.md)), so a preference that is later dropped leaves a column
+  behind it forever. A migration per preference is a migration too many.
+- **Not one JSON blob either.** A single row holding every choice has to be read, parsed and
+  written whole to change one word, which is how two windows lose each other's edits, and it puts a
+  shape the host cannot check inside a column SQLite cannot check.
+- **And not a free key/value table.** Key and value with nothing governing the key is a junk
+  drawer: it becomes the place where state that should have had a shape gets stashed — a cached
+  verdict, a half-finished draft, a list of things somebody opened — and nobody can say what a
+  workspace contains by reading the schema. So the key is bounded by the SQL (an identifier, at
+  most 64 characters; a value at most 4,096) and **enumerated by the host**: `commands/settings.rs`
+  holds the list, each key with what it may hold, and every write goes through it. A key that is
+  not on the list is refused — _"That is not a setting this product keeps."_, which does not echo
+  the key, since whatever asked for it was not a person typing — and a value outside its range is
+  refused with the bound in the sentence, so a default width of 5,000 mm comes back naming the
+  1,000 mm the product allows. **The list in code is the schema, and a test holds it**: a key the
+  interface writes and the host does not keep is a red test rather than a preference that silently
+  never comes back. There is deliberately no `CHECK` enumerating the keys in the SQL, for the
+  reason `codes.kind` is bounded by length rather than enumerated — the list grows with the
+  interface, and a `CHECK` would need a migration to record something the host already refuses to
+  get wrong.
+- **What is kept, and it is the whole list.** `theme`; `default_width_mm`, `default_dpi` and
+  `default_quiet_zone` — the three numbers the Create screen starts from, which are a person's
+  house style and not a decision they should retype every morning; and `keep_wifi_passwords`, which
+  the Save form's checkbox starts from rather than asking the same question about every network
+  ([ADR-018](#adr-018)). A default is a starting point and never a rule: it is what a new code
+  begins with, it is visible in the control it fills, and changing it on one code changes that
+  code, not the setting.
+- **What is deliberately not kept.** **The window's position and size**, because they are the
+  operating system's to remember and a product that restores its own geometry is a product
+  fighting Windows about which monitor somebody is on. **A list of recent files**, because nothing
+  in this product stores a fact about where somebody's files live: Read keeps nothing at all
+  ([ADR-030](#adr-030)), the logo import keeps the normalised image and not the path it came from
+  ([ADR-016](#adr-016)), and the one folder that is written down is the one a batch actually wrote
+  into, where it is part of that run's report rather than a convenience. And **nothing derived** —
+  no cached scan verdict, no last-used code, no remembered screen: a verdict has an owner
+  ([ADR-010](#adr-010)) and a convenience that shadows it is the copy that eventually disagrees.
+- **The theme moves to the table, and the pre-paint read stays as a fallback.** The workspace is a
+  file the host opens after the window exists, and a value that lives in SQLite therefore cannot be
+  read before the first paint without blocking it — which is exactly the moment the theme is needed,
+  because a person who chose dark must never be shown a white window first. So the theme is written
+  to the table **and** mirrored into the window's own storage, and the direction is what keeps two
+  copies of one fact honest: the table is the authority and is written first; the mirror is written
+  after it and is **read in exactly one place**, the synchronous read before the first paint; and
+  when the workspace answers, the table corrects the mirror, never the other way round. A workspace
+  copied to another machine carries the theme with it, because the preference is in the file; the
+  mirror left behind is a paint hint about a window, not a preference about a person.
+
+**Cost accepted: the database cannot enforce what a setting means, so every read has to survive a
+value the product did not write.** The bounds in the SQL stop a workspace edited by hand from
+making the host read a megabyte to find out what the theme is, and they stop nothing else: `theme`
+could hold `sepia`, `default_dpi` could hold `banana`. The rule that pays for this is the one
+`readTheme` has had since F0, applied to every key — a reader that never throws, falls back to the
+default, and leaves the stored value alone until the person changes it. A preference is a
+convenience, and a screen that will not render is not.
+
+**Second cost: adding a setting is a change in two places, and that is the point.** The host's list
+and the control that offers it both have to be written, and the test that compares them fails until
+they agree. A design where a new preference costs nothing is a design where preferences accumulate
+until a person cannot find the one they are looking for — the closed list is what makes Settings a
+short screen a year from now, and what lets `SECURITY.md` say plainly that the table holds no
+secret: `keep_wifi_passwords` holds the word `true` or the word `false`, and a table that refuses
+every key but five cannot be used as a store for anything at all.

@@ -10,7 +10,9 @@
 export type Destination =
   'create' | 'library' | 'batch' | 'read' | 'diagnostics' | 'settings' | 'about';
 
-/** The order of the rail. */
+/**
+ * The order of the rail: the work first, then the three that are about the product itself.
+ */
 export const DESTINATIONS: readonly Destination[] = [
   'create',
   'library',
@@ -20,6 +22,14 @@ export const DESTINATIONS: readonly Destination[] = [
   'settings',
   'about',
 ];
+
+/**
+ * Where the rail draws its one separator (F11): before the trio that is about the product
+ * rather than about a code. It is named here, beside the order it divides, so the rail draws
+ * the grouping rather than deciding it — and so a destination inserted into the list above
+ * cannot silently land on the wrong side of the line.
+ */
+export const RAIL_SEPARATOR_BEFORE: Destination = 'diagnostics';
 
 export const DESTINATION_LABELS: Record<Destination, string> = {
   create: 'Create',
