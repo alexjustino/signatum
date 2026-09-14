@@ -713,7 +713,11 @@ fn read_text_file_at(path: &str) -> Result<TextFile> {
         .file_stem()
         .and_then(|found| found.to_str())
         .unwrap_or("");
-    let base = stem.split('.').next().unwrap_or(stem);
+    let base = stem
+        .split('.')
+        .next()
+        .unwrap_or(stem)
+        .trim_end_matches([' ', '.']);
     if RESERVED.contains(&base.to_ascii_lowercase().as_str()) {
         return Err(Error::InvalidInput(
             "That is a name Windows reserves for a device, not a file.".to_string(),

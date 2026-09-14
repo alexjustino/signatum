@@ -12,6 +12,7 @@
  * still costs nothing to notice (SPEC §5).
  */
 
+import { bothForms } from './link';
 import type { PayloadResult } from './index';
 
 export interface EmailForm {
@@ -134,5 +135,5 @@ export function buildEmail(form: EmailForm): PayloadResult {
   const address = `${encodeAddressPart(local)}@${host}`;
   const payload = query.length > 0 ? `mailto:${address}?${query.join('&')}` : `mailto:${address}`;
 
-  return { ok: true, payload, summary: `Writes to ${local}@${host}` };
+  return { ok: true, payload, summary: `Writes to ${local}@${bothForms(host)}` };
 }

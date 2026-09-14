@@ -57,10 +57,12 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 # One honest note about this line. `arboard`'s `image-data` feature asks `image`
 # for `bmp` on Windows, and Cargo unifies features — so a BMP decoder is compiled
 # into the binary even though nothing here names it. It is reachable only from
-# arboard's clipboard *reading* path, which this host never calls (it only ever
-# puts an image on the clipboard), and the logo importer picks its decoder from
-# the magic bytes against a closed list of five formats, so a `.bmp` somebody was
-# sent is still one sentence and no decode (ADR-016).
+# arboard's clipboard *reading* path — which, since Read (F10), this host does
+# call: `read_clipboard` takes an image the system already decoded, and the
+# pixel caps are applied after that decode, not before it (SECURITY.md says so).
+# The logo importer and Read's file door still pick their decoder from the magic
+# bytes against a closed list, so a `.bmp` somebody was sent is one sentence and
+# no decode (ADR-016).
 sha2 = "0.10"
 hex = "0.4"
 # The normalised logo reaches the screen as a `data:` URL, because the interface

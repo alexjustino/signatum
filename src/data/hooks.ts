@@ -27,6 +27,7 @@ import {
   saveCode,
 } from './library';
 import { deleteLogo, importLogo, listLogos, logoDataUrl } from './logos';
+import { readClipboard, readImage } from './read';
 import { fetchAccentRamp, fetchSystemInfo } from './system';
 
 export const keys = {
@@ -246,4 +247,23 @@ export function useCancelBatch() {
 /** Write the report the domain composed, beside the codes it is about. */
 export function useWriteBatchReport() {
   return useMutation({ mutationFn: writeBatchReport });
+}
+
+/**
+ * The two doors into Read (F10), both mutations and neither cached.
+ *
+ * A reading is an answer about one image a person put in front of the product at one moment, and
+ * nothing else ever wants to read it back — the same reason the scan-gate commands are mutations.
+ * Nothing read is stored, here or anywhere below this line, so there is nothing for a cache to be
+ * stale about.
+ */
+
+/** Read the image at the chosen path, and say what is in it. */
+export function useReadImage() {
+  return useMutation({ mutationFn: readImage });
+}
+
+/** Read whatever image is on the clipboard — the door a screenshot arrives through. */
+export function useReadClipboard() {
+  return useMutation({ mutationFn: readClipboard });
 }

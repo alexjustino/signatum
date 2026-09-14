@@ -71,9 +71,10 @@ seriously.
   every kind.
 - **Links are shown as they will resolve.** Only `http` and `https`, plus the payload kinds' own
   schemes (`mailto`, `tel`, `SMSTO`, `geo`, `WIFI`); anything else is refused. An
-  internationalised domain is shown as it will resolve — in punycode today, with the Unicode form
-  beside it when the Read screen arrives (F10) — so a look-alike domain is
-  visible before it is printed rather than after.
+  internationalised domain is shown as it will resolve **and** as a person reads it — the punycode
+  form since F2, the Unicode form beside it since Read (F10, ADR-030), from a decode-only RFC 3492
+  implementation in the pure domain — so a look-alike domain is visible before it is printed rather
+  than after, and in a code somebody was sent as well as in one somebody is making.
 - **Batch files stay in the folder chosen, and this is now what the code does (F9, ADR-029).** A
   file name built from a CSV cell is reduced to one file name before anything is written:
   normalised, stripped of control characters, every `\ / : * ? " < > |` replaced, leading and
@@ -103,23 +104,47 @@ seriously.
   that network is in the file. Either way the printed code itself carries the password in plain
   text, because that is what a Wi-Fi code is; what this choice governs is only what the workspace
   keeps afterwards.
-- **Minimum capabilities, and two doors that read a file.** Tauri 2 capabilities are declared
+- **Minimum capabilities, and three doors that read a file.** Tauri 2 capabilities are declared
   explicitly, one by one. Files are read and written **only** through paths the person chose in a
   system dialog; nothing in the product enumerates a directory or follows a path it was not handed.
-  Shell execution is not granted. Exactly two host commands read a file, each under its own caps:
-  `import_logo`, which refuses above 20 MiB and hands back a normalised image or a sentence, and —
-  since the batch (F9) — `read_text_file`, which reads the chosen CSV at no more than 2 MiB, as
+  Shell execution is not granted. Exactly three host commands read a file, each under its own caps:
+  `import_logo`, which refuses above 20 MiB and hands back a normalised image or a sentence;
+  `read_text_file`, since the batch (F9), which reads the chosen CSV at no more than 2 MiB, as
   UTF-8 or a refusal, from a local path only, refusing a name Windows reserves for a device before
-  it is opened, and is used by that one screen. A batch's folder is
-  the third thing a dialog hands over, and it is the only place a batch writes.
+  it is opened, and is used by that one screen; and — since Read (F10) — `read_image`, below. A
+  batch's folder is the fourth thing a dialog hands over, and it is the only place a batch writes.
+- **Read opens a file to look inside it, keeps none of it, and acts on none of it (F10, ADR-030).**
+  `read_image` is the third door, and it carries the raster rules the logo import already makes its
+  claims on: refused above 20 MiB, the format decided by the **bytes** and never by the name,
+  dimensions read from the header and capped before a pixel is decoded, a truncated file refused as
+  a sentence. Two things are deliberately different. An SVG is **refused for reading** — a vector
+  file is not a photograph, and the one place in this product that parses one is still the logo
+  import — and a photograph is decoded at up to 2,048 pixels on its long side rather than reduced to
+  the importer's 1,024, because a code needs its pixels to be read at all. **Nothing from the file
+  is stored**: no row, no artefact, no history, no thumbnail, and not the path — the interface asked
+  for a file, was told what was in it, and there is nothing left afterwards. What comes back is
+  **data and is never acted on**: a link found in an image is shown and never followed, resolved or
+  previewed (there is no network to follow it with), a Wi-Fi password is masked on screen until it
+  is revealed, content that is not text is shown as hexadecimal rather than as a string that
+  misrepresents it, and nothing read is ever executed, opened or passed to the system. Carrying a
+  payload to the Create screen is a **press the person makes**, and it goes through the same
+  builders and the same escaping as anything typed. The same screen has a second door that opens no
+  file at all: `read_clipboard` takes an image that is already on the clipboard — how a screenshot
+  arrives — and takes an image only, storing nothing. One honest difference from the file door:
+  the system decodes a clipboard image before this host sees it, so the pixel caps are applied
+  to the decoded picture and the byte cap does not apply there at all — a hostile image copied
+  from a page costs what the system's decoder lets it cost, on the machine of the person who
+  pressed the button. It is the first place this product **reads** the clipboard rather than
+  writing to it, it happens only when a person presses for it, and an empty or non-image
+  clipboard is a sentence rather than a search for something else to read.
 - **What leaves is an image, and it lands only where a dialog said.** Copying a code puts the
   **verified image** on the clipboard and never the payload text: a payload on the clipboard is a
   paste into the wrong window — into the message somebody was writing, or into a terminal — and
   nothing about a code needs the clipboard to carry it as text. An export writes only through the
-  path a save dialog produced, and the SVG and the PDF (F7) join the PNG under the same three
-  checks the host already applies: the path came from the dialog, its extension is the kind being
-  written, and it is on a local drive — a network path is refused. The bytes written are always a
-  code that read back (ADR-010, ADR-026).
+  path a save dialog produced, and the SVG and the PDF (F7) join the PNG under the same three checks
+  the host already applies: the path came from the dialog, its extension is the kind being written,
+  and it is on a local drive — a network path is refused. The bytes written are always a code that
+  read back (ADR-010, ADR-026).
 
 ### What the tests must refuse
 
@@ -154,10 +179,12 @@ the extension of the kind being written, never a network path, and the bytes are
 that read back. A batch widens that by a folder rather than by a kind: the host writes as many files
 as the run has rows, but only inside the one folder the dialog returned, and only names that are a
 single path segment. The same
-interface could ask the host to read any one file on a local drive — as a logo, or as the text of a
-CSV — because the open dialog hands it a path and the host reads the path it is given: it is read
-once, under the cap for that door, and what comes back is a normalised image, at most 2 MiB of
-UTF-8 text, or a sentence. A network path is refused on every door. The dialog plugin may only open
+interface could ask the host to read any one file on a local drive — as a logo, as the text of a
+CSV, or as an image to look for a code in — because the open dialog hands it a path and the host
+reads the path it is given: it is read once, under the cap for that door, and what comes back is a
+normalised image, at most 2 MiB of UTF-8 text, what a decoder found in the pixels, or a sentence.
+Nothing read through the third door is written down, so a file read that way leaves no trace in the
+workspace. A network path is refused on every door. The dialog plugin may only open
 and save; the interface itself never reads a file, and nothing in the product walks a directory.
 
 ## Distribution integrity

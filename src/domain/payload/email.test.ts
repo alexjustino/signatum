@@ -68,7 +68,7 @@ describe('buildEmail', () => {
     expect(result).toEqual({
       ok: true,
       payload: 'mailto:ana@xn--bcher-kva.example',
-      summary: 'Writes to ana@xn--bcher-kva.example',
+      summary: 'Writes to ana@bücher.example (xn--bcher-kva.example)',
     });
   });
 

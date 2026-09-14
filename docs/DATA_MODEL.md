@@ -1,11 +1,9 @@
 # Data model
 
-> **Status: `001_init` landed with F0, `002_logos` with F4 and `003_export_formats` with F7 — schema
-> version 3; `004_library` arrives with F8 and takes it to 4. The SQL wins over this text.** What
-> has shipped — `workspace`, `verifications` and `logos` — is reproduced below from the migrations
-> themselves, and the migrations are the authority. Everything else named here belongs to a later
-> slice: it is a plan, not a promise, and each table and column is confirmed, or changed, by the
-> migration that introduces it.
+> **Status: `001_init` landed with F0, `002_logos` with F4, `003_export_formats` with F7,
+> `004_library` with F8 and `005_batches` with F9 — schema version 5. The SQL wins over this
+> text.** Every table below is reproduced from the migrations themselves, and the migrations are
+> the authority; a column this text gets wrong is corrected by the SQL, not the other way round.
 
 The authoritative schema is `src-tauri/migrations/`. This document explains _why_ it is shaped
 the way it is; the SQL explains what it is.
@@ -27,18 +25,27 @@ the way it is; the SQL explains what it is.
 >
 > A **batch** is one list — a CSV, or rows pasted in — turned into files, with a report of every
 > row that says what happened to it.
+>
+> A **reading** is not one of these nouns, and that is the decision rather than an omission: Read
+> (F10) opens an image, says what is in it, and keeps nothing — no row, no artefact, no history,
+> not even the path the file came from ([ADR-030](architecture/ADR.md#adr-030)).
 
 ## Tables
 
-| Table           | Holds                                                             | Arrives      |
-| --------------- | ----------------------------------------------------------------- | ------------ |
-| `workspace`     | one row: which migration this file is at, and when it was made    | F0, shipped  |
-| `verifications` | what a decoder read back from which bytes, and whether it matched | F0, shipped  |
-| `logos`         | the normalised logo, its hash and what normalisation changed      | F4, shipped  |
-| `codes`         | a payload, a style and a size — one row per saved code            | F8, arriving |
-| `brand_kits`    | a logo, a look and a size, named                                  | F8, arriving |
-| `batches`       | one run over one list of rows                                     | F9, arriving |
-| `batch_rows`    | the report: one append-only row per row that run tried            | F9, arriving |
+| Table           | Holds                                                             | Arrives     |
+| --------------- | ----------------------------------------------------------------- | ----------- |
+| `workspace`     | one row: which migration this file is at, and when it was made    | F0, shipped |
+| `verifications` | what a decoder read back from which bytes, and whether it matched | F0, shipped |
+| `logos`         | the normalised logo, its hash and what normalisation changed      | F4, shipped |
+| `codes`         | a payload, a style and a size — one row per saved code            | F8, shipped |
+| `brand_kits`    | a logo, a look and a size, named                                  | F8, shipped |
+| `batches`       | one run over one list of rows                                     | F9, shipped |
+| `batch_rows`    | the report: one append-only row per row that run tried            | F9, shipped |
+
+**Read adds nothing to this list.** F10 reads codes out of images somebody else made and writes no
+row for any of them: no table, no column, no migration, and nothing in the workspace file that says
+an image was ever opened. What a person wants kept leaves Read through the Create screen, and is
+saved there as a code like any other.
 
 `codes` is the library's table, and the library is F8 — where it arrives, in `004_library.sql`,
 together with `brand_kits`. Until then F0 to F7 make codes and prove them without keeping them, on
@@ -269,7 +276,7 @@ what they were, which is the pair the screen and the composer actually read; `by
 normalised `viewBox` is always the origin plus `width` and `height`, so a column for it would
 restate them. `imported_at` is here under the name every other table uses, `created_at`.
 
-## `codes` — arrives with F8
+## `codes` — shipped with F8
 
 The library's table, in `004_library.sql`. A saved code is **its fields, its look, its size, which
 logo, and the name of the scene it made** — never a stored image and never the encoded string
@@ -308,7 +315,7 @@ and never empty, where the plan had it empty until the person typed one: a code 
 saved, the interface offers a name derived from what the code carries, and an empty one is refused
 with a sentence rather than stored as a row nobody can find again.
 
-## `brand_kits` — arrives with F8
+## `brand_kits` — shipped with F8
 
 A look, a size and a logo, under a name, applied to a new code in one click. **A kit never carries a
 payload** (ADR-028): what it sets is everything except what the code says.
@@ -334,7 +341,7 @@ size behind would be applied and then corrected by hand every time.
 `name` is `UNIQUE` because a kit is chosen from a list by its name. Two kits called _Brand_ is a
 list where one of the two is a mistake nobody can see.
 
-## `batches` — arrives with F9
+## `batches` — shipped with F9
 
 One run, in `005_batches.sql`. A batch is the Create pipeline in a loop
 ([ADR-029](architecture/ADR.md#adr-029)): every row is rendered, decoded and compared exactly as a

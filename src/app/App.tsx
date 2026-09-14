@@ -15,10 +15,12 @@ import type { EclFloor } from '@/features/create/LookCard';
 import { resolveLogo } from '@/features/create/resolveLogo';
 import { DiagnosticsPage } from '@/features/diagnostics/DiagnosticsPage';
 import { LibraryPage } from '@/features/library/LibraryPage';
+import { ReadPage, type MadeFromRead, type ReadState } from '@/features/read/ReadPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { DESTINATION_LABELS, type Destination } from '@/features/shell/destinations';
 import { Sidebar } from '@/features/shell/Sidebar';
 import { TitleBar } from '@/features/shell/TitleBar';
+import { announce } from '@/ui/announce';
 
 /**
  * The window shell: title bar, navigation rail, content layer.
@@ -68,6 +70,10 @@ export function App() {
   const [printSize, setPrintSize] = useState<PrintSize>(DEFAULT_PRINT_SIZE);
   // The batch's rows live here so that leaving the Batch screen and coming back keeps them.
   const [batchRows, setBatchRows] = useState('');
+  // What the Read screen is looking at, for the same reason: a person goes to Settings to switch
+  // the theme and comes back, and the photograph they were reading must still be on screen. It is
+  // in memory for as long as the window lives, and nowhere else — nothing read is ever stored.
+  const [read, setRead] = useState<ReadState>({ reading: null, problem: null });
   // The saved code on screen, when there is one (F8): the row in the library the editor is
   // showing, either because it was opened from there or because it was just written there. It
   // lives here rather than in Create because everything that detaches it lives here.
@@ -147,6 +153,27 @@ export function App() {
   const go = useCallback((next: Destination) => setDestination(next), []);
 
   /**
+   * A code that was read becomes a code being made.
+   *
+   * The same three setters `openSavedCode` uses — the kind, that kind's draft, the screen — and
+   * the same detach, because what lands in the form is a new code and not the saved one that was
+   * on screen. Only the two kinds whose payload is one field arrive this way; a contact read out
+   * of a photograph is a form with parts, and filling it is its own slice.
+   */
+  const makeFromRead = useCallback(
+    (made: MadeFromRead) => {
+      const form: PayloadForm =
+        made.kind === 'link' ? { kind: 'link', url: made.text } : { kind: 'text', text: made.text };
+      detach();
+      setKind(form.kind);
+      setDrafts((all) => ({ ...all, [form.kind]: form }));
+      setDestination('create');
+      announce('Create is open, with what the code held.');
+    },
+    [detach],
+  );
+
+  /**
    * Open a saved code: the fields, the look, the floor, the size and the logo go back where they
    * came from, and the editor is where the person lands — with the gate about to verify it again,
    * because a code that was verified yesterday has had nothing said about it today.
@@ -220,6 +247,12 @@ export function App() {
               rows={batchRows}
               onRows={setBatchRows}
             />
+          )}
+          {/* Read hands Create a payload and nothing else: the look, the size and the logo on
+              the editor are the person's, and a code somebody else made does not get to change
+              them. */}
+          {destination === 'read' && (
+            <ReadPage state={read} onState={setRead} onMake={makeFromRead} />
           )}
           {destination === 'diagnostics' && <DiagnosticsPage />}
           {destination === 'settings' && <SettingsPage theme={theme} onChoose={chooseTheme} />}
