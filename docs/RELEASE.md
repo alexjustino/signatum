@@ -9,7 +9,10 @@ can reason about afterwards.
 
 1. **The slice branches are merged** into `develop` and CI is green on it.
 2. **Bump the version** in `src-tauri/tauri.conf.json`. Mirror it into
-   `package.json` and `src-tauri/Cargo.toml`, then prove they agree:
+   `package.json` and its lockfile with `npm version X.Y.Z --no-git-tag-version`,
+   into `src-tauri/Cargo.toml` by hand, and let cargo rewrite `Cargo.lock`
+   (`cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1`
+   does it without compiling). Then prove the six agree:
 
    ```bash
    npm run check:version
@@ -69,15 +72,21 @@ can reason about afterwards.
 
     ```bash
     git checkout main && git pull
-    git tag vX.Y.Z
+    git tag -a vX.Y.Z -m "Signatum X.Y.Z — <theme>"
     git push origin vX.Y.Z
     ```
 
-11. The **Release workflow** runs on the tag: gates, build, bundle check, and a
-    **draft** GitHub Release with the MSI and the NSIS installer attached. It is
-    a draft on purpose — somebody reads the notes before the world does.
-12. **Edit the draft release notes** from the changelog, add the SHA-256 of each
-    installer, then publish.
+    An annotated tag, so the tag carries who made it, when, and the theme.
+
+11. The **Release workflow** runs on the tag: it refuses a tag that does not
+    name the version the tree declares or that is not on `main`, then gates,
+    build, bundle check, and a **draft** GitHub Release with the MSI and the
+    NSIS installer attached — the very files the bundle check approved, built
+    once — and the SHA-256 of each written into the notes by the same job. It
+    is a draft on purpose — somebody reads the notes before the world does.
+12. **Edit the draft release notes** from the changelog. Check the two SHA-256
+    values against the downloaded assets (`Get-FileHash -Algorithm SHA256`),
+    then publish.
 13. **Merge `main` back into `develop`** so the release commits are not stranded.
 
 ## After

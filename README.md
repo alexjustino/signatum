@@ -15,9 +15,14 @@ No cloud. No account. No telemetry. No redirect. The code is a file you own.
 
 ---
 
-> **Status: pre-release.** Signatum is being built in public, one vertical slice at a time.
-> Nothing on this page is claimed as working until the slice that carries it has landed and
-> says so. See [the roadmap](#roadmap) for what each release holds.
+> **Status: 1.0.0 — "The mark", released 2026-09-14.** Installers are on the
+> [Releases page](https://github.com/alexjustino/signatum/releases): an **MSI** and an **NSIS**
+> `.exe`, either one is the whole product. They are **not code-signed**, so Windows SmartScreen
+> will show "Windows protected your PC" on first run — choose **More info**, then **Run anyway**,
+> after checking that the SHA-256 in the release notes matches the file you downloaded. Download
+> only from the Releases page of this repository. Signatum needs **no account** and makes **no
+> network request**: everything it does happens on your machine, and your codes live in one file
+> you own. See [the roadmap](#roadmap) for what is in this release and what is not.
 
 ## Why
 
@@ -194,19 +199,23 @@ opened in both themes on every run and checked by the industry's automated acces
 where a violation fails the build, then driven by real key presses from an empty window to the
 export button, into the library and through a dialog that has to give the focus back.
 
-What is left before 1.0.0 is not a feature at all: the release itself — an installer that runs on a
-clean machine, F0's proof passing on it, and the phone matrix on real cameras.
+1.0.0 is released: the eight payload kinds, the logo placement engine, the scan gate in front of
+every way out, the look and the printed size, the library and brand kits, batch, Read, and the
+defaults that mean a choice is made once. What comes after it is not decided here. Corrections land
+as 1.0.x — bug fixes only, no schema change and no new surface — by the flow in
+[`VERSIONING.md`](VERSIONING.md) and the checklist in [`docs/RELEASE.md`](docs/RELEASE.md). A minor
+release is opened when there is a theme worth opening one for, and this page will say so when there
+is.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 
-## What is planned
+## What 1.0.0 holds
 
-For 1.0.0, and nothing beyond it:
+In one list, for somebody deciding whether to install it:
 
-- **Payload kinds** — web link (with presets for WhatsApp, Instagram, LinkedIn and Google
-  Maps), plain text, e-mail, phone, SMS, Wi-Fi network, geographic location and contact card
-  (vCard 3.0 and 4.0, MECARD for density). Each kind validates and escapes to its own format,
-  and the preview says in one line what scanning it will do.
+- **Payload kinds** — web link, plain text, e-mail, phone, SMS, Wi-Fi network, geographic
+  location and contact card (vCard 3.0 and 4.0, MECARD for density). Each kind validates and
+  escapes to its own format, and the preview says in one line what scanning it will do.
 - **The logo** — imported from PNG, JPEG, GIF (first frame, and it says so), WebP or SVG;
   centred on a plate (none, square, rounded, circle) with its own padding and colour; sized
   automatically to the largest the code can carry, or smaller by choice — never larger.
@@ -284,8 +293,9 @@ The UI contract is [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md).
   fetches it, which needs a network connection **once, at install time**. Nothing the product
   does afterwards touches a network.
 
-Installers, when they arrive, will not be code-signed, so SmartScreen will warn on first run.
-Verify the download came from the Releases page of this repository.
+The installers on the Releases page are not code-signed, so SmartScreen warns on first run.
+Verify the download came from the Releases page of this repository and that its SHA-256 matches
+the release notes.
 
 Building needs Node.js 22+, a stable Rust toolchain with the MSVC build tools, and PowerShell 7.
 
@@ -308,10 +318,13 @@ npm run gates
 
 | Release   | Theme               | Contents                                                                                                  |
 | --------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
-| **1.0.0** | The mark            | the list above                                                                                            |
+| **1.0.0** | The mark            | **released 2026-09-14** — the list above, on the Releases page                                            |
 | 1.1.0     | The card            | business-card and badge layouts (print-ready PDF sheets) · frames with a call to action · calendar events |
 | 1.2.0     | The payment         | PIX BR Code (EMV, CRC16) · EPC SEPA · payload templates per country                                       |
 | 2.0       | Only if it earns it | macOS and Linux                                                                                           |
+
+The rows after 1.0.0 are candidate themes, not commitments: the next minor is opened when there is
+a theme worth opening one for, and this page says so when it is.
 
 Deliberately out of scope: **dynamic codes are refused on principle, not deferred** — a dynamic
 code is a redirect through a server that learns who scanned what, when, and that is precisely the
