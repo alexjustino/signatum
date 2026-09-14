@@ -54,7 +54,9 @@ function escapedFields(body: string): Record<string, string> {
       value += body[i + 1] ?? '';
       i += 1;
     } else if (c === ';') {
-      out[key] = value;
+      // Readers treat the key as case-insensitive (`p:` opens a network as `P:` does), so it
+      // is normalised here once; a password under a lowercase key is still a password.
+      out[key.toUpperCase()] = value;
       key = '';
       value = '';
       inValue = false;
@@ -203,9 +205,17 @@ export interface WouldScan {
   sentence: string;
 }
 
-/** Whether a code of `sideModules` modules (quiet zone included) would scan printed `widthMm` wide. */
-export function wouldScanAt(sideModules: number, widthMm: number): WouldScan {
-  const moduleMm = moduleSizeMm(sideModules, widthMm);
+/** The quiet zone the standard asks for on every side, in modules; a printed code carries it. */
+export const QUIET_ZONE_MODULES = 4;
+
+/**
+ * Whether a code of `symbolModules` modules a side — the symbol as a decoder reports it, quiet
+ * zone excluded, 17 + 4 × version — would scan printed `widthMm` wide. The standard's quiet zone
+ * is added here, once, because the printed width a person measures includes it and the number a
+ * decoder reports does not; a screen that added it again would be wrong by a third.
+ */
+export function wouldScanAt(symbolModules: number, widthMm: number): WouldScan {
+  const moduleMm = moduleSizeMm(symbolModules + 2 * QUIET_ZONE_MODULES, widthMm);
   const shown = Number(moduleMm.toFixed(2));
   const mm = String(Number(widthMm.toFixed(2)));
   if (shown >= MIN_MODULE_MM) {

@@ -104,15 +104,23 @@ describe('describeBytes', () => {
   });
 });
 
+describe('describeBytes with a lowercase Wi-Fi key', () => {
+  it('still treats the password as a secret', () => {
+    const read = describeBytes(new TextEncoder().encode('WIFI:S:Office;T:WPA;p:hunter2;;'));
+    expect(read.kind).toBe('wifi');
+    expect(read.sensitive).toBe(true);
+  });
+});
+
 describe('wouldScanAt', () => {
   it('answers reads, tight or too small from the module size', () => {
-    // A version-2 code with its quiet zone is 33 modules.
-    expect(wouldScanAt(33, 25)).toMatchObject({ verdict: 'reads' });
-    expect(wouldScanAt(33, 15)).toMatchObject({ verdict: 'tight' });
-    expect(wouldScanAt(33, 10)).toMatchObject({ verdict: 'too small' });
-    expect(wouldScanAt(33, 25).sentence).toBe(
+    // A version-2 code is 25 modules a side; with its quiet zone it prints as 33.
+    expect(wouldScanAt(25, 25)).toMatchObject({ verdict: 'reads' });
+    expect(wouldScanAt(25, 15)).toMatchObject({ verdict: 'tight' });
+    expect(wouldScanAt(25, 10)).toMatchObject({ verdict: 'too small' });
+    expect(wouldScanAt(25, 25).sentence).toBe(
       'At 25 mm the modules are 0.76 mm — most cameras read that from 30 cm.',
     );
-    expect(wouldScanAt(33, 10).sentence).toContain('too small');
+    expect(wouldScanAt(25, 10).sentence).toContain('too small');
   });
 });

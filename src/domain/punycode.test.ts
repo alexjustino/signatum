@@ -21,6 +21,11 @@ describe('punycode', () => {
     expect(decodePunycodeLabel('')).toBe('');
   });
 
+  it('refuses a label longer than a DNS label instead of throwing', () => {
+    expect(decodePunycodeLabel('a'.repeat(64))).toBeNull();
+    expect(() => decodePunycodeLabel('a-'.repeat(40000))).not.toThrow();
+  });
+
   it('shows a host both ways, and says when they differ', () => {
     expect(unicodeHost('xn--bcher-kva.example')).toEqual({
       punycode: 'xn--bcher-kva.example',

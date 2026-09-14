@@ -33,6 +33,9 @@ function digit(code: number): number {
 
 /** One Punycode label (without its `xn--` prefix) as Unicode, or null when it is not one. */
 export function decodePunycodeLabel(input: string): string | null {
+  // A DNS label is at most 63 octets; anything longer is not a host label and is refused
+  // before it can cost anything.
+  if (input.length > 63) return null;
   const output: number[] = [];
   const last = input.lastIndexOf('-');
   let basicEnd = 0;
@@ -68,7 +71,9 @@ export function decodePunycodeLabel(input: string): string | null {
     output.splice(i, 0, n);
     i += 1;
   }
-  return String.fromCodePoint(...output);
+  let text = '';
+  for (const point of output) text += String.fromCodePoint(point);
+  return text;
 }
 
 /** A host as it will resolve and as a person reads it, and whether the two differ. */
