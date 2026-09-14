@@ -9,6 +9,7 @@ pub mod brand_kits;
 pub mod codes;
 pub mod logos;
 pub mod migrations;
+pub mod settings;
 pub mod verifications;
 
 use std::path::PathBuf;

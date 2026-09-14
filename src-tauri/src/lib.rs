@@ -48,6 +48,12 @@
 //!   command that **keeps nothing**: no row, no file, not even the picture,
 //!   which reaches the screen as this host's own re-encoded PNG. What the
 //!   content means is the domain's to say, as it always was.
+//! - F11: the choices a person makes. A `settings` table of key and value, and
+//!   a closed list in `commands/settings.rs` that is the schema of it — the
+//!   table holds what the host allows and nothing else, so the workspace never
+//!   becomes a place the interface leaves notes for itself. The theme moves out
+//!   of the browser store and into the file, which is where a preference that
+//!   has to survive a reinstall of the web view belongs.
 
 pub mod commands;
 pub mod db;
@@ -121,6 +127,9 @@ pub fn run() {
             commands::batch::write_batch_report,
             commands::read::read_image,
             commands::read::read_clipboard,
+            commands::settings::settings_get,
+            commands::settings::settings_set,
+            commands::settings::settings_all,
         ])
         .run(tauri::generate_context!())
         .expect("Signatum failed to start");

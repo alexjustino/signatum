@@ -27,6 +27,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "005_batches",
         include_str!("../../migrations/005_batches.sql"),
     ),
+    (
+        "006_settings",
+        include_str!("../../migrations/006_settings.sql"),
+    ),
 ];
 
 /// Every migration, name and SQL, in the order they apply.
@@ -109,7 +113,7 @@ mod tests {
     /// to somebody whose file is a release behind.
     #[test]
     fn a_workspace_at_any_earlier_version_migrates_to_this_one() {
-        assert_eq!(target_version(), 5, "F9 adds the fifth migration");
+        assert_eq!(target_version(), 6, "F11 adds the sixth migration");
 
         for stop_at in 0..=target_version() {
             let conn = memory();
@@ -129,7 +133,14 @@ mod tests {
             apply(&conn).expect("migrate the rest of the way");
 
             assert_eq!(current_version(&conn), target_version());
-            for table in ["logos", "codes", "brand_kits", "batches", "batch_rows"] {
+            for table in [
+                "logos",
+                "codes",
+                "brand_kits",
+                "batches",
+                "batch_rows",
+                "settings",
+            ] {
                 let rows: i64 = conn
                     .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))
                     .unwrap_or_else(|error| panic!("`{table}` is missing at head: {error}"));
@@ -193,6 +204,7 @@ mod tests {
             "brand_kits",
             "batches",
             "batch_rows",
+            "settings",
         ] {
             let found: i64 = conn
                 .query_row(
@@ -203,6 +215,50 @@ mod tests {
                 .unwrap_or(0);
             assert_eq!(found, 1, "table `{table}` is missing after migration");
         }
+    }
+
+    /// The migration this slice adds, from the version the last release left
+    /// behind. The round-trip above covers every version at once, which is the
+    /// property; this is the one case a person actually upgrading is in, and it
+    /// says so by name — with a row already in the file, because a settings
+    /// table that arrives by way of a rebuilt workspace would arrive empty.
+    #[test]
+    fn a_workspace_at_version_five_gains_the_settings_table_and_keeps_its_rows() {
+        let conn = memory();
+        for (index, (_, sql)) in sources().iter().enumerate() {
+            let version = index as i64 + 1;
+            if version > 5 {
+                break;
+            }
+            conn.execute_batch(&format!(
+                "BEGIN; {sql}
+                 UPDATE workspace SET schema_version = {version} WHERE id = 1; COMMIT;"
+            ))
+            .expect("apply one migration by hand");
+        }
+        conn.execute(
+            "INSERT INTO codes
+               (id, created_at, updated_at, name, kind, payload_json, style_json, size_json,
+                scene_sha256)
+             VALUES ('kept', 't', 't', 'Menu', 'link', '{}', '{}', '{}', ?1)",
+            ["a".repeat(64)],
+        )
+        .expect("save a code at version 5");
+        assert_eq!(current_version(&conn), 5);
+
+        apply(&conn).expect("migrate");
+
+        assert_eq!(current_version(&conn), 6);
+        let settings: i64 = conn
+            .query_row("SELECT count(*) FROM settings", [], |r| r.get(0))
+            .expect("`settings` is missing after migrating from 5");
+        assert_eq!(settings, 0, "a new table starts empty");
+        let kept: i64 = conn
+            .query_row("SELECT count(*) FROM codes WHERE id = 'kept'", [], |r| {
+                r.get(0)
+            })
+            .expect("read back");
+        assert_eq!(kept, 1, "and the library is still there");
     }
 
     #[test]
