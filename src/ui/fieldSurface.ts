@@ -20,7 +20,11 @@ export const FIELD_CHROME = [
   'border-b-2 border-b-stroke-strong',
   'transition-colors duration-100 ease-easy',
   'hover:bg-card-hover',
-  'focus:border-b-accent focus:bg-card focus:outline-none',
+  // Fluent's focus for a field is the accent bottom stroke, and it is drawn however the focus
+  // arrived. The ring on top of it is the global `:focus-visible` rule, which fires for the
+  // keyboard and not for a click — so a field does not suppress the outline, it simply does not
+  // ask for one (DESIGN_SYSTEM §7).
+  'focus:border-b-accent focus:bg-card',
   'disabled:cursor-not-allowed disabled:text-fg-disabled',
 ].join(' ');
 

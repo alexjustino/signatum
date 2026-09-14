@@ -20,7 +20,9 @@ export function Select({
           'h-(--density-control) w-full appearance-none rounded-md border border-stroke bg-card',
           'border-b-2 border-b-stroke-strong pr-8 pl-3 text-body text-fg',
           'transition-colors duration-100 ease-easy',
-          'hover:bg-card-hover focus:border-b-accent focus:outline-none',
+          // The accent bottom stroke is the focus Fluent draws; the keyboard's ring on top of it
+          // is the global `:focus-visible` rule, which this must not suppress (DESIGN_SYSTEM §7).
+          'hover:bg-card-hover focus:border-b-accent',
           'disabled:cursor-not-allowed disabled:text-fg-disabled',
           className,
         ].join(' ')}

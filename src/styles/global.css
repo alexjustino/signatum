@@ -64,6 +64,24 @@ textarea,
   }
 }
 
+/* ── Colour swatches ───────────────────────────────────────────────────────
+   The one control whose fill is not a token, because it shows the colour
+   somebody is about to print (DESIGN_SYSTEM §2). Chromium draws the swatch
+   inside a wrapper of its own with padding of its own, which leaves a small
+   rectangle floating in a field-sized box: beside the hex value it is supposed
+   to belong to, the two read as two controls rather than one. The wrapper is
+   flattened so the colour fills the control, and the edge — which a near-white
+   choice needs against the card — is the field's own border from the token
+   layer, not one the browser drew. */
+input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+input[type='color']::-webkit-color-swatch {
+  border: none;
+  border-radius: 0;
+}
+
 /* ── Scrollbars ────────────────────────────────────────────────────────── */
 * {
   scrollbar-width: thin;
