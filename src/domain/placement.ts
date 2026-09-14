@@ -75,7 +75,7 @@ export interface FunctionMapOptions {
   /**
    * Leave the middle alignment pattern out of the map — the one a centred logo cannot avoid on
    * versions 7–13, 21–27 and 35–40, where an odd number of alignment centres puts one at, or
-   * two modules beside, the exact centre (ADR-024, proposed): decoders locate the grid from the
+   * two modules beside, the exact centre (ADR-024): decoders locate the grid from the
    * finders and the outer alignment patterns, and the scan gate is the judge of whether a code
    * still reads without it.
    */
@@ -188,7 +188,7 @@ export const SAFETY = 0.6;
 
 /**
  * Whether a plate may sit on the alignment pattern at the exact centre of the symbol
- * (ADR-024, proposed). Off, a logo on versions 7–13 costs a jump to version 14.
+ * (ADR-024, accepted). Off, a logo on versions 7–13 costs a jump to version 14.
  */
 export const ALLOW_CENTRE_ALIGNMENT = true;
 

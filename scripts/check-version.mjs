@@ -1,9 +1,9 @@
 /**
- * The version is one fact, declared in four files.
+ * The version is one fact, declared in five files.
  *
  * `src-tauri/tauri.conf.json` is the source of truth — it is what the installer
- * and the running binary carry. `package.json`, its lockfile and
- * `src-tauri/Cargo.toml` mirror it. VERSIONING.md has always said a gate fails
+ * and the running binary carry. `package.json`, its lockfile (in two places),
+ * `src-tauri/Cargo.toml` and `Cargo.lock` mirror it. VERSIONING.md has always said a gate fails
  * if they disagree; this is that gate.
  *
  * The lockfile is here because it drifted the first time this was used in
@@ -38,11 +38,28 @@ function readCargo(relative) {
   return { file: relative, value: match?.[1] };
 }
 
+/** The lockfile's second copy of the version: `packages[""].version`, which `npm version` moves too. */
+function readLockRoot(relative) {
+  const file = path.join(root, relative);
+  const value = JSON.parse(readFileSync(file, 'utf-8')).packages?.['']?.version;
+  return { file: `${relative} (packages[""])`, value };
+}
+
+/** The crate's own entry in Cargo.lock, which a cargo command rewrites and a release must commit. */
+function readCargoLock(relative) {
+  const file = path.join(root, relative);
+  const text = readFileSync(file, 'utf-8');
+  const match = text.match(/\[\[package\]\]\nname = "signatum"\nversion = "([^"]+)"/);
+  return { file: relative, value: match?.[1] };
+}
+
 const truth = readJson('src-tauri/tauri.conf.json', 'version');
 const mirrors = [
   readJson('package.json', 'version'),
   readJson('package-lock.json', 'version'),
+  readLockRoot('package-lock.json'),
   readCargo('src-tauri/Cargo.toml'),
+  readCargoLock('src-tauri/Cargo.lock'),
 ];
 
 const problems = [];

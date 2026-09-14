@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-09-14 — The mark
+
+Signatum makes QR codes with a brand mark in the middle, on your own machine, and refuses to let
+one out until an independent decoder has read it back. The code is drawn, the logo is placed into
+the pattern rather than laid over it, the whole picture is rasterised at the size it will be
+printed, and those pixels are handed to a decoder that shares no code with the encoder that made
+them. What comes back has to match what was asked for, byte for byte. Three states and no fourth:
+verified, not verified yet, or refused with the reason in a sentence. Nothing that failed is
+written, and nothing is drawn a second time between the verdict and the file — what a decoder read
+is what leaves.
+
+A code can be eight things: a web link, plain text, an e-mail, a phone number, a text message, a
+Wi-Fi network, a place on a map, or a contact card. Each is written in the form phones actually
+read and escaped to that form, and one line under the form says what scanning it will do — "Opens
+example.com", "Joins Office-5G", "Adds Ana Souza to contacts". The logo is imported from a PNG,
+JPEG, GIF, WebP or SVG, normalised into a clean copy this product made, and sized by arithmetic
+rather than taste: the engine counts what the logo would cost the code's error correction, keeps a
+margin in reserve for the smudged print and the cheap camera, never covers a pattern the code
+cannot lose, and refuses a logo that will not fit instead of shrinking it quietly. Colours, module
+and finder shapes, the quiet zone and the error-correction floor are choices, with a contrast gate
+in front of them; and the size is a width on paper at a chosen resolution, so a 25 mm code is 25 mm
+in every file that leaves — PNG, SVG, PDF, or the picture on the clipboard.
+
+A code that passed the gate can be saved and reopened exactly as it was, rebuilt from its fields
+and proved again rather than trusted; a brand kit saves a look — logo, colours, shapes, margin,
+level, printed size — and applies it to a new code in one click, without ever carrying a payload. A
+CSV of links or contact cards becomes one verified file per row, with every row that could not be
+made reported by its line number and the rest of the list made anyway. Read points the product the
+other way: open a photograph or a screenshot of somebody else's code and it says what the code
+holds, what scanning it would do and how it was built — read by the same decoder that stands in
+front of every export, and kept nowhere afterwards. The choices made once — default width,
+resolution, quiet zone, whether a Wi-Fi password is kept with a saved code, and the theme — live in
+the workspace file beside the codes and travel with it.
+
+What it refuses, on principle rather than as a backlog item: **dynamic codes**, and with them
+redirects, short links, tracking parameters and scan analytics. A dynamic code is a server standing
+between a printed thing and the person who scanned it, and it stops working the day a subscription
+does. There is no account, no sync, no telemetry, no crash reporting and no update check, and the
+product makes no network request at all — it never contacts the address a code opens. The cost is
+stated plainly where a link is typed: a printed code cannot be repointed later.
+
+The installers on the Releases page are **not code-signed**, so Windows SmartScreen will warn on
+first run. Check the SHA-256 in the release notes against the file you downloaded, and download
+only from this repository's Releases page.
+
+_"Signatum" is a trademark of Alex Justino. The Apache-2.0 licence grants rights to the source
+code; it does not grant permission to use the project name, logo or wordmark to endorse or promote
+derived products (Apache-2.0 §6). "QR Code" is a registered trademark of DENSO WAVE INCORPORATED;
+Signatum is not affiliated with or endorsed by DENSO WAVE._
+
 ### Added
 
 - **The Create screen.** Type a web link and it becomes a QR code on screen, redrawn as you
@@ -388,4 +438,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was audited screen by screen: a verdict that changes is announced once, in the sentence the
   screen shows; typing is not narrated back to the person doing it.
 
-[Unreleased]: https://github.com/alexjustino/signatum/compare/main...HEAD
+### Migrations
+
+- `001_init.sql` — the workspace row that carries the schema version, and the `verifications`
+  table: every scan-gate verdict and every export, recorded with hashes rather than payloads.
+- `002_logos.sql` — the logos that were let in, stored as the normalised copy this product made
+  and never as the bytes that arrived.
+- `003_export_formats.sql` — `dpi` and `format` on a verification, so the record says what was
+  written and at what resolution, not only that something was verified. Both nullable: rows
+  written before this migration are not back-filled with a value nobody recorded.
+- `004_library.sql` — saved codes and brand kits, each code stored as its fields and the hash of
+  the scene they made, never as a stored picture; a verification can point at the code it came
+  from.
+- `005_batches.sql` — one row per batch run and one append-only row per line of the CSV, so the
+  report is what happened rather than what somebody wanted to have happened.
+- `006_settings.sql` — key and value, one row per preference: theme, default width, default
+  resolution, default quiet zone, and whether a Wi-Fi password is kept with a saved code.
+
+Migrations are forward-only. A workspace created by 1.0.0 starts at schema version 6; a workspace
+from an earlier build is migrated forward to 6 on first launch, and Diagnostics says which version
+it holds.
+
+[Unreleased]: https://github.com/alexjustino/signatum/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/alexjustino/signatum/releases/tag/v1.0.0

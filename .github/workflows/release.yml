@@ -1,8 +1,10 @@
 name: Release
 
 # Tagging `vX.Y.Z` on `main` builds the Windows installers and attaches them to
-# the GitHub Release. A release artefact always comes from a tagged commit that
-# passed the gates — never from a developer machine.
+# a draft GitHub Release. A release artefact always comes from a tagged commit
+# that passed the gates — never from a developer machine — and it is built
+# once: the installers the bundle check approved are the installers that are
+# uploaded, and their SHA-256 is written into the notes by the same job.
 
 on:
   push:
@@ -18,6 +20,30 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The whole history, so the job can prove the tag sits on `main`.
+          fetch-depth: 0
+
+      - name: The tag names the version the tree declares
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'.TrimStart('v')
+          $declared = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          if ($tag -ne $declared) {
+            Write-Error "tag v$tag but src-tauri/tauri.conf.json declares $declared"
+            exit 1
+          }
+          "version=$declared" >> $env:GITHUB_OUTPUT
+        id: version
+
+      - name: The tag sits on main
+        shell: pwsh
+        run: |
+          $branches = git branch -r --contains ${{ github.sha }}
+          if ($branches -notmatch 'origin/main') {
+            Write-Error "the tagged commit is not on main: $branches"
+            exit 1
+          }
 
       - uses: actions/setup-node@v7
         with:
@@ -43,16 +69,36 @@ jobs:
       - name: Check the bundle
         run: npm run check:bundle
 
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Signatum ${{ github.ref_name }}
-          releaseBody: |
-            See CHANGELOG.md for what changed.
+      - name: Write the notes, with the SHA-256 of each installer
+        shell: pwsh
+        run: |
+          $v = '${{ steps.version.outputs.version }}'
+          $msi = Get-Item "src-tauri/target/release/bundle/msi/Signatum_${v}_x64_en-US.msi"
+          $exe = Get-Item "src-tauri/target/release/bundle/nsis/Signatum_${v}_x64-setup.exe"
+          $notes = @()
+          $notes += "See CHANGELOG.md for what changed in $v."
+          $notes += ""
+          $notes += "The installers are not code-signed: Windows SmartScreen will warn on first run."
+          $notes += "Verify the download came from this Releases page and that its SHA-256 matches."
+          $notes += ""
+          $notes += "| File | SHA-256 |"
+          $notes += "| --- | --- |"
+          foreach ($f in @($msi, $exe)) {
+            $hash = (Get-FileHash -Algorithm SHA256 $f.FullName).Hash.ToLower()
+            $notes += "| ``$($f.Name)`` | ``$hash`` |"
+          }
+          $notes -join "`n" | Set-Content -Path notes.md -Encoding utf8
+          Get-Content notes.md
 
-            The installers are not code-signed: Windows SmartScreen will warn on
-            first run. Verify the download came from this Releases page.
-          releaseDraft: true
-          prerelease: false
+      - name: Draft the release with the installers that were checked
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Signatum ${{ github.ref_name }}
+          body_path: notes.md
+          draft: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          # Named by version, so a bundle folder that kept an older build can never upload it.
+          files: |
+            src-tauri/target/release/bundle/msi/Signatum_${{ steps.version.outputs.version }}_x64_en-US.msi
+            src-tauri/target/release/bundle/nsis/Signatum_${{ steps.version.outputs.version }}_x64-setup.exe
