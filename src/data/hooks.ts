@@ -28,6 +28,7 @@ import {
 } from './library';
 import { deleteLogo, importLogo, listLogos, logoDataUrl } from './logos';
 import { readClipboard, readImage } from './read';
+import { fetchSettings, writeSetting, type SettingKey } from './settings';
 import { fetchAccentRamp, fetchSystemInfo } from './system';
 
 export const keys = {
@@ -40,6 +41,7 @@ export const keys = {
   /** Under the codes key: renaming or forgetting one has to reach the list as well. */
   code: (id: string) => ['codes', id] as const,
   brandKits: ['brand-kits'] as const,
+  settings: ['settings'] as const,
 };
 
 /** What the running binary says about itself. Read once: it does not change. */
@@ -50,6 +52,34 @@ export function useSystemInfo() {
 /** The ramp Windows gave for the user's accent colour. */
 export function useAccentRamp() {
   return useQuery({ queryKey: keys.accentRamp, queryFn: fetchAccentRamp });
+}
+
+/**
+ * What this workspace was set to: the theme, and what a new code starts as.
+ *
+ * Read once, when the window opens, and invalidated by the one command that changes it — this
+ * window is the only writer, so a timer would be a claim about a writer that does not exist.
+ * The window waits for this read before the first screen is drawn: a Create screen rendered
+ * from the built-in defaults and corrected a moment later would show somebody a size they did
+ * not choose, and the correction would look like a bug.
+ */
+export function useSettings() {
+  return useQuery({ queryKey: keys.settings, queryFn: fetchSettings });
+}
+
+/**
+ * Keep one setting.
+ *
+ * Each field on the Settings screen holds its own instance, so that a width the host refused
+ * says so under the width and nowhere else — one mutation shared by four fields would put one
+ * field's refusal under all of them.
+ */
+export function useSetSetting() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, value }: { key: SettingKey; value: string }) => writeSetting(key, value),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.settings }),
+  });
 }
 
 /** Ask the host to render and decode a code, without writing anything. */

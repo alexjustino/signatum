@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { applyAccent, applyTheme, readStoredTheme, storeTheme } from '@/app/theme';
+import { applyAccent, applyTheme, storeTheme } from '@/app/theme';
 import type { SavedCode } from '@/data/library';
+import { startingPrintSize, startingStyle, type Settings } from '@/data/settings';
 import { fetchAccentRamp } from '@/data/system';
 import { emptyForm, PAYLOAD_KINDS, type PayloadForm, type PayloadKind } from '@/domain/payload';
-import { DEFAULT_STYLE, type Style } from '@/domain/scene';
+import type { Style } from '@/domain/scene';
 import type { ThemeChoice } from '@/domain/settings';
-import { DEFAULT_PRINT_SIZE, type PrintSize } from '@/domain/size';
+import type { PrintSize } from '@/domain/size';
 import { AboutPage } from '@/features/about/AboutPage';
 import { BatchPage } from '@/features/batch/BatchPage';
 import { CreatePage, type AttachedCode } from '@/features/create/CreatePage';
@@ -29,14 +30,21 @@ import { announce } from '@/ui/announce';
  * the window shows through the chrome; the content region is the "layer" that
  * floats on it. That separation is the whole reason the application reads as
  * native rather than as a web page in a frame.
+ *
+ * What a new code starts as — the size, the resolution, the quiet zone, whether a Wi-Fi
+ * password is kept — arrives here already read (F11). The shell holds it for the same reason it
+ * holds the look and the logo: those are decisions about a person's codes, not about the link
+ * they happen to be typing.
  */
-export function App() {
+export function App({ settings }: { settings: Settings }) {
   const [destination, setDestination] = useState<Destination>('create');
 
-  // The theme is read once, before the first paint the user sees, and applied
-  // here rather than in each screen. The accent ramp is re-read with it,
-  // because the shade that reads on white does not read on near-black.
-  const [theme, setTheme] = useState<ThemeChoice>(readStoredTheme);
+  // The theme comes from the settings table, read before this screen was drawn, and is applied
+  // here rather than in each screen so that every screen changes at once. The accent ramp is
+  // re-read with it, because the shade that reads on white does not read on near-black. The
+  // browser store keeps a copy — see `storeTheme`: it is the guess the next window paints with
+  // before the table has answered, and nothing else.
+  const [theme, setTheme] = useState<ThemeChoice>(settings.theme);
   // The Create draft survives a trip to another screen: a person who goes to
   // Settings to switch the theme comes back to what they typed. There is one
   // draft per kind rather than one draft, so trying the Wi-Fi form and coming
@@ -57,8 +65,8 @@ export function App() {
   // The look lives here for the same reason: a person who set their colours set
   // them for their codes, so they survive a change of kind and a trip to
   // Settings. It starts as the default one — black on white, square, with the
-  // quiet zone the standard asks for.
-  const [style, setStyle] = useState<Style>(DEFAULT_STYLE);
+  // quiet zone this workspace was set to.
+  const [style, setStyle] = useState<Style>(() => startingStyle(settings));
   // The error-correction floor sits beside the style rather than inside it: the
   // style is the scene's, and the scene draws a matrix it is never asked to
   // choose the level for. Absent is "let the engine decide".
@@ -66,8 +74,8 @@ export function App() {
   // The printed size lives here with the look and the logo, and for the same
   // reason: somebody who said their sticker is 25 mm at 300 dpi said it about
   // their codes, not about the link they happened to be typing. It starts at the
-  // default — a 25 mm code at print resolution, which is 295 pixels square.
-  const [printSize, setPrintSize] = useState<PrintSize>(DEFAULT_PRINT_SIZE);
+  // size this workspace was set to, which is the one the Settings screen shows.
+  const [printSize, setPrintSize] = useState<PrintSize>(() => startingPrintSize(settings));
   // The batch's rows live here so that leaving the Batch screen and coming back keeps them.
   const [batchRows, setBatchRows] = useState('');
   // What the Read screen is looking at, for the same reason: a person goes to Settings to switch
@@ -80,13 +88,19 @@ export function App() {
   const [attached, setAttached] = useState<AttachedCode | null>(null);
   useEffect(() => {
     applyTheme(theme);
+    // The table corrects the mirror, never the other way round: whatever the workspace says the
+    // theme is becomes the guess the next window paints with, so a workspace carried to another
+    // machine, or a webview whose storage was cleared, flashes the wrong theme once and not again.
+    storeTheme(theme);
     void fetchAccentRamp()
       .then(applyAccent)
       .catch(() => undefined);
   }, [theme]);
 
+  // Applied now (the effect above mirrors it to the browser store). The table itself is written
+  // where the choice is made — the Settings screen — which is also where a workspace that refused
+  // to keep it can say so.
   const chooseTheme = useCallback((next: ThemeChoice) => {
-    storeTheme(next);
     setTheme(next);
   }, []);
 
@@ -230,6 +244,7 @@ export function App() {
               onPrintSize={choosePrintSize}
               attached={attached}
               onAttach={setAttached}
+              keepPasswords={settings.keepWifiPasswords}
             />
           )}
           {destination === 'library' && <LibraryPage onOpen={openSavedCode} />}
