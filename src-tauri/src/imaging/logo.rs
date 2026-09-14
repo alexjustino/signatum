@@ -52,8 +52,9 @@ pub const LOGO_STORE_SIDE: u32 = 1024;
 /// The most elements a logo's SVG may contain, counted before it is parsed.
 pub const MAX_SVG_NODES: usize = 20_000;
 
-/// The most memory a decoder may allocate for one logo.
-const MAX_DECODE_ALLOC: u64 = 256 * 1024 * 1024;
+/// The most memory a decoder may allocate for one picture — a logo here, and
+/// a photograph in `commands::read`. One ceiling, one place.
+pub(crate) const MAX_DECODE_ALLOC: u64 = 256 * 1024 * 1024;
 
 /// How a logo is stored, and therefore how it is drawn: as pixels, or as a
 /// tree.
@@ -160,7 +161,7 @@ fn without_bom(bytes: &[u8]) -> &[u8] {
 /// A doctype counts as an opening because that is how the entity attack is
 /// written, and a document that opens with one has to reach the refusals rather
 /// than fall through to a decoder that will only say it is not an image.
-fn looks_like_svg(bytes: &[u8]) -> bool {
+pub(crate) fn looks_like_svg(bytes: &[u8]) -> bool {
     let head = without_bom(bytes);
     let head: &[u8] = &head[..head.len().min(4096)];
     let start = head

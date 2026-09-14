@@ -42,6 +42,12 @@
 //!   run. `read_text_file` is the second and last command that reads a file
 //!   somebody chose; `cancel_batch` is the only piece of state in this host that
 //!   two commands share (ADR-029).
+//! - F10: reading. The same decoder the gate uses, pointed at somebody else's
+//!   pixels — a photograph from a file or a screenshot from the clipboard —
+//!   reporting every code it finds and how each was built. It is the one
+//!   command that **keeps nothing**: no row, no file, not even the picture,
+//!   which reaches the screen as this host's own re-encoded PNG. What the
+//!   content means is the domain's to say, as it always was.
 
 pub mod commands;
 pub mod db;
@@ -113,6 +119,8 @@ pub fn run() {
             commands::batch::run_batch,
             commands::batch::cancel_batch,
             commands::batch::write_batch_report,
+            commands::read::read_image,
+            commands::read::read_clipboard,
         ])
         .run(tauri::generate_context!())
         .expect("Signatum failed to start");
