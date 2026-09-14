@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { startSession, type Session } from './session';
+import { Keys } from './webdriver';
 
 /**
  * Accessibility (F11), and its proof of done from the specification:
@@ -68,11 +69,7 @@ async function violations(session: Session): Promise<AxeViolation[]> {
      window.axe
        .run(document, {
          resultTypes: ['violations'],
-         // The window is drawn on Mica the page cannot see, so a page-level
-         // background contrast rule has nothing true to measure; every
-         // component paints its own surface, which the per-element rules do
-         // check. Everything else axe knows stays on.
-         rules: { 'page-has-heading-one': { enabled: false } },
+         // Every rule axe knows, on: each screen has its own h1 and paints its own surfaces.
        })
        .then((r) => done({ violations: r.violations }))
        .catch((e) => done({ violations: [{ id: 'axe-failed', impact: 'serious', help: String(e), nodes: [] }] }));`,
@@ -122,48 +119,100 @@ describe('accessibility', () => {
     }
   }
 
-  it('reaches the navigation and the primary action by keyboard, with focus showing', async () => {
+  /** What the keyboard is on right now, as a short label, or 'BODY'. */
+  async function focused(): Promise<string> {
+    return session.driver.execute<string>(
+      `const el = document.activeElement;
+       if (!el || el === document.body) return 'BODY';
+       const label = el.getAttribute('aria-label') || el.textContent?.trim().slice(0, 30) || '';
+       return el.tagName + ':' + label + (el.matches(':focus-visible') ? ':ring' : '');`,
+    );
+  }
+
+  /** Real Tab presses through the WebDriver actions API, until a stop matches or the budget ends. */
+  async function tabUntil(matches: (label: string) => boolean, budget = 60): Promise<string[]> {
+    const path: string[] = [];
+    for (let i = 0; i < budget; i += 1) {
+      await session.driver.chord(Keys.TAB);
+      const now = await focused();
+      path.push(now);
+      if (matches(now)) return path;
+    }
+    return path;
+  }
+
+  it('reaches the rail and the export button with real Tab presses, and focus shows', async () => {
     const { driver } = session;
-    await go(session, 'Create');
     await setTheme(session, 'Light');
     await go(session, 'Create');
-    // The export button is reachable only once the gate has verified the code on screen.
     await driver.waitForText('read it back byte for byte');
+    // Start from nothing focused, as a person arriving at the window does.
+    await driver.execute('document.activeElement && document.activeElement.blur();');
 
-    // Tab from the top and collect what the keyboard lands on: a run of Tabs
-    // must reach the rail's destinations and the export button, and every stop
-    // must be a real control (never the body), with a visible focus ring.
-    const reached = await driver.execute<string[]>(
-      `const seen = [];
-       let active = document.activeElement;
-       for (let i = 0; i < 40; i += 1) {
-         const el = document.activeElement;
-         if (el && el !== document.body) {
-           const label = el.getAttribute('aria-label') || el.textContent?.trim().slice(0, 30) || el.tagName;
-           seen.push(el.tagName + ':' + label);
-         }
-         const ev = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
-         (document.activeElement || document.body).dispatchEvent(ev);
-         const next = document.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-         active = next[Math.min(i + 1, next.length - 1)];
-         if (active instanceof HTMLElement) active.focus();
-       }
-       return seen;`,
+    const path = await tabUntil((label) => label.startsWith('BUTTON:Export PNG'));
+    const text = path.join(' | ');
+    expect(text, text).toContain('BUTTON:Library');
+    expect(text, text).toContain('INPUT:Link');
+    expect(path.at(-1), text).toMatch(/^BUTTON:Export PNG.*:ring$/);
+    // Every stop shows its ring, and the rail comes before the work.
+    expect(
+      path.every((s) => s.endsWith(':ring')),
+      text,
+    ).toBe(true);
+    expect(path.findIndex((s) => s.startsWith('BUTTON:Library'))).toBeLessThan(
+      path.findIndex((s) => s.startsWith('INPUT:Link')),
     );
-    // The rail and the export button are among what the keyboard can reach.
-    const text = reached.join(' | ');
-    expect(text).toContain('Create');
-    expect(text).toContain('Export');
-    // The focus-visible ring is defined for the theme, so a focused control
-    // has an outline width to show.
-    const outlined = await driver.execute<boolean>(
-      `const b = document.querySelector('input[aria-label="Link"]');
-       if (!(b instanceof HTMLElement)) return false;
-       b.focus();
-       const cs = getComputedStyle(b);
-       return cs.getPropertyValue('--focus-ring').trim().length > 0;`,
-    );
-    expect(outlined).toBe(true);
     await session.screenshot('a11y-keyboard');
+  }, 60_000);
+
+  it('opens a saved code from the library by keyboard alone', async () => {
+    const { driver } = session;
+    await go(session, 'Create');
+    await driver.waitForText('read it back byte for byte');
+    await (await driver.findByXPath('//button[normalize-space(.)="Save…"]')).click();
+    const name = await driver.waitForElement('input[aria-label="Name"]');
+    await name.clear();
+    await name.sendKeys(' ');
+    await name.sendKeys(Keys.BACKSPACE);
+    await name.sendKeys('Menu');
+    await (await driver.findByXPath('//button[normalize-space(.)="Save code"]')).click();
+    await driver.waitForText('Saved as Menu');
+
+    await go(session, 'Library');
+    await driver.waitForElement('button[aria-label="Open Menu"]');
+    await driver.execute('document.activeElement && document.activeElement.blur();');
+    const path = await tabUntil((label) => label === 'BUTTON:Open Menu:ring');
+    expect(path.at(-1), path.join(' | ')).toBe('BUTTON:Open Menu:ring');
+    await driver.chord(Keys.ENTER);
+    await driver.waitForText('Reopened exactly as it was saved.');
+  }, 60_000);
+
+  it('the confirm dialog takes focus, keeps it, and gives it back on Escape', async () => {
+    const { driver } = session;
+    await go(session, 'Library');
+    await driver.waitForElement('button[aria-label="Delete Menu"]');
+    await driver.execute('document.activeElement && document.activeElement.blur();');
+    const path = await tabUntil((label) => label === 'BUTTON:Delete Menu:ring');
+    expect(path.at(-1), path.join(' | ')).toBe('BUTTON:Delete Menu:ring');
+    await driver.chord(Keys.ENTER);
+    await driver.waitForElement('[role="dialog"]');
+    const inside = () =>
+      driver.execute<boolean>(
+        'const d = document.querySelector("[role=dialog]"); return !!d && d.contains(document.activeElement);',
+      );
+    expect(await inside()).toBe(true);
+    for (let i = 0; i < 6; i += 1) {
+      await driver.chord(Keys.TAB);
+      expect(await inside(), `after ${i + 1} tabs the focus left the dialog`).toBe(true);
+    }
+    await driver.chord(Keys.ESCAPE);
+    await driver.waitFor(
+      'the dialog gone',
+      async () =>
+        (await driver.execute<boolean>(
+          'return document.querySelector("[role=dialog]") === null',
+        )) === true,
+    );
+    expect(await focused()).toMatch(/^BUTTON:Delete Menu/);
   }, 60_000);
 });
