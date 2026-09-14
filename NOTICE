@@ -30,9 +30,9 @@ describe what this product makes, never as part of its name.
 THIRD-PARTY COMPONENTS
 
 This product bundles or depends on third-party components distributed under
-their own licenses. The list below is the intended stack; each component is
-confirmed by licence, maintenance and the dependency audit before it is
-adopted (docs/architecture/ADR.md, ADR-012), and the authoritative list is
+their own licenses. The list below is what is adopted today; each component was
+confirmed by licence, maintenance and the dependency audit before it was
+adopted (docs/architecture/ADR.md, ADR-019), and the authoritative list is
 the one generated from the dependency manifests (Cargo.toml, package.json).
 
   Tauri .......................... Apache-2.0 OR MIT
@@ -44,9 +44,36 @@ the one generated from the dependency manifests (Cargo.toml, package.json).
   Fluent UI System Icons ......... MIT
   rusqlite / SQLite .............. MIT / Public Domain
   serde, serde_json .............. Apache-2.0 OR MIT
+  QR Code generator (Project Nayuki, vendored) ... MIT
+  resvg / usvg ................... Apache-2.0 OR MIT
+  tiny-skia ...................... BSD-3-Clause
+  rqrr ........................... MIT OR Apache-2.0, and ISC
+  image .......................... MIT OR Apache-2.0
+    the decoders its features compile into the binary, one per format a logo
+    may arrive as:
+    zune-jpeg, zune-core ......... MIT OR Apache-2.0 OR Zlib   (JPEG)
+    gif, weezl ................... MIT OR Apache-2.0           (GIF)
+    color_quant .................. MIT                         (GIF)
+    image-webp, quick-error ...... MIT OR Apache-2.0           (WebP)
+  sha2, hex ...................... MIT OR Apache-2.0
+  base64 ......................... MIT OR Apache-2.0
+  png ........................... MIT OR Apache-2.0
+  flate2 ........................ MIT OR Apache-2.0
+  pdf-writer .................... MIT OR Apache-2.0
+  ryu ........................... Apache-2.0 OR BSL-1.0
+  arboard ....................... MIT OR Apache-2.0
+  clipboard-win ................. BSL-1.0
+  error-code .................... BSL-1.0
+
+The vendored encoder carries its licence in the header of the file itself
+(src/domain/qr/vendor/), together with the upstream commit it was taken from
+and every local change made to it.
 
 Components specific to this product are added to this list as they are adopted,
 after the dependency audit (see docs/SPEC.md §3).
+
+BSL-1.0 is the Boost Software License 1.0, a permissive licence that asks for the
+notice to be kept in source distributions only.
 
 Full license texts of the above are retained in the dependency lockfiles and
 are reproduced in the distributed package.

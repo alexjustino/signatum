@@ -1,0 +1,103 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+/*
+ * Signatum — global surface
+ * The window is a Mica material painted by Windows. The page must therefore be
+ * transparent: an opaque body would cover the material and the app would look
+ * like a web page in a frame.
+ */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--surface-backdrop);
+  color: var(--fg-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+  -webkit-font-smoothing: antialiased;
+
+  /* The chrome is application UI, not a document: text selection and the
+     browser context menu do not belong here. Content areas opt back in. */
+  user-select: none;
+  cursor: default;
+}
+
+input,
+textarea,
+[contenteditable='true'],
+[data-selectable] {
+  user-select: text;
+  cursor: auto;
+}
+
+/* ── Focus ─────────────────────────────────────────────────────────────────
+   Visible on every interactive element, in both themes. Fluent draws a double
+   ring so the indicator survives on any surface. */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+  border-radius: var(--radius-md);
+}
+
+/* ── Motion ────────────────────────────────────────────────────────────────
+   Honoured globally, not per component — a component cannot forget it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Colour swatches ───────────────────────────────────────────────────────
+   The one control whose fill is not a token, because it shows the colour
+   somebody is about to print (DESIGN_SYSTEM §2). Chromium draws the swatch
+   inside a wrapper of its own with padding of its own, which leaves a small
+   rectangle floating in a field-sized box: beside the hex value it is supposed
+   to belong to, the two read as two controls rather than one. The wrapper is
+   flattened so the colour fills the control, and the edge — which a near-white
+   choice needs against the card — is the field's own border from the token
+   layer, not one the browser drew. */
+input[type='color']::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+input[type='color']::-webkit-color-swatch {
+  border: none;
+  border-radius: 0;
+}
+
+/* ── Scrollbars ────────────────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--stroke-strong) transparent;
+}
+
+/* ── Drag regions ──────────────────────────────────────────────────────────
+   The custom title bar moves the window; controls inside it must not. */
+[data-tauri-drag-region] {
+  app-region: drag;
+  -webkit-app-region: drag;
+}
+
+[data-tauri-drag-region] button,
+[data-tauri-drag-region] input,
+[data-tauri-drag-region] [role='button'] {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+}

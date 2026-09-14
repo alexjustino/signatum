@@ -4,26 +4,39 @@ Binding decisions. A record here is not a suggestion: changing one requires a ne
 supersedes it, not an edit in passing. Each entry states the context, the decision, and — the
 part that matters most later — the cost we accepted.
 
-| #               | Decision                                                           | Status   |
-| --------------- | ------------------------------------------------------------------ | -------- |
-| [001](#adr-001) | Tauri 2 with a deliberately thin Rust host                         | Accepted |
-| [002](#adr-002) | SQLite, one file, WAL                                              | Accepted |
-| [003](#adr-003) | The domain layer is pure TypeScript                                | Accepted |
-| [004](#adr-004) | Fluent is the visual language, with one icon set                   | Accepted |
-| [005](#adr-005) | Apache-2.0, and two trademark statements                           | Accepted |
-| [006](#adr-006) | No network, no telemetry                                           | Accepted |
-| [007](#adr-007) | Installers are not code-signed in 1.0.0                            | Accepted |
-| [008](#adr-008) | End-to-end tests drive the real binary                             | Accepted |
-| [009](#adr-009) | Accessibility is gated, not reviewed                               | Accepted |
-| [010](#adr-010) | The scan gate: nothing leaves that a decoder did not read back     | Accepted |
-| [011](#adr-011) | The decoder is of a different lineage from the encoder             | Accepted |
-| [012](#adr-012) | The library picks for encoder, decoders, imaging and PDF           | Proposed |
-| [013](#adr-013) | The logo is a region of the matrix, placed by an engine            | Accepted |
-| [014](#adr-014) | Dynamic codes are refused on principle                             | Accepted |
-| [015](#adr-015) | Size is an input, not a pixel count                                | Accepted |
-| [016](#adr-016) | Hostile input is normalised, never passed through                  | Accepted |
-| [017](#adr-017) | Error correction is automatic with a logo, overridable upward only | Accepted |
-| [018](#adr-018) | Wi-Fi passwords are stored in the clear unless the person opts out | Accepted |
+| #               | Decision                                                                         | Status                        |
+| --------------- | -------------------------------------------------------------------------------- | ----------------------------- |
+| [001](#adr-001) | Tauri 2 with a deliberately thin Rust host                                       | Accepted                      |
+| [002](#adr-002) | SQLite, one file, WAL                                                            | Accepted                      |
+| [003](#adr-003) | The domain layer is pure TypeScript                                              | Accepted                      |
+| [004](#adr-004) | Fluent is the visual language, with one icon set                                 | Accepted                      |
+| [005](#adr-005) | Apache-2.0, and two trademark statements                                         | Accepted                      |
+| [006](#adr-006) | No network, no telemetry                                                         | Accepted                      |
+| [007](#adr-007) | Installers are not code-signed in 1.0.0                                          | Accepted                      |
+| [008](#adr-008) | End-to-end tests drive the real binary                                           | Accepted                      |
+| [009](#adr-009) | Accessibility is gated, not reviewed                                             | Accepted                      |
+| [010](#adr-010) | The scan gate: nothing leaves that a decoder did not read back                   | Accepted                      |
+| [011](#adr-011) | The decoder is of a different lineage from the encoder                           | Accepted                      |
+| [012](#adr-012) | The library picks for encoder, decoders, imaging and PDF                         | Superseded by [019](#adr-019) |
+| [013](#adr-013) | The logo is a region of the matrix, placed by an engine                          | Accepted                      |
+| [014](#adr-014) | Dynamic codes are refused on principle                                           | Accepted                      |
+| [015](#adr-015) | Size is an input, not a pixel count                                              | Accepted                      |
+| [016](#adr-016) | Hostile input is normalised, never passed through                                | Accepted                      |
+| [017](#adr-017) | Error correction is automatic with a logo, overridable upward only               | Accepted                      |
+| [018](#adr-018) | Wi-Fi passwords are stored in the clear unless the person opts out               | Accepted                      |
+| [019](#adr-019) | The library picks, confirmed                                                     | Accepted                      |
+| [020](#adr-020) | The matrix is proven against the standard, and the corpus is a proof, not a gate | Accepted                      |
+| [021](#adr-021) | One builder per payload kind, and the summary comes from the builder             | Accepted                      |
+| [022](#adr-022) | Three card formats, and a density warning at a nominal size                      | Accepted                      |
+| [023](#adr-023) | The logo is composed by the host into the bytes the gate decodes                 | Accepted                      |
+| [024](#adr-024) | The middle alignment pattern may sit under the plate                             | Accepted                      |
+| [025](#adr-025) | A look is gated before the scan gate, and function patterns are never reshaped   | Accepted                      |
+| [026](#adr-026) | What is written is what was verified, with one named exception                   | Accepted                      |
+| [027](#adr-027) | The scan margin is a report, never a gate                                        | Accepted                      |
+| [028](#adr-028) | A saved code is its fields and the name of its scene, never an image             | Accepted                      |
+| [029](#adr-029) | A batch is the Create pipeline in a loop, written only inside the chosen folder  | Accepted                      |
+| [030](#adr-030) | Read is the gate's own decoder on somebody else's pixels, and nothing is stored  | Accepted                      |
+| [031](#adr-031) | Settings are a closed list of keys the host owns, and the theme lives there      | Accepted                      |
 
 ---
 
@@ -285,10 +298,12 @@ it failed.
 
 ## ADR-012 — The library picks for encoder, decoders, imaging and PDF {#adr-012}
 
-**Status: Proposed.** These are candidates, not adoptions. Each is confirmed by licence,
-maintenance and the dependency audit in F0 and F1, recorded in `NOTICE`, and this record is then
-superseded by an Accepted one naming what was actually taken. ADR-011's independence rule is
-Accepted and depends on none of these names.
+**Status: Superseded by [ADR-019](#adr-019).** These were candidates, not adoptions, and the
+record stayed Proposed so that the audit was allowed to say no. F0 built with them and ADR-019
+names what was actually taken, at which version and under which licence. The table below is kept
+as it was written — it is the reasoning the picks were made against, and the PDF row is still a
+candidate, because F7 has not happened. ADR-011's independence rule was Accepted throughout and
+depends on none of these names.
 
 | Role               | Candidate                                        | Why it is the candidate                                                 |
 | ------------------ | ------------------------------------------------ | ----------------------------------------------------------------------- |
@@ -344,7 +359,9 @@ gate (ADR-010) then proves the arithmetic on the bytes rather than standing in f
 covers no function pattern — asserted on the matrix, not on a rendered image — and the result
 decodes. One module over the budget is refused with the reason. The negative battery in SPEC §6
 (version 1 with a logo, the first version with a centre alignment pattern, a transparent logo, a
-white logo on a white plate) belongs to the same suite.
+white logo on a white plate) belongs to the same suite. The engine is
+`src/domain/placement.ts` and the battery that holds it is `src/domain/placement.test.ts`; the one
+function pattern that may be covered, and only behind a constant, is [ADR-024](#adr-024).
 
 **Cost accepted.** The logo is smaller than a design tool would draw it, deliberately, and some
 people will want the bigger one; the product says why they cannot have it. The engine carries an
@@ -470,3 +487,969 @@ stated export path, and it will be its own record.
 to the Windows user account can read the Wi-Fi passwords in the library, along with everything
 else in it; the database is not encrypted at rest. The opt-out is the mitigation the product
 offers today, and saying so plainly, where the password is typed, is the rest of it.
+
+## ADR-019 — The library picks, confirmed {#adr-019}
+
+**Status: Accepted.** Supersedes [ADR-012](#adr-012).
+
+**Context.** ADR-012 named candidates and said plainly that they were candidates. F0 had to build
+with something: encode a code, rasterise it, decode it with a different lineage, and prove the
+whole path from a test process. What follows is what was taken, at the versions in `Cargo.lock`
+and `package-lock.json` on the day F0 landed. Versions are named because "we use resvg" is not a
+fact anybody can check a year later.
+
+**Decision.**
+
+| Role                     | Taken                                                                                                           | Version                 | Licence                                   |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------- | ----------------------- | ----------------------------------------- |
+| Encoder                  | Project Nayuki's QR Code generator, **vendored**                                                                | upstream `8329a7108fc2` | MIT                                       |
+| Decoder, in the host     | `rqrr`                                                                                                          | 0.10.1                  | (MIT OR Apache-2.0) AND ISC               |
+| Decoder, third, in tests | `jsQR` (with `pngjs` to read the file)                                                                          | 1.4.0, 7.0.0            | Apache-2.0; MIT (`pngjs`)                 |
+| SVG rasteriser           | `resvg`, default features **off**                                                                               | 0.45.1                  | Apache-2.0 OR MIT                         |
+| └ SVG parser             | `usvg`, re-exported by `resvg`                                                                                  | 0.45.1                  | Apache-2.0 OR MIT                         |
+| └ Rasteriser backend     | `tiny-skia`, re-exported by `resvg`                                                                             | 0.11.4                  | BSD-3-Clause                              |
+| PNG in and out           | `image`, `png` feature only                                                                                     | 0.25.10                 | MIT OR Apache-2.0                         |
+| Hashing                  | `sha2`, `hex`                                                                                                   | 0.10.9, 0.4.3           | MIT OR Apache-2.0                         |
+| Host, storage, platform  | `tauri` (+ `dialog`, `log` plugins), `rusqlite` (bundled SQLite), `windows` (`UI_ViewManagement`, `Foundation`) | 2.11.5, 0.32.1, 0.58    | Apache-2.0 OR MIT; MIT; MIT OR Apache-2.0 |
+
+Every licence is permissive and compatible with this product's Apache-2.0; none is copyleft. The
+list a person sees is `NOTICE`, and the About screen reads it from that file rather than from a
+second list somebody would have to remember to update.
+
+**The encoder is vendored, and pinned.** `src/domain/qr/vendor/qrcodegen.ts` is upstream
+byte-for-byte apart from two lines — a `@ts-nocheck` and lint pragma, and an `export` to give a
+script a module boundary — both recorded in `VENDORED.md` beside it, both re-checked by a test
+that fails on any third difference, against the upstream file's SHA-256. It is vendored rather
+than depended upon for the reason ADR-012 gave: from F5 the placement engine has to reach inside
+the matrix, which no packaged encoder exposes. The cost is unchanged and now real — an upstream
+fix is a manual merge, not a version bump.
+
+**`resvg` is compiled with its default features off**, which is a security decision before it is a
+size one. The defaults are text layout, system fonts, memory-mapped fonts and GIF/JPEG/WebP
+decoding: every one of them a parser that would be reachable from a file this product was handed,
+and not one of them needed to draw a background rectangle and a path. `usvg` and `tiny-skia` are
+not declared as dependencies at all — `resvg` re-exports the exact versions it was built against,
+and a second copy of `tiny-skia` at another version would be two incompatible `Pixmap` types.
+
+**`jsQR` is the third decoder**, in the end-to-end suite only, never in the product. It runs in
+the Node process that drives the binary, reads the PNG from disk after the product wrote it, and
+shares its lineage with neither the encoder (Nayuki) nor the host's decoder (`rqrr`, a port of
+quirc). Three readings of one code by three unrelated implementations is the strongest statement
+this product can make without a camera. `zxing-cpp`, ADR-012's fallback verifier, was **not**
+taken: it would put a C++ toolchain on every machine that builds this, and two decoders in the
+host would raise a question — which one wins — that the product has no good answer to.
+
+**PDF is not decided here.** `pdf-writer` and `svg2pdf` remain candidates; F7 is where export
+formats are built, and the choice belongs to the record that follows it.
+
+**Cost accepted: the MSRV holds the versions down.** `rust-version = "1.80"` is kept, the same
+value the sibling products use, so one toolchain builds the whole family and a contributor is
+never asked which Rust today's repository wants. Newer `resvg` and `rqrr` releases require a
+newer compiler, so 0.45 and 0.10 are what F0 takes rather than the latest published. That is a
+real cost, and it comes due the day one of these crates fixes something that matters upstream:
+the answer then is to raise the MSRV across the family deliberately, in its own record, not to
+raise it quietly here for one crate.
+
+## ADR-020 — The matrix is proven against the standard, and the corpus is a proof, not a gate {#adr-020}
+
+**Status: Accepted.**
+
+**Context.** F0 proved the path: a link becomes a code, the code becomes a file, and a decoder of a
+different lineage reads the file back ([ADR-010](#adr-010), [ADR-011](#adr-011)). What F0 did not
+prove is the _matrix_. One link, at one version, at one level, with whatever mask the encoder chose,
+says nothing about version 37 at H under mask 5. The encoder is vendored and mature
+([ADR-019](#adr-019)), but "the encoder we vendored agrees with itself" is not a proof, and the logo
+engine that will reach inside the matrix from F5 onwards needs a matrix somebody has checked against
+the published tables first.
+
+**Decision, in two halves.**
+
+**The domain carries the reading half of ISO/IEC 18004.** `src/domain/qr/structure.ts` computes,
+from the standard and nothing else, the 15-bit format information (BCH(15, 5) over the generator
+10100110111, XORed with 101010000010010 — Annex C), the 18-bit version information for versions 7
+and above (BCH(18, 6), Annex D), the alignment-pattern centres of every version (Annex E), and the
+position of every function pattern: three finders, their separators, both timing patterns, the dark
+module. It also reads those fields back out of a matrix, from both of the copies the standard
+requires, so a caller can insist the two agree. Nothing in it writes a module. A matrix is therefore
+judged against the standard's tables — with known answers for format, version and alignment copied
+into the test straight from those tables — rather than against the encoder's idea of itself.
+
+**The sweep is in the gate.** Every combination the standard allows is built and read back by
+`vitest`: forty versions × four levels × numeric, alphanumeric and byte modes × eight masks =
+3,840 matrices, each one required to have the size its version fixes, to draw every function
+pattern, and to carry the version, level and mask it claims in both copies of its format and
+version information.
+Beside it, a decoder of a different lineage decodes a symbol at every version and every level, and
+byte-mode input that is not valid text comes back as the same bytes. That runs on every push.
+
+**The corpus is a proof, and deliberately not a gate.** `npm run corpus` builds the domain's encoder
+as a plain module, generates ten thousand randomised payloads from a fixed seed — every version
+reached, lengths skewed the way real codes are but touching version 40, several scripts, and one
+payload that is not UTF-8 at all — and hands each matrix to the host's decoder in a release build
+(`src-tauri/tests/corpus.rs`, `#[ignore]`d so that it is never run by accident). Each symbol must
+come back as the same _bytes_, with the version, level and mask the encoder claimed: a code that
+decodes to the right payload from the wrong matrix is a coincidence, not a correct encoder. The host
+rasterises the modules directly, without going through the SVG renderer, so the proof of the matrix
+does not depend on how the product happens to draw. The corpus is generated, never committed, and
+reproducible from its seed, so a failure is named by the id of its line. It runs from the command
+line and from a workflow of its own — on dispatch and weekly — and it is **not** part of
+`npm run gates`.
+
+**Cost accepted: a regression that only the corpus would catch can reach `develop` between two
+runs.** Ten thousand symbols take minutes, the release build takes longer, and a battery a
+contributor is tempted to skip protects nothing. So the corpus buys its runtime with a real gap, and
+the gap is narrowed rather than denied: the 3,840-cell sweep and the per-version decode by a foreign
+decoder _are_ in the `vitest` gate, and the corpus is asked for by hand whenever the encoder, the
+decoder or the code between them is touched, with the weekly run as the backstop. That convention is
+written into `CONTRIBUTING.md`, which is the only thing that makes "run it when you touch the
+encoder" more than a hope.
+
+**Two smaller consequences, recorded so that they are not rediscovered.** The third decoder now runs
+in the unit suite as well as the end-to-end one; [ADR-019](#adr-019)'s binding part is unchanged —
+it is a development dependency and is never linked into the product. And the corpus carries its
+payloads and module bits as base64, which nothing the product ships reads, so the crate that decodes
+it is a `dev-dependency`, absent from a release build.
+
+## ADR-021 — One builder per payload kind, and the summary comes from the builder {#adr-021}
+
+**Status: Accepted.**
+
+**Context.** A code carries bytes, and a person reads a sentence. F0 had one kind, a link, and the
+two lived in one file without effort. F2 brings seven, and each of them is a different answer to the
+same two questions: what exactly does the code carry, and what does a phone do when it reads it?
+The failure this product exists to prevent is the gap between those two answers — a preview that
+says _"Joins Office-5G"_ over a payload that joins a network called `Office-5G;P:`. That gap is not
+found by testing harder; it is opened by writing the payload in one place and the sentence in
+another.
+
+**Decision.** A payload kind is **one pure builder**, in its own file under `src/domain/payload/`,
+which takes that kind's form and returns either the exact bytes **and** the sentence together, or
+one reason and the name of the field that earned it. Never two functions that could disagree:
+`buildEmail` is the only thing that knows both what a `mailto:` looks like and that it _"writes to
+ana@example.com"_. The screen dispatches, shows and refuses; it knows the format of nothing. The
+preview's accessible name, the helper line under the form and the end-to-end suite all read that
+same sentence, so there is nothing left for two readings to disagree about.
+
+Every builder is **total**: it throws nothing, because a half-typed form is the normal state of a
+form and not an error, and the empty form of every kind is refused — which is what keeps an export
+from being offered before anything has been typed.
+
+**The formats, and why these.** The test a format has to pass here is not elegance, it is what the
+two mobile platforms' built-in cameras actually act on:
+
+| Kind     | Format                         | Why                                                                                 |
+| -------- | ------------------------------ | ----------------------------------------------------------------------------------- |
+| Link     | WHATWG URL, `http`/`https`     | what a browser would resolve, punycode included (`SECURITY.md`)                     |
+| Text     | the text, byte for byte        | the one kind with no format: a trailing space in a serial number is part of it      |
+| E-mail   | `mailto:` (RFC 6068)           | the only mail URI phones open; subject and body are its query, so both are encoded  |
+| Phone    | `tel:` (RFC 3966)              | digits and at most a leading `+` — what a dialler acts on, not what a person writes |
+| SMS      | `SMSTO:<number>:<message>`     | read by both platforms for a decade; see the cost below                             |
+| Wi-Fi    | ZXing `WIFI:T:…;S:…;P:…;H:…;;` | the de-facto network-join format both platforms implement; there is no standard one |
+| Location | `geo:` (RFC 5870)              | opens the map application rather than a maps vendor's website                       |
+
+Escaping is part of the format, not a tidy-up after it: the reserved characters of `WIFI:` are
+escaped in the name and the password with the backslash handled first, and in `mailto:` the local
+part is percent-encoded exactly as the subject and the body are — a `?` inside an address is a
+character, never a second field.
+
+**Cost accepted: two of the seven are not standards, and one of them is chosen _over_ a standard.**
+`SMSTO:` has no RFC. `sms:` does ([RFC 5724](https://www.rfc-editor.org/rfc/rfc5724)), and the two
+mobile platforms disagree about where the message body goes in it, so a `sms:` code that pre-fills
+the message on one platform opens an empty message on the other. The product ships the form that
+works on the phone rather than the one that reads best in a specification, and the same reasoning
+gives `WIFI:`, which is ZXing's convention and nobody's standard. The cost is real: these two
+formats are defined by what implementations do, so they can drift, and no specification will settle
+an argument about them. It is paid deliberately, because the alternative is a code that scans
+correctly and does nothing useful. Both are pinned by tests that assert the exact bytes, so a drift
+is a failed test rather than a surprise on a printed sheet.
+
+**Second cost: seven builders is seven files.** A kind cannot be added by editing one switch; it
+needs its file, its tests and its form. That is the point — the dispatch and the form switch are
+exhaustive over the union the domain declares, so a kind added without a form is a type error rather
+than an empty panel — but it does mean the cheapest-looking change, adding a field to an existing
+kind, is the one to watch: a field that the builder ignores is a field the person will believe in.
+
+## ADR-022 — Three card formats, and a density warning at a nominal size {#adr-022}
+
+**Status: Accepted.**
+
+**Context.** A contact card is the payload people print on paper and hand to strangers, and it is
+the payload with the most ways to go quietly wrong. It is long — a filled-in vCard is several
+hundred bytes where a link is forty — and bytes are modules, so the same card that scans from an A4
+poster can be unreadable on a business card. It is also structured: `;` separates the components of
+a value and `,` separates the values of a multi-valued one, so a family name written `O'Brien; Jr`
+is not punctuation, it is a name and a suffix, and the address book files a different person. And
+unlike a link, nothing on the screen shows whether it worked; the person who finds out is the one
+who scanned it.
+
+**Decision.** One kind, three formats, chosen on the form and decided before any byte is written.
+
+| Format        | What it is                                          | Why it is offered                                                              |
+| ------------- | --------------------------------------------------- | ------------------------------------------------------------------------------ |
+| **vCard 3.0** | [RFC 2426](https://www.rfc-editor.org/rfc/rfc2426)  | the default: the form the widest range of phones and mail clients import today |
+| vCard 4.0     | [RFC 6350](https://www.rfc-editor.org/rfc/rfc6350)  | the current standard — `KIND:individual` and `tel:` URIs, for what reads it    |
+| MECARD        | the convention phone cameras have read for a decade | density: roughly half the bytes, for a code that has to be printed small       |
+
+3.0 is the default because the test a format has to pass here is the one [ADR-021](#adr-021) set —
+what the two mobile platforms and the desktop address books actually act on — and not which
+document is newest. 4.0 exists because it is where the standard is, and the difference is written
+where the standard writes it: the `KIND` property it added, the `TYPE=INTERNET` parameter it
+dropped, and telephone numbers as `tel:` URIs rather than bare text. MECARD exists because a code
+that does not scan at the size it is printed carries nothing at all.
+
+**Escaping, and the two places it deliberately stops.** Every text value is escaped by RFC 6350
+§3.4 — the backslash first, then `;` and `,`, and a line break as the two characters `\n` — with
+the components of `N` and `ADR` escaped one by one and only then joined, because in a structured
+value position is meaning. Two exceptions are decisions rather than omissions:
+
+- **A web address is written raw in a vCard.** `URL` is a URI value, not a text value (RFC 6350
+  §6.7.8), and a URI is not backslash-escaped; escaping it would put a backslash into an address
+  that some clients then open literally. It is safe to write raw only because the link parser has
+  already refused anything with whitespace or a line break in it — the same parser the Link kind
+  uses.
+- **A line break inside MECARD is passed through.** MECARD has no escape for one. Writing `\n` as
+  two characters would not encode the break, it would put a backslash and an `n` into the note, and
+  a reader that does unescape would produce a value nobody typed. Passing it through is the only
+  choice that cannot corrupt the value, and in a single-line format it is visible rather than
+  silent.
+
+Long lines are folded at 75 octets with CRLF and a space (RFC 6350 §3.2), counted in UTF-8 octets
+and never inside a multi-byte sequence: a card folded through the middle of an `ü` imports as
+mojibake. UTF-8 is the charset in both versions, so no `CHARSET` parameter is written.
+
+**A number on a card carries its country code.** The Phone kind accepts a national number, because
+a code taped to a shop counter is scanned in that country. A card is not taped to anything — it
+travels, and it is stored — so a number without its country code becomes a local number on whatever
+phone reads it later. The card refuses it with a sentence instead, and every other field is read by
+the parser its own kind already owns, so what is refused on the Phone or Link tab is refused here in
+the same words.
+
+**A density warning, not a refusal, at a nominal size.** How small a module comes out is a function
+of the payload's length, and the person who could act on it is the one typing. So the number is
+computed from the code on screen and shown beside the preview: at 25 mm, this code's modules are
+0.24 mm, and below half a millimetre most cameras fail at arm's length. It is **a warning and never
+a refusal** — the printed size is the person's to choose, and what decides whether a code leaves is
+the scan gate ([ADR-010](#adr-010)), which reads the bytes that will actually be exported. The
+warning is decided on the two-decimal number the sentence shows, not the exact one, so the screen
+never claims that 0.50 mm is below half a millimetre; a person reading a warning that contradicts
+itself stops believing the next one. Until the export screen makes the physical size an input
+([ADR-015](#adr-015), F7), 25 mm is assumed, and the sentence says so — so it is read as the
+assumption it is.
+
+**Cost accepted: a card written for one address book's parser may read differently in another.**
+Three formats, two of them with implementations older than their specification, and no test in this
+repository can settle what a phone will do with a `;` after it has been unescaped. The bytes are
+pinned — every format's exact output is asserted, the escaping negative cases included — and the
+decoder proves those bytes come back off the printed drawing; neither proves the import. That proof
+is the phone matrix and the host proof in `docs/SPEC.md` §7: the card imports into Outlook and
+Google Contacts intact, checked on a real machine by a person, per release. A defect that only the
+address book can see is found there or not at all.
+
+**Second cost: the warning is generic where the builder is specific.** The density sentence ends
+with the same advice for every code, including one already written as a MECARD, while the
+over-length refusal in the builder is careful not to suggest MECARD to somebody who is writing one.
+Recorded as the smaller of two evils — a warning shown late is worse than a warning worded loosely
+— and to be narrowed when the export screen takes over the size.
+
+## ADR-023 — The logo is composed by the host into the bytes the gate decodes {#adr-023}
+
+**Status: Accepted.**
+
+**Context.** The scene the domain draws is an SVG, and the obvious place to put the logo is inside
+it: one document, one renderer, nothing to keep in step. But the logo is a file somebody was sent.
+Putting it in the scene means either embedding a foreign SVG inside our own or carrying a raster as
+a data URI, and both put bytes this product did not write into the document it hands a renderer and
+injects into the window — the exact thing [ADR-016](#adr-016) exists to prevent.
+
+**Decision.** The scene carries the **plate** and nothing else of the logo. The plate is a plain
+`<rect>` or `<circle>` the domain emits, so it is rasterised with the modules, by the same renderer,
+in the same pass. The **logo image** is drawn by the Rust host into the pixmap, **before** the PNG
+is encoded — so the bytes the independent decoder reads, and the bytes that are written to disk, are
+the artefact with the logo on it ([ADR-010](#adr-010)). On screen the same normalised image is laid
+over the figure as an `<img>`, positioned at the same box.
+
+**Why.** A logo drawn after the verification is a logo nobody checked, and a verdict about a code
+without its logo is a verdict about a picture nobody will print. Composing before the encode makes
+the gate's claim cover the whole artefact, and it keeps a foreign document out of the SVG: the only
+markup this product injects remains the scene its own domain serialised.
+
+**Cost accepted: two renderers have to agree about one box.** The browser draws the overlay and the
+host draws the export, and neither can see the other's result. The box is therefore stated once, by
+the domain, in the scene's own units — modules with the quiet zone included — and both sides use it
+as a fraction of one `viewBox`: the screen turns it into percentages of the figure's square, the
+host turns it into pixels against the scale the renderer used. Nothing else converts. Held by the
+end-to-end test, which reads the box back off the screen's own geometry, exports with it, and then
+checks the **centre pixel of the exported file** is the logo's colour and that a third decoder still
+reads the link off it. If the two ever drift, that test fails on the artefact rather than on paper.
+
+## ADR-024 — The middle alignment pattern may sit under the plate {#adr-024}
+
+**Status: Accepted** (2026-09-14, by the owner, for the 1.0.0 release). Every other record here
+was settled by a table or by a test. This one could not be: no decoder in this repository can say
+what a phone will do with a symbol whose middle alignment pattern is gone. So it was written as a
+proposal, the code carried it behind a constant that is on by default, and the owner accepted it
+for the release — the phone matrix of the release notes is the host proof it rests on (SPEC §6),
+and a failure there on a version 7–13 code is 1.0.1 work that would supersede this record. As
+accepted, this is the behaviour of every logo on those twenty versions, and the strict mode
+(`ALLOW_CENTRE_ALIGNMENT = false`) is one line nobody has to find.
+
+**Context.** Versions 7–13, 21–27 and 35–40 have an odd number of alignment centres, which puts
+one of them in the middle of the symbol — at the exact centre on most of them, up to four modules
+beside it on 22–27 and 36–40, where the standard's rounding shifts the row. A centred logo on
+those versions cannot avoid it. Every other function pattern is avoidable by making the logo
+smaller; this one is not, because the logo and the pattern want the same modules.
+[ADR-013](#adr-013) says none of them is ever covered, so the engine's only other move is to
+refuse the version and grow: from version 7 the next symbol with a free centre is version 14 — 45
+modules a side become 73, a symbol 62 % wider and more than two and a half times the area, or, at
+a fixed printed size, modules under two thirds of the size they were. That is a heavy price for
+the smallest pattern on the symbol, and it is paid by every code on twenty of the forty
+versions.
+
+**Decision.** The plate may cover the middle alignment pattern, and only that one. It
+is left out of the function-pattern map, so the modules under the plate are knocked out with the
+rest and nothing of it shows at the plate's edge; the finders, the separators, both timing
+patterns, every other alignment pattern, the format and version information and the dark module
+stay untouchable in both modes. The behaviour is one constant, `ALLOW_CENTRE_ALIGNMENT` in
+`src/domain/placement.ts`, on by default and threaded through `coverage`, `checkBox`,
+`largestBox`, `knockOut` and `planCode` rather than read again inside each of them. With it off
+the engine skips every version that has a middle alignment pattern, and that strict mode is not
+theoretical — it is built and tested: content that lands naturally on version 7 at H is planned
+onto version 14 instead. The scan gate ([ADR-010](#adr-010)) remains the judge of any individual
+code: this record decides what the engine may offer, never what may leave.
+
+**Why.** A decoder finds the symbol by its three finders, takes the grid from them and the timing
+patterns, and reads the format information beside them — none of which the plate touches.
+Alignment patterns refine the sampling grid where the symbol is large enough, or the surface
+uneven enough, that the grid drifts from one corner to another, and the ones doing that work are
+the outer ones, at the edges where the drift has accumulated. The middle one refines the middle,
+which is where the plate is and where there is now nothing to sample. The budget this engine
+spends is conservative on top of that: `SAFETY = 0.6` leaves 40 % of every block's correctable
+capacity to print and camera, so a code that has given up its middle alignment pattern is not a
+code sitting at the edge of what it can lose. The proof that it still reads is on the matrix, at
+the first version where the case exists — version 7 at H, with the largest plate the budget
+allows drawn over the pattern, decoded back to the same content by a decoder of a different
+lineage — and the same content planned at version 14 with the exception off, so both halves of
+the decision are held by the suite.
+
+**Cost accepted.** This leans on what decoders tolerate rather than on the letter of ISO/IEC
+18004, which draws that pattern and says nothing about a symbol that has covered it. No test here
+can settle that: every decoder in the suite is software, reading a clean raster, held still, at a
+scale of its own choosing — precisely the conditions under which a doubtful code passes. The
+proof is the phone matrix, per release, and until it has been held against a code on one of these
+versions the default is a bet, written down as one. If a camera fails on such a code the constant
+flips, every code on those twenty versions jumps to the next free version and its modules get
+smaller at the same printed size — which the module-size warning ([ADR-015](#adr-015)) then has
+to say out loud, because somebody who printed at 25 mm yesterday is printing denser modules
+today.
+
+## ADR-025 — A look is gated before the scan gate, and function patterns are never reshaped {#adr-025}
+
+**Status: Accepted.**
+
+**Context.** A look is where somebody's taste meets a camera's tolerance, and both colours and
+shapes can produce a code that is perfectly legible to a rasteriser and not to a phone. Grey on a
+lighter grey separates at full precision in a clean raster and disappears under a restaurant's
+lighting. A light code on a dark plate is something the encoder is entirely happy to draw and most
+cameras will not look for. A grid of dots is still a grid of modules to a decoder given the grid —
+but finding the grid is the part that comes first. [ADR-010](#adr-010) already says nothing leaves
+that a decoder did not read back; the difficulty is that the gate answers about one artefact under
+laboratory conditions (SPEC §9, R2), and it answers late — by then the person has chosen a look and
+has no way of knowing which part of it was the mistake.
+
+**Decision.** Three rules, all of them in the domain — `src/domain/style.ts` and
+`src/domain/scene.ts` — and all of them decided before the host is asked for anything.
+
+1. **Colours pass a contrast gate before the code is built.** The two print colours must be at
+   least `MIN_CONTRAST = 4.5` apart on the WCAG 2 contrast ratio, computed from sRGB relative
+   luminance, and the code must be the darker of the two. A look that fails is refused, in the
+   domain, with a sentence that names which of the two rules it broke and, for contrast, the ratio
+   it reached against the one it needed. Nothing is rasterised, nothing is decoded, nothing is
+   offered for export.
+2. **Shapes apply to data modules, and never to the patterns a decoder navigates by.** A module
+   shape (square, rounded, dot) is drawn for data modules only; the three finder patterns take
+   their own shape (square, or rounded with a corner radius of 0.75 module on the ring) and are
+   drawn as three opaque shapes each — the ring in the code colour, the gap in the plate colour,
+   the heart in the code colour — so that a rounded finder is a finder and not a decorated
+   square. A circular finder is not offered, and the rounding is modest, on measurement: the
+   host's decoder derives the grid's perspective from the finder's corners, and against it a ring
+   rounded past a radius of one module reads at no size, a circle at none — every module shape
+   read at every size. A shape the gate would never let out is not a choice. The timing patterns, the
+   alignment patterns, the format information and the version information stay square whatever the
+   data modules are, taken from the same function-pattern map the placement engine uses
+   ([ADR-013](#adr-013)) — asked for without the exception [ADR-024](#adr-024) grants that engine,
+   because where a plate is allowed over the middle alignment pattern those modules are gone
+   already, and where there is no plate the pattern is drawn square like every other.
+3. **A quiet zone under four modules is a warning, not a refusal.** Four is the number the
+   standard asks for and the number the product defaults to; under it the domain returns a sentence
+   — a different one when there is no quiet zone at all — and the code is still built.
+
+**Why 4.5.** It is the threshold WCAG sets for text a person has to read, and it is used here as a
+floor rather than as a target: a camera has to separate the two colours _and_ find the grid in
+them, at an angle, at a distance, in whatever light the code was printed into. A threshold known to
+be barely enough for a reader who can lean closer is a reasonable minimum for a reader who cannot.
+Choosing a number of our own would have meant defending it with a proof this repository cannot
+produce; choosing the one the accessibility world already defends means the number can be looked up.
+
+**Why inverted is refused rather than warned.** Most phone cameras binarise the image expecting a
+dark code on a light plate, and several will not attempt a symbol in the other polarity at all —
+including, on some releases, the default camera applications the phone matrix is run against. The
+ratio can be 21:1 and the code still unscannable, which is precisely the case a contrast number
+cannot express, so it is a separate rule with its own sentence.
+
+**Why the function patterns stay square.** A decoder locates the symbol by the three finders, takes
+the grid's origin and pitch from the alternating runs of the timing patterns, refines it on the
+alignment patterns, and reads the format information beside the finders before it reads any data. A
+run of alternating dark and light modules is what those patterns _are_: a row of dots is a row of
+separated discs, with light between every one of them, and a sampler measuring a period on it
+measures the wrong thing. Reshaping them is the one part of a stylised code that attacks the step
+before error correction exists — nothing can be corrected if the grid was never found. Data
+modules, by contrast, are sampled at their centres, which is where a rounded corner or a dot puts
+the ink. The default look is unchanged by all of this: with square modules and square finders the
+scene is byte-identical to the one the product has written since its first slice, down to the
+`shape-rendering` hint, which only becomes `geometricPrecision` when something was actually shaped.
+Every one of the nine combinations of module and finder shape is rasterised and read back by a
+decoder of a different lineage in the rule tests, and the export is verified by the host's decoder
+like any other code.
+
+**Cost accepted: a look the gate would have passed is refused by policy.** A ratio of 4.0 will
+scan, at a sensible size, on a clean print — and this product will not build it. The gate is a
+policy applied to the whole population of codes rather than a verdict about one of them, and a
+policy is blunt by construction. It is paid deliberately: the alternative is a warning that people
+learn to click past, on the one decision whose consequences show up only after printing. The number
+sits in one constant, next to the reason it was chosen, so raising or lowering it later is one
+change, argued once, and a superseding record.
+
+**Cost accepted: a white logo on a white plate is not detected here.** SPEC §6 lists it among the
+mandatory negative cases, and F6 does not answer it. The plate is the background colour by design —
+that is what makes a mark sit clear of the modules instead of on top of them — so a white-on-white
+logo is not a contrast defect in the code's colours, and the scan gate is unaffected either way:
+the modules under the plate were knocked out before anything was drawn ([ADR-013](#adr-013)), and
+the code verifies with or without a visible mark. What is invisible is the logo, and the logo's own
+colours are the host's knowledge, not the domain's — the domain never sees the image bytes
+([ADR-023](#adr-023)). The case therefore belongs where a code is judged as a picture rather than as
+a payload: the Read screen in F10, which already has to say what it sees in an image somebody
+photographed. Written down here so that the gap is a decision and not an oversight.
+
+## ADR-026 — What is written is what was verified, with one named exception {#adr-026}
+
+**Status: Accepted.**
+
+**Context.** [ADR-010](#adr-010) fixed the order — nothing leaves that a decoder did not read
+back, and the export writes _that_ buffer — at a time when there was one way out of the product.
+F7 opens four. Each of them asks the same question in a different shape: what exactly are the
+bytes the verdict is about? A PNG has pixels a decoder can read. A PDF is a container around
+something. The clipboard is not a file at all. And an SVG has no pixels until something draws it —
+and the thing that will draw it is somebody else's renderer, in somebody else's layout tool,
+months later.
+
+**Decision.** One sentence per way out, and the exception is named rather than smoothed over.
+
+- **PNG — the verified pixmap _is_ the written file.** Unchanged from F0, with one addition: the
+  encoder writes a `pHYs` chunk carrying the resolution the code was designed at, both axes, in
+  pixels per metre — 300 dpi is 11,811, the number `pixelsPerMetre` in `src/domain/size.ts`
+  computes — so the file states its own physical size instead of leaving it to whatever opens it
+  next ([ADR-015](#adr-015)).
+- **PDF — the page is the printed size, and what is on the page is the verified raster.** The
+  `/MediaBox` is the physical size in points (millimetres × 72 ÷ 25.4, so 25 mm is 70.87 pt) and
+  the verified PNG is embedded edge to edge. The PDF therefore carries the verified bytes: what a
+  printer rips is the image a decoder read, at the size the person asked for. Writing the modules
+  as vector paths would have looked better under a loupe and would have broken the rule — it is a
+  second rendering of the scene, by a second code path, and [ADR-010](#adr-010) exists to forbid
+  exactly that.
+- **SVG — the written file is the very SVG string the decoder rasterised.** `sizedSvg` inserts
+  `width` and `height` in millimetres immediately after the `viewBox` and touches nothing else, so
+  the document inside is byte-identical to the one that was verified; placing it in a layout tool
+  gives the size it was designed at. **Plus, when there is a logo:** the logo the host composed
+  from the same stored bytes ([ADR-023](#adr-023)), embedded before `</svg>` as a `data:` image or
+  as the normalised drawing inlined as a nested `<svg>` at the plate's box. Either way the file
+  points at nothing outside itself — a `data:` URI carries its bytes inside the document, and the
+  inlined drawing references nothing — which is the rule [ADR-016](#adr-016) set for everything
+  this product writes.
+
+  **This is the one place where the bytes written are not the bytes decoded**, and it is a
+  decision rather than an oversight. An SVG has no pixels to verify: the host has to rasterise it
+  to be able to say anything at all, and the raster it verified is the composed pixmap, logo
+  included, exactly as for a PNG. What is written is the same scene that decoder read, plus the
+  mark the host drew onto it from the same stored bytes. The alternative — refusing to embed the
+  logo — exports a vector file with the brand missing from the middle, which is not the artefact
+  anybody asked for. The gap is closed from the other side, in the end-to-end suite: a **third**
+  renderer rasterises the **written** SVG and a third decoder reads the payload off it
+  ([ADR-008](#adr-008), [ADR-011](#adr-011)).
+
+- **Clipboard — the verified PNG's pixels, as an image, and never the payload text.** A payload on
+  the clipboard is a paste into the wrong window: into the message somebody was writing, into a
+  terminal, into a document that is about to be sent. The clipboard is an export like any other
+  and goes through the same verification before anything is put on it.
+
+**Why.** Four ways out is four chances to verify one artefact and write another, which is the one
+bug [ADR-010](#adr-010) was written to make impossible and the one that reaches paper without
+anybody noticing. Stating per format what the verified bytes are turns that from a property
+somebody has to remember into a sentence a reviewer can hold against the code. And where the
+property genuinely cannot hold, one paragraph saying so is worth more than a claim that is true of
+three formats out of four.
+
+**Cost accepted: the SVG asymmetry, stated.** A logo embedded after the raster was decoded is a
+logo no decoder in this product read _in that document_. What is verified is the same mark in the
+same box, rasterised by the same host; what is not verified is a foreign renderer drawing it. A
+defect only such a renderer can produce — a `data:` image ignored, a nested `<svg>` positioned
+differently — would be invisible to the gate. The end-to-end suite's third renderer is what
+narrows that, and it narrows rather than closes it.
+
+**Second cost: the size is bounded by the raster.** The host renders between
+`MIN_PIXEL_SIZE` = 64 and `MAX_PIXEL_SIZE` = 4096 pixels square
+(`src-tauri/src/imaging/render.rs`), and the export is that same raster, so a printed size and
+resolution whose raster falls outside — 5 mm at 150 dpi is 30 pixels, 1000 mm at 1200 dpi is
+47 244 — is refused by the domain before anything is rendered, with the sentence naming the
+resolution to change (`checkPrintSize` in `src/domain/size.ts`, `MIN_PIXELS` and `MAX_PIXELS`
+mirroring the host's constants). A refusal rather than a silent clamp, because a clamp writes a
+file at a size nobody asked for; and a floor at all, because below it a code has fewer pixels than
+modules and a decode that succeeded there would prove nothing. The two constants live in two
+places and must agree; a host test and a domain test each pin their own, and a change to one
+without the other is a refusal on one side that the other cannot explain.
+
+## ADR-027 — The scan margin is a report, never a gate {#adr-027}
+
+**Status: Accepted.**
+
+**Context.** The scan gate answers one question about one artefact under laboratory conditions
+(SPEC §9, R2): does this file read, clean, held still, at the scale the renderer chose. That is
+the right question and it is not the whole of what somebody printing a menu, a bottle or a bus
+shelter needs to know. The code that reads perfectly at 2,000 pixels is going onto paper, through
+a press, under a phone held at an angle in poor light — and the honest thing to say about that is
+not a verdict, it is a distance: how much abuse is left before it stops reading.
+
+**Decision.** After a verdict, and only after one, the host degrades the render it already has
+nine ways and hands each variant to the same decoder that produced the verdict:
+
+| Degradation  | Variants                                         | Why that one                                                        |
+| ------------ | ------------------------------------------------ | ------------------------------------------------------------------- |
+| Shrunk       | 50 %, 33 %, 25 % of the pixel size               | printed small, or read from far — nearest-neighbour, the cruel one  |
+| Blurred      | box blur, radius 1, 2 and 3 px at the pixel size | a camera that did not focus, or ink that spread                     |
+| Recompressed | JPEG at quality 80, 50 and 25, decoded back      | the code that went through a chat application before it was printed |
+
+Each variant reports its label and whether it read, and the screen shows them as short lines —
+"Shrunk to 25 %: reads", "Blurred 3 px: fails". **It informs, and it never blocks.** It does not
+gate an export, it does not change the verdict, and a code the gate passed is exportable whatever
+the nine lines say. Nothing in F7 writes the margin down: it is a report about one render at one
+moment, not evidence about a file that was written.
+
+**Why.** The two questions are different, and answering the second one with a refusal would be a
+category error. The gate answers _does this file read_ — a fact about one artefact, with one
+correct answer, and it is requirement one (SPEC §4). The margin answers _how much abuse before it
+does not_ — a set of measurements with no threshold anybody in this repository can defend. A clean
+raster passing while a blurred one fails is **information**: it says this code is at the edge of
+what a downscale can take, so print it larger or shorten the payload. Turned into a gate it would
+become a number chosen by us, refusing codes that scan, and the first person to meet it would ask
+which of the nine lines they are allowed to fail — a question with no answer. Shown as nine lines
+it needs no threshold at all, because the person reading it knows what their code is going onto
+and this product does not.
+
+**Cost accepted: it is the host decoder's opinion, not a camera's.** One implementation (`rqrr`,
+[ADR-019](#adr-019)) reading synthetic degradations of a clean render. A box blur is not a
+defocus, a nearest-neighbour downscale is not a printer's screening, a JPEG quality is not a
+phone's imaging pipeline — and the decoder that produced the verdict is the decoder that produces
+the margin, so one that is generous in the first is generous in the second. The margin is
+therefore written and read as an indication, in the same breath as the thing that actually
+decides: the phone matrix, two phones at the printed size, per release (SPEC §6). A smaller second
+cost: nine decodes cost what nine decodes cost, so the margin is asked for after the verdict and
+is never on the path between a verdict and a file.
+
+## ADR-028 — A saved code is its fields and the name of its scene, never an image {#adr-028}
+
+**Status: Accepted.**
+
+**Context.** Until F8 a code existed only while the window was open: typed, verified, written out,
+and gone when the window closed. A library changes what the product is responsible for — a row in
+a file somebody will open again in six months, after an update, after an escaping rule has been
+corrected. There are three plausible things to keep, and two of them are traps. Keeping the
+**rendered image** is the first: it reopens instantly, it can never be proved again, and it carries
+whatever defect the encoder had on the day it was drawn — a picture of a code is not a code.
+Keeping the **encoded string** is the second, and it is the more tempting one, because those are
+the exact bytes a decoder read back — and it freezes every escaping bug in this product's history
+into the person's own data, where a fix cannot reach it without a migration nobody could write
+honestly.
+
+**Decision.** A saved code is **the fields the person typed, the look, the size, which logo, and
+the name of the scene it made** — nothing else. A brand kit is the same minus the payload.
+
+- **The payload is stored as the form, never as the encoded string.** `payload_json` holds the
+  `PayloadForm` the domain validated — SSID, given name, subject, latitude — and the `WIFI:`,
+  `mailto:` or vCard string is produced by the builder again every time the code is rendered
+  ([ADR-021](#adr-021), `DATA_MODEL.md`). So a corrected escaping rule reaches **every code already
+  in the library**, with no data migration and nothing to re-derive. It follows that re-encoding can
+  change the payload's hash and therefore invalidate a verification row written under the old rule.
+  That is not a defect to be worked around: a code built by rules that have since been corrected has
+  not been proved under the corrected ones, and the product says so instead of carrying the old
+  verdict forward.
+- **The scene's name is its SHA-256, computed in the domain.** `sceneHash` in
+  `src/domain/library.ts` hashes the scene's SVG with `src/domain/sha256.ts`, a plain FIPS 180-4
+  implementation that is part of the pure layer. The name of the scene is decided **where the scene
+  is made**: the domain draws it, so the domain can say what it is, without a command round-trip and
+  without the asynchronous, browser-only `crypto.subtle`. It is pinned twice — to the standard's own
+  vectors and to the platform's digest, on the lengths where padding goes wrong.
+- **Opening a code rebuilds it and asks the gate again.** The stored fields go back through the same
+  builder, encoder, placement engine and scene renderer, and the hash of the rebuilt scene is
+  compared with the stored one. Then the code is verified again, by the host's decoder, exactly as a
+  code typed from nothing is ([ADR-010](#adr-010)) — the stored verification is never the export's
+  token. **A saved code is not trusted, it is re-proven**, which is the only reading of "reopened
+  exactly as it was" (SPEC §2.7) that a product making this product's claim is allowed to use.
+- **A brand kit carries a look, a size and a logo, and never a payload.** `applyKit` returns what to
+  set — style, error-correction floor, printed size, logo — and the form on screen is untouched. A
+  kit that could carry a payload would be a code by another name, and applying it would silently
+  replace what somebody had typed.
+- **A logo in use is not deleted, and the refusal names what is using it.** `logo_id` is
+  `ON DELETE RESTRICT` from both `codes` and `brand_kits`, and the host turns the constraint into a
+  sentence that **names the kits and the saved codes** standing in the way. `CASCADE` would take
+  them with it; `SET NULL` would leave a kit that quietly looks different the next time it is
+  applied, which is the worst of the three because nobody sees it happen.
+- **The Wi-Fi opt-out [ADR-018](#adr-018) promised is this slice's.** `redactForSave` blanks the
+  password when the person clears "Save the password with this code", and the row is stored without
+  it; every other kind is returned untouched. A redacted code still reopens, into the form it was
+  saved from, and the screen asks for the password again before the gate can pass — `reopens`
+  returns the builder's own refusal, so the sentence is the one the Wi-Fi form would have shown
+  anyway. Kept, it is in the clear in the workspace file, and `SECURITY.md` says so in those words.
+
+**Why the hash at all, rather than comparing the fields.** Two forms can be equal and produce
+different scenes — a different encoder version, a different mask after a knock-out, a constant
+changed in the placement engine. The scene is what the person saw and what the decoder read, so the
+scene is the thing worth naming, and a 64-character name is cheap to store and exact to compare.
+It is also what F8's proof of done is stated in (SPEC §7): the code reopens after a restart with
+the **identical** scene, hashed, not with a scene that looks the same.
+
+**Cost accepted: a code saved under an older build may rebuild to a different scene, and the product
+has to say so.** Every one of the rules above points the same way — the library follows the code
+rather than freezing it — so an improvement to the encoder, the placement engine or the style layer
+can change the drawing a stored row produces. When the rebuilt scene's hash does not match the
+stored one, the mismatch is **shown, never hidden and never silently overwritten**: the code is the
+one the fields describe, it is verified again like any other, and the person is told that what they
+are looking at is not byte-identical to what was saved. The alternative — keeping the image, or
+keeping the encoded string — buys a match that means nothing, because it is a match against bytes
+this product would no longer produce.
+
+**Second cost: SHA-256 now exists twice in this repository.** The host already hashes with `sha2`
+([ADR-019](#adr-019)), and the domain may not reach for it ([ADR-003](#adr-003)), so the pure layer
+carries its own implementation of a standard that is not ours to get wrong. The two never hash the
+same bytes — the host names payloads and artefacts, the domain names scenes — so the risk is not
+that they disagree but that one of them is quietly incorrect, which a hash cannot show by looking
+wrong. It is held down the only way it can be: pinned to the vectors in FIPS 180-4 and to the
+platform's own digest, on the lengths where padding goes wrong. The alternative was a command
+round-trip in the middle of the render loop, which is a worse trade: the scene would be named by a
+process that did not draw it.
+
+**Third cost: applying a kit copies, it does not subscribe.** The planned `codes.brand_kit_id` is
+not in the migration. A kit is a starting point, so what it sets is copied into the code's own look
+and size, and editing the kit afterwards changes nothing that was already made. That is the
+behaviour the screen promises — one click sets the look — and it means there is no lineage to show
+a person who wonders why their older codes did not follow the kit. Recorded here so that the
+question has an answer.
+
+---
+
+## ADR-029 — A batch is the Create pipeline in a loop, and the host writes only inside the chosen folder {#adr-029}
+
+**Status: Accepted.**
+
+**Context.** Until F9 every code was made by a person watching it: typed into a form, refused with a
+sentence they read, exported to a path they chose in a dialog. A batch takes the person out of the
+middle of that — a file somebody else wrote decides what is built, what it is called and how many
+times it happens — and it does so with two inputs this product already calls hostile. The **cells**
+are strings from a colleague's spreadsheet or an export out of an HR system, and one of them names a
+file; the **report** is then opened in the spreadsheet those cells came from. Both halves have a
+known way to go wrong: a cell that is a path escapes the folder that was chosen, and a cell that
+begins with `=` is a formula in whatever opens the report. There is a quieter way to go wrong as
+well, and it is the one that would cost the most — a "batch mode" that goes faster by proving less,
+so that two hundred files leave under a claim that was tested on one of them.
+
+**Decision.** A batch is the Create pipeline run in a loop, and nothing in it is a shortcut.
+
+- **Every row is planned by the same three functions one code is.** `planBatch` in
+  `src/domain/batch.ts` calls `buildPayload` → `planCode` → `renderScene` per row, with the look,
+  the size, the error-correction floor and the logo the Create screen is carrying at that moment. So
+  a batch **cannot make a code the screen could not**: the same builders and the same escaping
+  ([ADR-021](#adr-021)), the same placement engine and its refusals ([ADR-013](#adr-013)), the same
+  automatic error correction with a logo ([ADR-017](#adr-017)), the same contrast gate
+  ([ADR-025](#adr-025)). A second rendering path for volume would be a second product, and the first
+  defect it shipped would ship two hundred times.
+- **A row that fails is a problem by line, and the loop goes on.** A refusal becomes
+  `RowProblem { line, reason }`, carrying the domain's own sentence and the line **as the person
+  sees it in the file** — counted through quoted fields, so a note with a line break in it does not
+  shift every number after it. A row with the wrong number of fields, a link that is not a link, a
+  card with no name, a logo that will not fit at that size: each is one line of the report, and none
+  of them is a stop. The caps are the other half of that promise — 10 000 rows, 64 KiB per row,
+  2 MiB per file — each refused with a sentence rather than by slowing to a halt.
+- **The header decides what the batch is.** A `url` column makes a batch of links; `given_name` or
+  `family_name` makes a batch of contact cards; anything else is refused before a row is read, with
+  the sentence that names the columns it would have accepted. Guessing the kind from the cells would
+  let the same file mean different things on different days.
+- **A file name comes from a `name` column, or from the name the payload gives itself.** It then
+  goes through `sanitiseFileStem`:
+  normalised to NFC, stripped of control characters, every `\ / : * ? " < > |` replaced by `-`,
+  runs of dots and of hyphens collapsed, spaces collapsed, leading and trailing dots and spaces
+  trimmed, `.` and `..` and the empty string
+  turned into `code`, a name Windows reserves (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`,
+  `LPT1`–`LPT9`, `CONIN$`, `CONOUT$`, with or without an extension) prefixed with `code-`, and cut
+  to 80 characters. `fileNameFor` then prefixes the row number — `007-Ana Souza` — so the folder
+  sorts in the order of the file it came from and two people with one name do not overwrite each
+  other; a name already taken takes a `-2`. `../../evil` becomes plain `evil`: the separators were
+  the danger and they are gone, and two dots in a row are collapsed even inside a name, so the
+  domain never hands the host a leaf the host would refuse.
+- **The host verifies each row exactly like an export, and writes it the same way.** Every file is
+  rasterised, decoded by the independent decoder and compared byte for byte before it is written
+  ([ADR-010](#adr-010)), and what is written is what was decoded ([ADR-026](#adr-026)), through a
+  temporary name renamed into place. Two hundred files are two hundred verifications; a row that
+  does not read back is `refused` in the report and there is no file for it. A file already in the
+  folder under a row's name is **never replaced**: that row fails with a sentence and the file
+  stays, so a list run twice into one folder is a report of failed rows, not a folder of replaced
+  files. One run at a time: a second `run_batch` while one is going is refused, so Cancel always
+  means the run on screen.
+- **The folder chosen is the only place written.** The host canonicalises that folder once, and
+  checks each leaf again on its own side of the boundary — one segment, no separator, no `..` — so a
+  leaf that is not one segment is a **failed row, never a path**. The domain's sanitising and the
+  host's check are deliberately the same rule written twice: the domain's is what makes a usable
+  name, the host's is what makes the containment claim, and a claim that depends on the webview
+  having been correct is not a claim.
+- **The report is built by the domain and only written by the host.** `reportCsv` produces the whole
+  file — `line,name,file,status,reason`, CRLF, in line order, one line per planned row and one per
+  problem — with every cell escaped for CSV **and** neutralised by `csvCell`: a cell beginning `=`,
+  `+`, `-`, `@`, a tab or a carriage return is prefixed with an apostrophe, so a spreadsheet reads
+  it as text (the OWASP rule). The host writes that string beside the codes, through the same staged
+  rename, and **never over a report that is already there** — a second run lands beside the first,
+  not on top of it. CSV is written in exactly one place in this repository, which is what makes it
+  possible to say it is safe.
+- **The rows of a batch are append-only.** `batch_rows` refuses `UPDATE` outright and refuses
+  `DELETE` while the batch is still there; deleting the whole run takes its rows with it, which is
+  the one deletion that is not a rewrite of a report ([`DATA_MODEL.md`](../DATA_MODEL.md)). This is
+  the reasoning behind the verification rows, applied to a run instead of a code: the report is
+  evidence, and evidence that can be edited is not evidence.
+- **Reading the CSV is the host's job, under a cap.** `read_text_file` is the second door in this
+  product that reads a file a person chose in a dialog, after `import_logo`: at most 2 MiB, UTF-8 or
+  a refusal, a local path only, and used by this screen alone. The interface still never reads a
+  file itself — it hands over the path the dialog produced and receives text
+  ([`SECURITY.md`](../../SECURITY.md)).
+
+**Why the plan is shown before anything is written.** The person sees what the file would produce —
+how many rows can be made, what each one will be called, and every problem by line — before they
+choose a folder. A batch that asked for the folder first would put its refusals after the writing,
+which is the order in which nobody reads them.
+
+**Cost accepted: a negative number in a name cell is written as `'-1` in the report.** The rule that
+neutralises `=HYPERLINK(...)` cannot tell a formula from a minus sign, because the spreadsheet
+cannot either until it has evaluated it. So a row named `-1` is reported as `'-1`, and somebody
+reading the report sees an apostrophe that was not in their data. It is the right side to be wrong
+on: the apostrophe is visible and harmless, and the alternative is a report about hostile input that
+is itself the attack. It is tested with `=HYPERLINK`, `+cmd`, `@SUM` and a plain `-1`, so the cost
+is asserted rather than remembered.
+
+**Second cost: 10 000 rows, and the whole plan is in memory.** The plan is materialised before a
+single file is written — every row's scene, drawn and held — because the screen shows the plan first
+and the host is handed rows that were already proved plannable. That is what makes the cap a number
+rather than an intention: a longer list is split into two runs. Streaming the plan would buy an
+unbounded batch at the price of the thing that makes this one honest, which is that every refusal is
+known before the folder is chosen.
+
+**Third cost: the paste door exists because a test cannot open a dialog, and it is a product feature
+anyway.** The end-to-end suite drives the real binary ([ADR-008](#adr-008)), and a native file
+dialog is outside what WebDriver can operate, so rows have to be able to arrive without one. Rather
+than a hidden hatch the suite uses and nobody else has — a second way in, exercised only by tests,
+is a second product — the screen takes pasted rows in a plain `TextArea`, for everybody, and says
+so. It reads nothing: the text was already in the person's clipboard, and it goes through the same
+parser the file does. The cost is one more place a batch can start from; the gain is that the path
+the tests prove is the path people use.
+
+---
+
+## ADR-030 — Read is the gate's own decoder on somebody else's pixels, and nothing read is stored {#adr-030}
+
+**Status: Accepted.**
+
+**Context.** Everything up to F10 was a code this product made: drawn by its own encoder, rasterised
+by its own host, and read back under laboratory conditions by a decoder that shares no lineage with
+the encoder ([ADR-010](#adr-010), [ADR-011](#adr-011)). F10 turns that around. The pixels now arrive
+from somebody else's camera — a menu photographed at an angle under a yellow lamp, a screenshot
+pasted out of a chat, a sticker printed by a press nobody here owns — and the product has to say
+what the code holds, what scanning it would do, how it was built, and whether it would still read at
+a printed size. Two temptations come with those pixels, and both are the kind that only become
+visible months later. The first is a **second decoder**, more forgiving than the gate's and tuned
+for photographs, so that Read answers more often. The second is a **history** — a list of what was
+read, because it is cheap to keep and looks like a feature.
+
+**Decision.** Read is the gate's decoder, pointed at an image somebody put in front of it, and it
+keeps nothing.
+
+- **The same decoder, and no second lineage.** `read_image` prepares the luma of the opened image
+  and hands it to the same `rqrr` ([ADR-019](#adr-019)) that stands behind the scan gate in
+  `src-tauri/src/imaging/decode.rs`. So **what Read says a code holds is what the gate would have
+  accepted**, and what Read cannot read is what the gate would have refused. That sentence is only
+  true while there is exactly one decoder in this product, which is why there is one. A reader more
+  generous than the gate would be a second opinion nobody could act on: the screen would name a
+  payload that this product would then refuse to export.
+- **Two doors, and neither of them is the product going looking.** A reading starts from a file the
+  person chose in a dialog, or from an image already on their clipboard — which is how a screenshot
+  arrives, and pasting one should not require saving it first. The clipboard door reads nothing from
+  disk: it takes an image that was already in the person's hands, exactly as the batch screen takes
+  pasted rows ([ADR-029](#adr-029)), and it takes an image only. Neither door is a watcher, a folder
+  scan or a history: the product looks at what it was handed, once, when it was handed it.
+- **One second pass, and the screen says it happened.** Photographs fail for one dull reason more
+  often than all the others together — a single global threshold cannot hold a page that is bright
+  at one corner and in shadow at the other. So when the first pass finds no grid at all, and only
+  then, the host retries once on an adaptively thresholded copy (Bradley's method, the window an
+  eighth of the short side). When that second pass is what found the code, the screen says so —
+  _"Found after adjusting the exposure."_ — because a person who is told that knows their photograph
+  was marginal, and a person who is not told believes their print is fine. An improvement made
+  silently is the thing this product refuses everywhere else
+  ([`DESIGN_SYSTEM.md`](../../DESIGN_SYSTEM.md) §10), and exposure is no exception.
+- **The meaning of the bytes is the domain's, in the sentences Create already uses.** The host
+  reports pixels and structure — the bytes, the version, the error-correction level, the mask, the
+  modules per side, where the corners sit — and stops there. What those bytes _mean_ is
+  `describeBytes` in `src/domain/read.ts`, which recognises this product's own kinds by their
+  grammar and answers in the product's own words: _"Opens example.com"_, _"Joins Office-5G"_, _"Adds
+  Ana Souza to contacts"_. `describeLink` is the very function the Create screen's summary comes
+  from ([ADR-021](#adr-021)), not a copy of it, so **a code that was read and a code that was made
+  are described by one sentence, written once**. Bytes that are not text are shown as hexadecimal
+  with a note, never as a lossy string that would quietly misrepresent them.
+- **"Would it scan at 20 mm" is arithmetic, and it is never a verdict about the file.**
+  `wouldScanAt` divides the printed width by the modules across and reads the answer off the
+  thresholds that already exist in `src/domain/density.ts`: half a millimetre a module reads, four
+  tenths to a half is tight, below that is too small for most cameras. It is an estimate about a
+  print that does not exist yet, made from a photograph of one that does, and it decides nothing —
+  the standing this product already gives the scan margin ([ADR-027](#adr-027)). The host is not
+  asked the question at all: it reports the module count, and the arithmetic stays where the
+  thresholds are. **The count divided into is the one the Create screen's warning uses — the symbol
+  and the quiet zone that will be printed around it** — while the host reports the symbol alone
+  (`side_modules`, 17 + 4 × version, which is what the detector measured), so the quiet zone is
+  added before the question is asked. The two counts differ by eight modules, and taking the wrong
+  one is a silent error of roughly a fifth in the module size — about the width of the gap between
+  _tight_ and _too small_ — which is why the seam between two components that are each correct is
+  written down here rather than left to be discovered.
+- **Nothing read is stored.** No row, no file, no history, no thumbnail, no list of recent images —
+  and therefore no migration: F10 adds nothing to the schema ([`DATA_MODEL.md`](../DATA_MODEL.md)).
+  A photograph somebody opened is theirs, and so is what was in it; the product reads it, says what
+  it found, and has nothing left when the screen is left. The path is not kept either, because where
+  a file sits is itself a fact about somebody's machine. What a person wants kept has a door
+  already: _Make a code like this_ builds it on the Create screen, where saving is a decision they
+  take.
+- **SVG is refused for reading.** A vector file has no pixels a camera produced; a code in one is
+  markup this product would be parsing rather than decoding, and those are not the same question.
+  The refusal names the other door rather than being a dead end — _"Read works on photographs and
+  screenshots; open an SVG as a logo instead."_ The hostile-SVG rules ([ADR-016](#adr-016)) stay
+  exactly where they are, at the logo import, which is the one place in this product that parses
+  one.
+- **What is read is data, and it is never acted on.** A link found in an image is **shown, never
+  followed** — not opened, not resolved, not previewed, not checked for existence
+  ([ADR-006](#adr-006)); the product has no network, and reading somebody's photograph is not where
+  it grows one. A Wi-Fi payload is shown with its password **masked until it is revealed**, because
+  a screen may be shared or overlooked and the person who opened the image does not yet know what is
+  in it ([ADR-018](#adr-018)). An internationalised host is shown **in Unicode beside its punycode**
+  — _bücher.example (xn--bcher-kva.example)_ — by `src/domain/punycode.ts`, a decode-only RFC 3492
+  implementation in the pure layer, pinned to the RFC's own sample and to the pairs a person will
+  meet. The product still never encodes a host itself: the WHATWG parser does that on the way in.
+  This is the line SPEC §5 has carried since F2 with half of it owed, and it is now true in both
+  places it is claimed — on the Create screen and on this one — because both call the same function.
+- **"Make a code like this" carries a link or a text, and says so plainly.** This slice prefills the
+  Create form for those two kinds only. An e-mail, a Wi-Fi network, a place or a contact card read
+  out of a photograph is described in full and its content can be copied, but it does not yet reopen
+  as a filled form: turning a parsed vCard back into thirteen validated fields is the builders'
+  inverse, and an inverse written quickly is an escaping bug pointed the other way. It is a
+  follow-up, named here so that the gap is a decision rather than an omission somebody discovers.
+
+**Cost accepted: a photograph this decoder cannot read is reported as "no code", never as a guess.**
+A damaged print, a code at a steep angle, one under a glare, one folded along the crease of a menu —
+for any of these the answer may be _"No QR code was found in this image"_ where a phone held in
+front of the real thing would have read it. That is the price of the first bullet, and it is the
+right price: the alternative is a decoder chosen for how often it answers rather than for whether
+its answer means anything, and on the day the two decoders disagree the product would have no
+position to state. A code-like pattern that is found but does not decode is reported as exactly that
+— something in the image that looked like a code and did not come back — so that "nothing here" and
+"something here I could not read" stay two different sentences.
+
+**Second cost: the decoding ceiling is 2,048 pixels on the long side.** The opened file meets the
+caps the logo import already makes its claims on ([`SECURITY.md`](../../SECURITY.md)) — refused
+above 20 MiB, dimensions read from the header and capped before a pixel is decoded, the format
+decided by the bytes and never by the name — with one difference: a photograph is **not** reduced to
+the logo importer's 1,024 pixels, because a code needs its pixels to be decoded at all. The ceiling
+is 2,048, which holds a twelve-megapixel phone photograph at about half its width, and a code
+occupying a small corner of a very large frame can fall below the modules per pixel the decoder
+needs and be reported as not found. The number is a compromise with the memory one open file may
+cost a webview-fronted desktop product, and the person whose photograph fails has the remedy the
+product cannot have: take it again, closer.
+
+## ADR-031 — Settings are a closed list of keys the host owns, and the theme lives there {#adr-031}
+
+**Status: Accepted.**
+
+**Context.** F0 shipped one setting — the theme — in the browser's own storage, with a note beside
+it promising a table on the day a second setting existed ([`DATA_MODEL.md`](../DATA_MODEL.md)).
+F11 is that day. The polish slice adds the choices a person makes once and expects to find again:
+the width and the resolution a code is designed at, the quiet zone around it, and whether a Wi-Fi
+password is kept with a saved code ([ADR-018](#adr-018)). Five preferences is where the shape of
+this has to be decided rather than improvised, because the shape chosen here is the one every later
+preference arrives into, and both of the obvious shapes fail in a way that only becomes visible
+much later.
+
+**Decision.** One table of key and value, and **the list of keys is closed, in the host**.
+
+- **Not a column per preference.** A column is the tidy answer for five settings and the wrong
+  answer for the sixth: every preference a slice adds becomes a migration, applied to everybody's
+  workspace, to record a fact the host already knows — and migrations are forward-only history
+  ([`DATA_MODEL.md`](../DATA_MODEL.md)), so a preference that is later dropped leaves a column
+  behind it forever. A migration per preference is a migration too many.
+- **Not one JSON blob either.** A single row holding every choice has to be read, parsed and
+  written whole to change one word, which is how two windows lose each other's edits, and it puts a
+  shape the host cannot check inside a column SQLite cannot check.
+- **And not a free key/value table.** Key and value with nothing governing the key is a junk
+  drawer: it becomes the place where state that should have had a shape gets stashed — a cached
+  verdict, a half-finished draft, a list of things somebody opened — and nobody can say what a
+  workspace contains by reading the schema. So the key is bounded by the SQL (an identifier, at
+  most 64 characters; a value at most 4,096) and **enumerated by the host**: `commands/settings.rs`
+  holds the list, each key with what it may hold, and every write goes through it. A key that is
+  not on the list is refused — _"That is not a setting this product keeps."_, which does not echo
+  the key, since whatever asked for it was not a person typing — and a value outside its range is
+  refused with the bound in the sentence, so a default width of 5,000 mm comes back naming the
+  1,000 mm the product allows. **The list in code is the schema, and a test holds it**: a key the
+  interface writes and the host does not keep is a red test rather than a preference that silently
+  never comes back. There is deliberately no `CHECK` enumerating the keys in the SQL, for the
+  reason `codes.kind` is bounded by length rather than enumerated — the list grows with the
+  interface, and a `CHECK` would need a migration to record something the host already refuses to
+  get wrong.
+- **What is kept, and it is the whole list.** `theme`; `default_width_mm`, `default_dpi` and
+  `default_quiet_zone` — the three numbers the Create screen starts from, which are a person's
+  house style and not a decision they should retype every morning; and `keep_wifi_passwords`, which
+  the Save form's checkbox starts from rather than asking the same question about every network
+  ([ADR-018](#adr-018)). A default is a starting point and never a rule: it is what a new code
+  begins with, it is visible in the control it fills, and changing it on one code changes that
+  code, not the setting.
+- **What is deliberately not kept.** **The window's position and size**, because they are the
+  operating system's to remember and a product that restores its own geometry is a product
+  fighting Windows about which monitor somebody is on. **A list of recent files**, because nothing
+  in this product stores a fact about where somebody's files live: Read keeps nothing at all
+  ([ADR-030](#adr-030)), the logo import keeps the normalised image and not the path it came from
+  ([ADR-016](#adr-016)), and the one folder that is written down is the one a batch actually wrote
+  into, where it is part of that run's report rather than a convenience. And **nothing derived** —
+  no cached scan verdict, no last-used code, no remembered screen: a verdict has an owner
+  ([ADR-010](#adr-010)) and a convenience that shadows it is the copy that eventually disagrees.
+- **The theme moves to the table, and the pre-paint read stays as a fallback.** The workspace is a
+  file the host opens after the window exists, and a value that lives in SQLite therefore cannot be
+  read before the first paint without blocking it — which is exactly the moment the theme is needed,
+  because a person who chose dark must never be shown a white window first. So the theme is written
+  to the table **and** mirrored into the window's own storage, and the direction is what keeps two
+  copies of one fact honest: the table is the authority and is written first; the mirror is written
+  after it and is **read in exactly one place**, the synchronous read before the first paint; and
+  when the workspace answers, the table corrects the mirror, never the other way round. A workspace
+  copied to another machine carries the theme with it, because the preference is in the file; the
+  mirror left behind is a paint hint about a window, not a preference about a person.
+
+**Cost accepted: the database cannot enforce what a setting means, so every read has to survive a
+value the product did not write.** The bounds in the SQL stop a workspace edited by hand from
+making the host read a megabyte to find out what the theme is, and they stop nothing else: `theme`
+could hold `sepia`, `default_dpi` could hold `banana`. The rule that pays for this is the one
+`readTheme` has had since F0, applied to every key — a reader that never throws, falls back to the
+default, and leaves the stored value alone until the person changes it. A preference is a
+convenience, and a screen that will not render is not.
+
+**Second cost: adding a setting is a change in two places, and that is the point.** The host's list
+and the control that offers it both have to be written, and the test that compares them fails until
+they agree. A design where a new preference costs nothing is a design where preferences accumulate
+until a person cannot find the one they are looking for — the closed list is what makes Settings a
+short screen a year from now, and what lets `SECURITY.md` say plainly that the table holds no
+secret: `keep_wifi_passwords` holds the word `true` or the word `false`, and a table that refuses
+every key but five cannot be used as a store for anything at all.

@@ -15,9 +15,14 @@ No cloud. No account. No telemetry. No redirect. The code is a file you own.
 
 ---
 
-> **Status: pre-release.** Signatum is being built in public, one vertical slice at a time.
-> Nothing on this page is claimed as working until the slice that carries it has landed and
-> says so. See [the roadmap](#roadmap) for what each release holds.
+> **Status: 1.0.0 — "The mark", released 2026-09-14.** Installers are on the
+> [Releases page](https://github.com/alexjustino/signatum/releases): an **MSI** and an **NSIS**
+> `.exe`, either one is the whole product. They are **not code-signed**, so Windows SmartScreen
+> will show "Windows protected your PC" on first run — choose **More info**, then **Run anyway**,
+> after checking that the SHA-256 in the release notes matches the file you downloaded. Download
+> only from the Releases page of this repository. Signatum needs **no account** and makes **no
+> network request**: everything it does happens on your machine, and your codes live in one file
+> you own. See [the roadmap](#roadmap) for what is in this release and what is not.
 
 ## Why
 
@@ -42,18 +47,175 @@ placed by an engine that knows which modules the code cannot lose.
 
 ## What exists today
 
-Nothing runs yet. The specification, the decisions and the threat model are written; F0 is next.
+F0 has landed, and it is the whole promise on one screen: type a web link, watch it become a QR
+code, and export it as a PNG — but only after an independent decoder has rasterised that exact
+drawing, read it back, and matched it against the link byte for byte. A code that does not read
+back is refused, with the reason in a sentence, and no file is written. The end-to-end suite
+proves it against the real binary, decoding the exported file from disk with a third decoder that
+shares no code with either of the other two.
+
+Behind it, F1 has proven the matrix itself: every one of the forty versions, at each of the four
+levels of error correction, under each of the eight mask patterns, checked against the standard's
+own tables — and ten thousand randomised codes read back, byte for byte, by the same decoder that
+ships inside the product.
+
+F2 has widened what a code can carry: seven kinds — link, plain text, e-mail, phone, SMS, Wi-Fi
+network and location — each written in the exact form phones read, each escaped to its own format,
+and each with one line under the form saying what scanning it will do. The kind is chosen at the
+top of the screen, and every kind keeps its own draft, so trying one does not cost what was typed
+in another.
+
+F3 has added the eighth kind, and the one that is most often printed on paper: a contact card. The
+eight kinds now include it, in whichever of three forms the address book on the other side reads —
+vCard 3.0 by default, vCard 4.0, or MECARD when the code has to be small — with every field escaped
+to its format and long lines wrapped where the standard wraps them. A number on a card must carry
+its country code, because a card travels. And beside the preview, the screen now says when a code
+would be printed too dense to scan: how small its modules would be at a nominal 25 mm, and a
+warning below half a millimetre. That is a warning and never a refusal; the decoder still decides
+whether a code may leave.
+
+F4 has put the brand in the middle. A logo is imported from a PNG, JPEG, GIF, WebP or SVG — what
+the file is comes from its bytes, never from its name — and nothing that arrives is kept as it
+arrived: a photograph is decoded, capped and written out again as a PNG this product made, and an
+SVG is parsed into a drawing and re-serialised from it. A file that cannot be used is refused with
+a sentence about that file, and nothing is stored from it. The logo is then drawn onto the pixels
+**before** the decoder is asked, so the code that read back is the code that carries it, and the
+exported file is those same bytes. A plate — none, square, rounded or circle — is part of the code
+itself rather than a decoration over it, and a code with a logo is encoded at the strongest error
+correction the standard offers.
+
+F5 has worked out how large the logo may really be, and it is arithmetic rather than taste. A QR
+code carries a fixed amount of error correction, and a logo spends it: the engine counts, before
+anything is drawn, how much of that budget a given size would cost the worst-affected block, and
+allows the largest centred square that stays within it — keeping four tenths of what the code could
+correct in reserve for the smudged print, the bad angle and the cheap camera. It knows where every
+part of a code that cannot be lost sits, on all forty sizes — the corner squares, the timing lines,
+the alignment squares, the strip that says how the code was drawn — and stops before reaching one.
+The modules the logo covers are cleared, whole ones only, so no half module survives at the edge of
+the plate; the pattern the code is drawn through is then chosen again, on the code as it will
+really be printed; and the error-correction level and the size of the code are chosen for the logo,
+never the smallest code and never weaker than the content forces. A logo that will not fit is
+refused with the reason — which pattern it would reach, or by how much it is over the budget —
+rather than quietly shrunk, and a smaller logo can be asked for, never a larger one. One decision
+in it is not yet settled and is written down as such: the small alignment square that some sizes of
+code place exactly in the middle is allowed to go under the logo, because refusing it would push
+the code to a far larger size, and whether real phone cameras agree is proved with two phones
+before it is accepted.
+
+F6 has given the code a look, and put a gate in front of it. Both colours can be chosen — they are
+the colours of the print rather than of the application's theme, and they are the same in a light
+window as in a dark one, because paper has no theme — and the pair is measured before the code is
+built: colours too close together are refused with the contrast they reached against the 4.5 a
+camera needs, and a code lighter than the plate it sits on is refused however strong the contrast,
+because phone cameras look for a dark code on a light background and several will not turn the
+picture over to find one. The modules can be square, softened at the corners or drawn as separate
+dots, and the three large squares in the corners square, rounded or round. What keeps its shape is
+what a camera navigates by — the lines of alternating modules between those corners, the small
+alignment squares, the strip that records how the code was drawn — because a scanner finds the grid
+by measuring those runs, and a row of dots is not a run. All nine combinations of module and corner
+shape are rasterised and read back by an independent decoder on every run of the suite, and a code
+nobody restyled is drawn exactly as it was before, to the byte. The blank margin around the code is
+a choice too, with a sentence under the four modules the standard asks for and a blunter one when
+there is none at all — a warning and never a refusal, since what decides whether a code may leave is
+still the decoder that reads it back.
+
+F7 has made the size an input and given the code four ways out. A code is designed for a width on
+paper — millimetres or inches, from 5 mm to a metre — at a chosen resolution, and everything else
+follows from those two numbers: a 25 mm code at 300 dpi is 295 pixels square, and the module size
+the screen warns about is now the size those modules will really be printed at rather than one
+assumed for the warning. It leaves as a PNG with the resolution written into the file, so the file
+states its own physical size instead of leaving it to whatever opens it next; as an SVG at the
+printed size with the logo embedded, for a layout tool; as a PDF whose page is exactly the size
+asked for, with the verified image on it edge to edge, which is the answer for a printer; or
+straight onto the clipboard — the picture, never the payload text, because a payload on the
+clipboard is a paste into the wrong window. Every one of them is verified before it is written, and
+where "the bytes written are the bytes decoded" could not be literally true — a vector file has no
+pixels for a decoder to read — it is written down rather than glossed over. Alongside the verdict,
+the code is also shrunk, blurred and recompressed nine ways and read again, so the screen can say
+how much abuse it has left in it: a report, and never a gate.
+
+F8 has given the product a memory. A code that has passed the gate can be saved under a name and
+reopened later from a library of its own — after closing the window, after an update — with the
+fields, the colours and shapes, the printed size and resolution, the logo and its plate all as they
+were. What is kept is what was typed rather than the encoded string, and the name of the drawing the
+code made: never a stored picture. So reopening a code rebuilds it by the same rules and hands it to
+the decoder again, rather than trusting a verdict from months ago, and a correction to the way a
+format is escaped reaches every code already saved. If a later version of the product would draw a
+saved code differently, the screen says so instead of quietly showing something else under the old
+name. Codes can be renamed, and deleting one asks first. A **brand kit** saves a logo, the colours,
+the shapes, the margin, the error-correction floor and the printed size together, and applies all of
+them to a new code in one click — a kit changes how a code looks and never what it says. A logo that
+a kit or a saved code is using cannot be deleted, and the refusal names the kits and the codes that
+are using it. And the choice a Wi-Fi password deserves is now a choice: keep it with the code, in
+the clear in the workspace file, as the screen says plainly — or clear it, and be asked for it again
+the next time the code is opened.
+
+F9 has made it a list. A CSV of links or of contact cards — opened from disk, or pasted into the
+screen — becomes one file per row, and every one of them is built by the same pipeline as a code
+typed by hand and read back by the same independent decoder before it is written: two hundred rows
+are two hundred verifications, not one claim repeated. The first line of the file names the columns
+and decides what the batch is, and a `name` column names each file. What that column says is reduced
+to a file name and nothing else — no path separator, no `..`, no name Windows reserves, and the
+row's number in front, so the folder sorts like the file it came from and two people with the same
+name do not overwrite each other. The folder chosen is the only place anything is written, checked
+on the host's side of the boundary and not merely on the way in, and a file already there is never
+replaced. A row that cannot be made — a wrong
+number of fields, an address that is not a link, a card with nobody's name, a logo that will not fit
+— becomes a line in the report with its line number and the reason, and the rest of the list is made
+anyway; the whole plan, with its refusals, is shown before a folder is asked for. The report is
+itself a CSV, written beside the codes and never over one that is already there, with any cell that
+begins `=`, `+`, `-` or `@` written as text so that a report about a hostile list is not the attack
+when it is opened. While it runs, it says how far it has got, and it can be stopped between rows.
+
+F10 has pointed the product the other way: it now reads codes it did not make. Open a photograph or
+a screenshot — a menu on a table, a sticker on a bottle, an image pasted out of a chat — and the
+screen says what the code holds, what scanning it would do, and how it was built: version,
+error-correction level, mask and modules across, with every code found outlined on the image itself.
+What reads it is **the same decoder that stands in front of every export**, so what Read says a code
+holds is what the gate would have accepted, and an image with nothing in it is told it has nothing
+rather than given a guess; a photograph lit unevenly gets one second attempt with the exposure
+adjusted, and the screen says when that is what found it. What the bytes mean is written by the same
+functions the Create screen uses, so a code that was read and a code that was made are described in
+one voice — including a domain in another script, shown as a person reads it beside the form it
+resolves as, which makes true on both screens the claim this file has made since the first slice. A
+Wi-Fi password is masked until it is revealed, a link found in an image is shown and never followed,
+and "would it scan at 20 mm" is answered as what it is: arithmetic about a print that does not exist
+yet, deciding nothing. Nothing that is read is kept — no row, no file, no history, not even where
+the image was — because a photograph somebody opened is theirs; what they want to keep goes to the
+Create screen through **Make a code like this**, where saving is a decision they take.
+
+F11 has been the pass over everything already built. The choices a person makes once are now made
+once: a default printed width, a default resolution, a default quiet zone and whether a Wi-Fi
+password is kept with a saved code, set on the Settings screen, kept in the workspace file beside
+the codes themselves, and used as the starting point for the next code. Each control saves as it is
+changed and says so, and a value the product will not take comes back with the limit named, still
+holding what was typed. The theme moved there too, out of the browser's storage, so it travels with
+a workspace copied to another machine — and it is still read before the first paint, so nobody who
+chose dark sees a white window on the way in. On the screens themselves: the code, its verdict and
+the ways out now stay in view while the look is edited below them, the four ways out sit as a block
+instead of leaving Copy alone on a line of its own, and the navigation separates making codes from
+the product's own screens. And it is proved rather than reviewed — every one of the seven screens is
+opened in both themes on every run and checked by the industry's automated accessibility checker,
+where a violation fails the build, then driven by real key presses from an empty window to the
+export button, into the library and through a dialog that has to give the focus back.
+
+1.0.0 is released: the eight payload kinds, the logo placement engine, the scan gate in front of
+every way out, the look and the printed size, the library and brand kits, batch, Read, and the
+defaults that mean a choice is made once. What comes after it is not decided here. Corrections land
+as 1.0.x — bug fixes only, no schema change and no new surface — by the flow in
+[`VERSIONING.md`](VERSIONING.md) and the checklist in [`docs/RELEASE.md`](docs/RELEASE.md). A minor
+release is opened when there is a theme worth opening one for, and this page will say so when there
+is.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 
-## What is planned
+## What 1.0.0 holds
 
-For 1.0.0, and nothing beyond it:
+In one list, for somebody deciding whether to install it:
 
-- **Payload kinds** — web link (with presets for WhatsApp, Instagram, LinkedIn and Google
-  Maps), plain text, e-mail, phone, SMS, Wi-Fi network, geographic location and contact card
-  (vCard 3.0 and 4.0, MECARD for density). Each kind validates and escapes to its own format,
-  and the preview says in one line what scanning it will do.
+- **Payload kinds** — web link, plain text, e-mail, phone, SMS, Wi-Fi network, geographic
+  location and contact card (vCard 3.0 and 4.0, MECARD for density). Each kind validates and
+  escapes to its own format, and the preview says in one line what scanning it will do.
 - **The logo** — imported from PNG, JPEG, GIF (first frame, and it says so), WebP or SVG;
   centred on a plate (none, square, rounded, circle) with its own padding and colour; sized
   automatically to the largest the code can carry, or smaller by choice — never larger.
@@ -131,8 +293,9 @@ The UI contract is [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md).
   fetches it, which needs a network connection **once, at install time**. Nothing the product
   does afterwards touches a network.
 
-Installers, when they arrive, will not be code-signed, so SmartScreen will warn on first run.
-Verify the download came from the Releases page of this repository.
+The installers on the Releases page are not code-signed, so SmartScreen warns on first run.
+Verify the download came from the Releases page of this repository and that its SHA-256 matches
+the release notes.
 
 Building needs Node.js 22+, a stable Rust toolchain with the MSVC build tools, and PowerShell 7.
 
@@ -151,18 +314,17 @@ Run the full validation battery exactly as CI does:
 npm run gates
 ```
 
-Neither command works yet: F0 has not landed, so there is no application to start and no gate
-script to run. Until it does, this repository holds the specification, the decisions and the
-contracts.
-
 ## Roadmap
 
 | Release   | Theme               | Contents                                                                                                  |
 | --------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
-| **1.0.0** | The mark            | the list above                                                                                            |
+| **1.0.0** | The mark            | **released 2026-09-14** — the list above, on the Releases page                                            |
 | 1.1.0     | The card            | business-card and badge layouts (print-ready PDF sheets) · frames with a call to action · calendar events |
 | 1.2.0     | The payment         | PIX BR Code (EMV, CRC16) · EPC SEPA · payload templates per country                                       |
 | 2.0       | Only if it earns it | macOS and Linux                                                                                           |
+
+The rows after 1.0.0 are candidate themes, not commitments: the next minor is opened when there is
+a theme worth opening one for, and this page says so when it is.
 
 Deliberately out of scope: **dynamic codes are refused on principle, not deferred** — a dynamic
 code is a redirect through a server that learns who scanned what, when, and that is precisely the

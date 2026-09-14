@@ -50,7 +50,9 @@ placed by an engine that knows which modules the code cannot lose.
    plain text, e-mail, phone, SMS, Wi-Fi network, geographic location, and **contact card**
    (vCard 3.0 and 4.0, MECARD for density). Each kind validates and escapes to its format, and
    the preview says in one line what scanning it will do: _"Opens example.com"_, _"Joins
-   Office-5G"_, _"Adds Ana Souza to contacts"_.
+   Office-5G"_, _"Adds Ana Souza to contacts"_. A number on a card carries its country code —
+   a card travels, and a national number is a local number on whatever phone reads it
+   ([ADR-022](architecture/ADR.md#adr-022)).
 2. **The logo** — import PNG, JPEG, GIF (first frame, and it says so), WebP and SVG. Centred on
    a plate (none, square, rounded, circle) with its own padding and colour. Sized automatically
    to the largest the code can carry, or smaller by choice — never larger.
@@ -125,20 +127,23 @@ the export command write the file — and it writes the bytes it verified, not a
 verifier built from the same code as the encoder would share its mistakes; independence is the
 point.
 
-**The placement engine** (ADR-013): the logo is a region of the matrix, not an image on top.
-The engine knows every function pattern — the three finders and their separators, timing, the
-alignment patterns, format and version information, the dark module — and **never covers one**.
+**The placement engine** (ADR-013; the middle alignment pattern, ADR-024): the logo is a region
+of the matrix, not an image on top. The engine knows every function pattern — the three finders
+and their separators, timing, the alignment patterns, format and version information, the dark
+module — and **never covers one**, with the single exception that second record names.
 It sizes the logo from the error-correction budget with a safety factor, knocks out the covered
 modules so no half-module shows at the edge of the plate, re-evaluates the mask with the knock-out
 in place, and raises the error-correction level if the logo needs it. A logo that cannot fit is
 refused with the reason, not squeezed.
 
-**Candidate libraries** (ADR-012, Proposed — each confirmed by licence, maintenance and the dependency audit
-before adoption, and recorded in `NOTICE`): encoder — Project Nayuki's QR Code generator (MIT, a
-reference-quality implementation) vendored into `domain/`; decoder in the host — `rqrr` (pure
-Rust, a port of quirc) or `zxing-cpp`; SVG — `usvg`/`resvg`; raster — `image`; PDF — `pdf-writer`
-or `svg2pdf`. The end-to-end suite decodes exported files with **a third** decoder (`jsQR` or
-`zxing-wasm`) in the test process.
+**Libraries** (ADR-019, Accepted — versions, licences and the reasoning are in that record, and
+the list a person sees is `NOTICE`): the encoder is Project Nayuki's QR Code generator (MIT),
+vendored into `domain/` and pinned to an upstream commit by hash; the decoder in the host is
+`rqrr` (pure Rust, a port of quirc); SVG is rasterised by `resvg`/`usvg` with default features
+off, so no font or raster decoder is compiled in; PNG in and out is `image` with only the `png`
+feature. The end-to-end suite decodes exported files with **a third** decoder, `jsQR`, in the test
+process — a lineage shared with neither of the other two. PDF is not chosen yet: it belongs to
+F7.
 
 The schema is in [`DATA_MODEL.md`](DATA_MODEL.md).
 
@@ -172,10 +177,13 @@ opened, and holds:
 - **Raster is hostile.** Dimensions read from the header and capped before a pixel is decoded
   (decompression bombs); frame count capped for GIF; a truncated or mislabelled file is a sentence.
 - **Payloads are escaped to their format** — vCard, MECARD and Wi-Fi each have reserved
-  characters, and a name with a semicolon must not become a second field.
+  characters, and a name with a semicolon must not become a second field; in a `mailto:`, the name
+  before the @ is percent-encoded exactly as the subject and the body are, so a `?` inside an
+  address cannot become a second field either.
 - **Links are shown as they will resolve.** Only `http` and `https` (and the payload kinds' own
-  schemes: `mailto`, `tel`, `sms`, `geo`, `WIFI`); an internationalised domain is shown in Unicode
-  **and** punycode, so a look-alike domain is visible before it is printed.
+  schemes: `mailto`, `tel`, `SMSTO`, `geo`, `WIFI`); an internationalised domain is shown in
+  Unicode **and** punycode — `bücher.example (xn--bcher-kva.example)` — on the Create screen and
+  on Read alike (F10), so a look-alike domain is visible before it is printed.
 - **Batch files stay in the folder chosen.** File names built from CSV cells are sanitised; no path
   separator, no `..`, no reserved Windows name reaches the filesystem. The batch **report** is
   itself a CSV and is written with formula injection neutralised (`=`, `+`, `-`, `@`).
@@ -214,6 +222,11 @@ tsc --noEmit · eslint (react-hooks/rules-of-hooks = ERROR) · prettier --check 
 ```
 
 One script, `npm run gates`, run identically by a developer and by CI.
+
+The host's randomised round-trips are the ten-thousand-code corpus, and they sit outside that script
+on purpose: `npm run corpus` generates the corpus and decodes it in a release build, on demand and
+once a week, because minutes per run do not belong in a gate (ADR-020). The sweep of every version,
+level, mode and mask stays in `vitest`, where every push meets it.
 
 ## 7. Vertical slices
 

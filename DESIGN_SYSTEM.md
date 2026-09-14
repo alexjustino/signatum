@@ -71,6 +71,20 @@ is about to print. Our palette is checked for a person reading a screen in two t
 code's palette is checked for a phone reading ink in a dim room. Two questions, two gates, and
 neither answers for the other.
 
+**A swatch shows the print colour, and that is where a literal is allowed.** The controls that
+choose the code's colours show those colours: a swatch, and the hex value beside it. A literal
+therefore reaches the screen in the one place §2 otherwise forbids one, and it is allowed for the
+same reason the preview is not themed — a swatch drawn from a token would be showing a colour
+nobody chose. Everything around it is themed as usual, and the swatch takes its own border from
+the token layer so that a near-white choice still has an edge against the card it sits on.
+
+**The gate over those two colours is the domain's, not axe's.** axe-core judges the interface —
+labels, controls, states, in both themes — and it is right to fail text that cannot be read. It has
+no opinion worth having about ink, and a swatch is not text. The 4.5 the code's colours must clear
+is the one in `domain/`, decided before the code is built and refused with a sentence
+(ADR-025); the 4.5 the labels around it must clear is the one axe measures. Same number, two
+readers, two gates.
+
 ### A view says what it left out
 
 A screen that cannot show every row does not quietly show the rest. A batch that made 198 files
@@ -140,6 +154,30 @@ component picks one rather than inventing a shadow.
 controls read `--density-row` and `--density-control`; they never hard-code a height. Changing
 one attribute on `<html>` re-sizes the whole product.
 
+### The thing being edited stays in view
+
+A screen where the form is long and the result is at the top is a screen where the result scrolls
+away exactly when it starts to matter. The pane that carries the result — on Create, the code, its
+scan-gate verdict and the ways out — is `lg:sticky lg:top-6 self-start` beside the form, so it
+holds its place while the person works down the column beside it. `self-start` is not optional: a
+grid item stretched to the row's height has nothing left to stick to, and the rule silently does
+nothing. A sticky pane taller than the window would pin its top and put its bottom out of reach, so
+the pane is also a named scroll region — `lg:max-h-[calc(100dvh-5rem)] lg:overflow-y-auto`, with
+`tabIndex={0}` and an `aria-label` that says what it holds — which is one more Tab stop, and worth
+it. It is a wide-window rule only — on a narrow window the two panes are one column and the result
+belongs where the reading order puts it, not pinned over the form.
+
+### A row of actions becomes a grid before it wraps one button alone
+
+A wrapped row that leaves the last button by itself on a second line reads as a different kind of
+action rather than the last of four, and it is the default window width that does it. A row of
+peer actions is `grid grid-cols-2`, and `lg:flex` only where the column can hold the whole row
+without wrapping — Create's export row, five buttons in half of `max-w-5xl`, cannot, so it stays a
+grid at every width, with its fifth button spanning the last row (`col-span-2`) so the odd one out
+is a deliberate wide button and not a wrap. The order is the same either way — the destructive or
+secondary one last, never promoted by the wrap. `flex-wrap` on a row of peers is what this rule
+replaces.
+
 ## 5. Icons
 
 **Fluent UI System Icons**, and only that set. Mixing icon families is immediately visible and
@@ -153,9 +191,12 @@ cannot be undone later without touching every screen.
 
 ### The mark
 
-**Not yet decided — and not invented here.** The product needs a mark in F0, because an
-installer has to carry one, and it is finished in F11 with the rest of the Fluent polish. Until
-then this section states what the mark has to satisfy, not what it looks like:
+**A seal with a check inside it.** The mark is a ring — the signet pressed into wax to prove who
+sent a thing — and, inside it, the check: the proof that the code scans. It is one file,
+`src/assets/mark.svg`, and the same drawing is the window icon, the installer icon and the
+title-bar mark, so there is nothing to keep in step. Two shapes and one accent, on a ground with
+the Windows 11 corner radius. The ring is a circle on purpose: a square ring with a square inside
+would read as a QR finder pattern. What it had to satisfy, and does:
 
 - **Monochrome-capable.** It must read as one colour before it reads as two: a taskbar, an
   installer, a black-and-white print of About and a disabled state will all take it that way.
@@ -215,26 +256,73 @@ component cannot forget it. Nothing animates in a loop.
   `useFocusTrap`.
 
 **Held by gates, not by review:** `src/styles/tokens.test.ts` checks every text-on-surface pair
-in both themes; the end-to-end suite runs axe-core on every screen in both themes, where serious
-and critical are failures, and drives the product by keyboard alone (`docs/SPEC.md` §6, slice
-F11).
+in both themes; the end-to-end suite runs axe-core, every rule on, on every screen in both themes,
+where **any** violation is a failure, and drives the product by keyboard alone with real key
+presses — the rail, the payload, the export button, a saved code opened from the library, and a
+dialog that holds focus and gives it back (`docs/SPEC.md` §6, slice F11).
 
 ## 8. The canonical primitives
 
 Everything lives in `src/ui/`. If a screen needs something that is not here, it is built here
 first — not inline in the feature.
 
-`Button` · `IconButton` · `SplitButton` · `Input` · `SearchBox` · `Select` · `Combobox` ·
-`DatePicker` · `TimePicker` · `Checkbox` · `Radio` · `Toggle` · `Slider` · `Badge` · `Chip` ·
-`Avatar` · `Card` · `Modal` · `ConfirmDialog` · `Drawer` · `Flyout` · `Tooltip` · `Menu` ·
-`ContextMenu` · `CommandBar` · `TabStrip` · `Breadcrumb` · `ProgressBar` · `ProgressRing` ·
-`Skeleton` · `EmptyState` · `Toast` · `InfoBar` · `Kbd` · `Resizer` · `VirtualList`
+`Button` · `IconButton` · `SplitButton` · `Input` · `TextArea` · `SearchBox` · `Select` ·
+`Combobox` · `DatePicker` · `TimePicker` · `Checkbox` · `Radio` · `Toggle` · `Slider` ·
+`Badge` · `Chip` · `Avatar` · `Card` · `Modal` · `ConfirmDialog` · `Drawer` · `Flyout` ·
+`Tooltip` · `Menu` · `ContextMenu` · `CommandBar` · `TabStrip` · `Breadcrumb` ·
+`ProgressBar` · `ProgressRing` · `Skeleton` · `EmptyState` · `Toast` · `InfoBar` · `Kbd` ·
+`Resizer` · `VirtualList`
 
-Present today: none — F0 brings the first of them. Each of the rest arrives with the slice that
-first needs it, and arrives _here_, never inline in a feature.
+Present today, because a screen uses them: `Button`, `Input`, `TextArea`, `Select`, `Checkbox`,
+`Card`, `TabStrip`, `ProgressBar`, `InfoBar`, `EmptyState`, `Modal` and `ConfirmDialog`, beside this
+product's own `CodePreview`, `ScanGateStatus` and `LogoPlatePicker`. Each of the rest arrives with
+the slice that first needs it, and arrives _here_, never inline in a feature.
+
+`TextArea` arrived with F2, for the fields that hold more than one line — a message, a body, plain
+text. It is an `Input` that grew: both take their surface from `fieldSurface.ts`, so a single-line
+and a multi-line field cannot drift into two different-looking controls, and it resizes vertically
+only, because a field that can be dragged wider than its column breaks the layout it sits in.
+
+`TabStrip` takes a `label`, and it is **required**: a strip with no accessible name is a row of
+words to anybody who is not looking at it. On Create, the strip of payload kinds is named for the
+question it answers — _"What the code does"_.
 
 A shortcut shown beside the thing it triggers is a `Kbd`, everywhere, so a person learns to
 read it once.
+
+**F6 added no primitive.** The look is chosen with controls already on the list: a `Select` for
+each shape and an `Input` for each colour and for the margin. A shape is offered by name rather
+than by a row of pictures, for the reason the plate picker is — "Circle" is a word before it is a
+picture — and grouping those controls together is a `Card`, not a new control. A slice that needs
+nothing new is the list working.
+
+**F9 brings one control off the list and adds nothing beside it.** `ProgressBar` arrives, because a
+run that writes two hundred files is the first thing in this product long enough to watch. All the
+rest of the batch screen is already here: a `Button` for each dialog, a `Select` for the format, a
+`Card` for each step, an `InfoBar` for a run that did not start, an `EmptyState` before there is a
+plan, and a `TextArea` for rows that arrive without a dialog. Pasting is a door of the product and
+not a way in for the tests (ADR-029): the box is labelled like any other field — _"Rows"_ — it is
+the same control the message and note fields use, and what it holds goes through exactly the parser
+a file goes through.
+
+**`ProgressBar` is a real `<progress>`, its label is required, and the numbers live in a caption
+beside it.** A bar assembled from two `div`s is a picture of a bar: the native element is what a
+screen reader announces as progress, what `value` and `max` mean something to, and what the platform
+draws without being told. It takes a `label` — a moving rectangle with no name says nothing about
+_which_ job is moving — and under it a caption says the count in the words of the thing being
+counted: "137 of 200", which is what a person acts on, where a percentage is what a person converts.
+The bar is shown from the moment the run starts rather than from the first event, because a bar at
+zero is the truth about a batch that has just begun. Indeterminate progress is not a state this
+product has: the plan is known before the first file is written.
+
+**`Modal` and `ConfirmDialog` arrive with F8**, the slice that first has something to destroy. Both
+are copied from the sibling products' implementations rather than reinvented, which is what makes a
+dialog in this product behave like a dialog in those: `role="dialog"` with `aria-modal`, named by
+its own heading, focus moved in on open and given back to whatever opened it on close, Tab held
+inside it by `useFocusTrap` (§7), and Escape closing it. `ConfirmDialog` is `Modal` with the one
+question it exists to ask — see below. Nothing else in F8 is new: the library's list, its rows and
+its empty state are a `Card`, a `Button`, an `EmptyState` and the product's own `CodePreview`, and a
+brand kit is chosen with a `Select`.
 
 ### What this product adds to the list
 
@@ -251,16 +339,82 @@ before** — a primitive built ahead of the screen that needs it is a guess with
   **the export button's gate, not a decoration**: it owns that button's disabled state, it sits
   beside it, and it is announced when it changes. It never shows a state that did not come back
   from a decoder.
-- **The physical-size input** (`PhysicalSizeInput`, F7) — a measurement with its unit,
-  millimetres or inches, the unit inside the control rather than a label beside it, and the
-  **module size read out** beneath it in the same unit. It takes the caution state when the
-  modules fall under the readable threshold, and names the threshold when it does.
+- **The size card** (F7) — not a primitive: a width `Input`, a unit `Select` and a resolution
+  `Select`, composed from the canonical controls, with the **pixels and the module size read out**
+  beneath them in a caption. A width or resolution the domain refuses is named under the control
+  it names, and the dense-code caution keeps naming the threshold from the real printed size.
 - **The logo plate picker** (`LogoPlatePicker`, F4) — the plate shape (none, square, rounded,
-  circle) with its padding and its colour, as one control. Every option is reachable and named
-  by keyboard, and the shape is never carried by the swatch alone.
-- **The batch report table** (`BatchReportTable`, F9) — a summary that **opens onto its rows**:
-  the figure is a button, pressing it lists the rows it counted, and a row that could not be
-  made shows its line number and its reason. A batch total nobody can decompose is a claim.
+  circle), as one control. Every option is reachable and named by keyboard, and the shape is
+  never carried by the swatch alone: "Circle" is a word before it is a picture. **Present today
+  with the shape alone**; the padding is one module and the colour is the background, because
+  until the placement engine (F5) there is nothing for a person to decide about either, and a
+  control invented ahead of that decision is a guess with a type signature.
+- **The logo itself is an overlay, never markup inside the code.** The scene SVG carries the
+  plate — it is part of the code and is rasterised with the modules — but never the logo image.
+  The logo is an `<img>` positioned over the figure, decorative (`alt=""`), not a pointer target,
+  and placed by percentages of the code's own `viewBox` so that the screen and the host draw it
+  in the same box (ADR-023). Nothing a file brought in is ever injected into the SVG this product
+  renders.
+- **The batch plan and the batch report** (F9) — not a primitive, and it is worth saying why,
+  because this document planned one under the name `BatchReportTable`. What shipped is a plain
+  `table` inside the batch feature for the plan, and a plain list for the rows a run did not write:
+  a component with one caller and a name that promises reuse is a promise nothing keeps, and it
+  moves to `src/ui/` on the day a second screen needs it. The **rules** are not optional, though,
+  and they are the ones a primitive would have carried. _A number can be opened_ (§2) is met here
+  by opening it in advance: the counts — "197 written · 2 refused · 1 failed" — are shown with
+  every row they are about underneath them, each with its line number and the sentence that says
+  what happened to it. Nothing is hidden behind a press, because on this screen the rows that did
+  not become files are the reason a person came back to it. The table and the list each carry
+  their own accessible name, for the reason `TabStrip` does. The counts sit in the live region and
+  the rows sit outside it, so what is announced is the summary and not two hundred lines somebody
+  is about to read at their own pace (§7). And a list the screen truncates says so, because the
+  written report keeps every line the table cut (§2, _a view says what it left out_).
+- **The outline over somebody else's picture** (F10) — not a primitive either, and it follows the
+  logo overlay's rule from the other direction. The image a person opened is an `<img>`, shown as it
+  is; where the codes were found is an `<svg>` laid over it, one polygon per code, drawn from the
+  four corners the decoder reported. The corners are in the **source picture's own pixels**, so the
+  overlay's `viewBox` is the width and height the reading reports — the picture the host decoded,
+  and not the natural size of the smaller copy being shown — and the polygons need no arithmetic on
+  this side: the browser scales the drawing exactly as it scales the picture, at any window size and
+  at any zoom, and an outline cannot drift off the code it is about. The overlay is `aria-hidden`,
+  takes no pointer events and is never a target — it is a drawing _about_ the picture, not a control
+  over it — which means it says nothing to anybody who is not looking at it. So **the caption under
+  the image carries the count**, in words: "1200 × 900 px · 2 codes · 41 ms", and each code's own card
+  names which one it is. Nothing from the opened file is ever injected into an SVG this product
+  renders; the picture stays an `<img>` and the outline is markup this product wrote from four
+  numbers.
+- **Revealing a secret is a press, and hiding it is the default** (F10) — a Wi-Fi password read out
+  of somebody's photograph is shown as dots until it is asked for, because a screen can be shared,
+  projected or simply overlooked, and the person who opened the image does not yet know what is in
+  it. The control is a `Button` named for what it will do — **Reveal** becoming **Hide** — beside
+  the field it governs and never instead of it; it carries `aria-pressed` so its state is a fact and
+  not an appearance, and the announcement is that the password is shown or hidden, never the
+  password itself. The masked form is text, not an image of text. The secret never appears in an
+  accessible name, a `title` or a tooltip, where it would be read out by a screen reader that was
+  never asked, and a revealed password goes back to dots when the image is closed or another one is
+  opened: the state belongs to the moment, not to the screen. This is the shape any secret in this
+  product takes from here on, not a Read speciality.
+- **A verdict is a word from a closed list, coloured by token, and the sentence carries the
+  meaning** (F10) — _reads_, _tight_ and _too small_ are the three answers to "would it scan at this
+  size", and there is no fourth (§2, _one word, one meaning_). The word is coloured from
+  `--color-success`, `--color-caution` and `--color-danger` in `tokens.css` — never a literal, never
+  the theme's accent, which belongs to the person's desktop and not to a judgement — and the colour
+  is **redundant by construction**: the sentence beside it says the whole thing in words, "At 20 mm
+  the modules are 0.44 mm — tight; a good camera reads it up close", so a reader who sees no colour
+  at all loses nothing (§2, _severity is never colour alone_). The sentence is written once, in the
+  domain, and the screen shows what it is given: a verdict the interface phrased itself would be a
+  second opinion about somebody's print, and this product has one.
+- **The Defaults card** (F11) — not a primitive either, and the pattern is the part worth keeping.
+  Each control in it is a canonical one — an `Input` for the width, the resolution and the quiet
+  zone, a `Checkbox` for keeping a Wi-Fi password — and **each saves on change**. There is no Save
+  button, because a Save button on a card of independent preferences is a thing to forget to press
+  and a way to lose four changes to one mistake. What a person gets instead is a receipt and a
+  refusal in the same place: **"Saved."** in the caption under the control that changed, and, when
+  the host will not take the value, **the host's own sentence** under that same control — the bound
+  named, in the words the host used, never an interface paraphrase of somebody else's rule (§10).
+  A control the host refused keeps what was typed, so the person can correct it rather than watch
+  it revert. A default is a starting point: it fills the control on the screen that uses it, and
+  changing it there changes that code and not the setting.
 
 ### Asking "are you sure"
 
@@ -268,6 +422,13 @@ before** — a primitive built ahead of the screen that needs it is a guess with
 a destructive action takes the danger tone — with the wording carrying the consequence too,
 never colour alone. `window.confirm` is not themed, not keyboard-consistent, and blocks the
 window's own event loop; it does not appear in this codebase.
+
+F8 is where this first has a subject: deleting a saved code or a brand kit. The dialog names the one
+being deleted, by the name the person gave it, and the confirming button says **Delete** — not "OK",
+which says nothing about what is about to happen. A logo still in use is not a confirmation at all
+but a refusal: it is shown where the removal was asked for, in the sentence the host returned,
+naming the kits and codes that are using it. A dialog asks a question, and there is nothing here to
+ask.
 
 ## 9. The window
 
@@ -282,6 +443,17 @@ automatically via `global.css`.
 **Known gap, tracked rather than hidden.** Snap Layouts — hovering maximise to choose a layout
 — requires native `WM_NCHITTEST` handling that a custom title bar does not get for free.
 Maximising works; the hover flyout does not appear yet.
+
+### The rail
+
+The destinations are ordered **work first, then the product**: Create · Library · Batch · Read,
+then Diagnostics · Settings · About. Between the two groups sits a hairline with
+`role="separator"` — a separator and **never** a disabled button, a heading nobody can reach or an
+empty `div` used as a gap: the grouping has to be a fact for somebody who is listening to the rail
+rather than looking at it, and nothing new may appear in the tab order to say it. Tab order is the
+rail's navigation, as it is everywhere else in this product; after the title bar's three window
+controls, the first Tab lands on the rail's first destination and the current one is a step or two
+away, in reading order — no roving `tabIndex`, nothing that moves under the keyboard.
 
 ## 10. Degrade visibly, never silently
 

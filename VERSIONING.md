@@ -14,9 +14,12 @@ MAJOR . MINOR . PATCH
 
 ## Single source of truth
 
-The version is declared in `src-tauri/tauri.conf.json` and mirrored into `package.json` and
-`src-tauri/Cargo.toml`. `scripts/check-version.mjs` fails if the three disagree, and runs as the
-first gate in `npm run gates` — so a bump that misses a file cannot reach a tag. The About screen
+The version is declared in `src-tauri/tauri.conf.json` and mirrored into `package.json`, its
+lockfile (in two places — `npm version --no-git-tag-version` moves both), `src-tauri/Cargo.toml`
+and `src-tauri/Cargo.lock` (rewritten by the first cargo command, and committed with the bump).
+`scripts/check-version.mjs` fails if any of the six disagree, and runs as the first gate in
+`npm run gates` — so a bump that misses a file cannot reach a tag. The Release workflow adds the
+last check: the tag has to name the version the tree declares, and has to sit on `main`. The About screen
 reads the version from the running binary, never from a constant typed by hand.
 
 ## The database schema version is separate

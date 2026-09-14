@@ -6,3 +6,6 @@ package-lock.json
 LICENSE
 NOTICE
 CODE_OF_CONDUCT.md
+
+# Vendored third-party source, kept byte-for-byte (see src/domain/qr/vendor/VENDORED.md)
+src/domain/qr/vendor/qrcodegen.ts
