@@ -1,9 +1,10 @@
 # Data model
 
 > **Status: `001_init` landed with F0, `002_logos` with F4, `003_export_formats` with F7,
-> `004_library` with F8 and `005_batches` with F9 — schema version 5. The SQL wins over this
-> text.** Every table below is reproduced from the migrations themselves, and the migrations are
-> the authority; a column this text gets wrong is corrected by the SQL, not the other way round.
+> `004_library` with F8, `005_batches` with F9 and `006_settings` with F11 — schema version 6. The
+> SQL wins over this text.** Every table below is reproduced from the migrations themselves, and
+> the migrations are the authority; a column this text gets wrong is corrected by the SQL, not the
+> other way round.
 
 The authoritative schema is `src-tauri/migrations/`. This document explains _why_ it is shaped
 the way it is; the SQL explains what it is.
@@ -29,18 +30,23 @@ the way it is; the SQL explains what it is.
 > A **reading** is not one of these nouns, and that is the decision rather than an omission: Read
 > (F10) opens an image, says what is in it, and keeps nothing — no row, no artefact, no history,
 > not even the path the file came from ([ADR-030](architecture/ADR.md#adr-030)).
+>
+> A **setting** is one of five choices this product keeps for the person using it, by name. Not a
+> place for anything a screen would like to remember: the keys are a closed list the host owns
+> ([ADR-031](architecture/ADR.md#adr-031)).
 
 ## Tables
 
-| Table           | Holds                                                             | Arrives     |
-| --------------- | ----------------------------------------------------------------- | ----------- |
-| `workspace`     | one row: which migration this file is at, and when it was made    | F0, shipped |
-| `verifications` | what a decoder read back from which bytes, and whether it matched | F0, shipped |
-| `logos`         | the normalised logo, its hash and what normalisation changed      | F4, shipped |
-| `codes`         | a payload, a style and a size — one row per saved code            | F8, shipped |
-| `brand_kits`    | a logo, a look and a size, named                                  | F8, shipped |
-| `batches`       | one run over one list of rows                                     | F9, shipped |
-| `batch_rows`    | the report: one append-only row per row that run tried            | F9, shipped |
+| Table           | Holds                                                             | Arrives      |
+| --------------- | ----------------------------------------------------------------- | ------------ |
+| `workspace`     | one row: which migration this file is at, and when it was made    | F0, shipped  |
+| `verifications` | what a decoder read back from which bytes, and whether it matched | F0, shipped  |
+| `logos`         | the normalised logo, its hash and what normalisation changed      | F4, shipped  |
+| `codes`         | a payload, a style and a size — one row per saved code            | F8, shipped  |
+| `brand_kits`    | a logo, a look and a size, named                                  | F8, shipped  |
+| `batches`       | one run over one list of rows                                     | F9, shipped  |
+| `batch_rows`    | the report: one append-only row per row that run tried            | F9, shipped  |
+| `settings`      | five named choices, by key: the theme and the defaults            | F11, shipped |
 
 **Read adds nothing to this list.** F10 reads codes out of images somebody else made and writes no
 row for any of them: no table, no column, no migration, and nothing in the workspace file that says
@@ -51,8 +57,9 @@ saved there as a code like any other.
 together with `brand_kits`. Until then F0 to F7 make codes and prove them without keeping them, on
 the principle that a table nothing writes to is a promise the product has not made yet.
 
-A `settings` table (key and value, an absent key meaning the default) arrives with the settings
-screen. F0's one setting — the theme — lives in the window's own storage until then.
+`settings` is F11's, in `006_settings.sql`, and it is the table F0 promised on the day a second
+setting existed: key and value, an absent key meaning the default. The theme moved into it from the
+window's own storage at the same time ([ADR-031](architecture/ADR.md#adr-031)).
 
 ## `workspace`, and where the schema version lives
 
@@ -428,6 +435,47 @@ would be one relation stored twice, which is the failure mode this document refu
 because the second copy is the one that eventually disagrees. If listing a run's verifications
 without joining `batch_rows` ever earns a column, it arrives in a migration of its own.
 
+## `settings` — shipped with F11
+
+Key and value, in `006_settings.sql`. One row per setting, written by an upsert so a reader never
+finds the moment between a delete and an insert — the moment in which a person has no theme at all.
+
+| Column       | Type | Meaning                                                            |
+| ------------ | ---- | ------------------------------------------------------------------ |
+| `key`        | TEXT | the name of the setting, primary key, 1 to 64 characters           |
+| `value`      | TEXT | what it is set to, as text, at most 4,096 characters               |
+| `updated_at` | TEXT | when it last changed; kept because the column is the upsert's test |
+
+**The SQL bounds the key and the value; it does not enumerate the keys.** There is no `CHECK`
+listing them, for the reason `codes.kind` is bounded by length rather than enumerated: the list
+grows with the interface, and a `CHECK` would need a migration to record a fact the host already
+refuses to get wrong. What the bounds do is hold whatever the list becomes — a key is an
+identifier, a value is a short string — so a workspace edited by something other than this product
+still cannot make the host read a megabyte to find out what the theme is.
+
+**The list itself is in the host, and it is closed** ([ADR-031](architecture/ADR.md#adr-031)):
+`theme`, `default_width_mm`, `default_dpi`, `default_quiet_zone`, `keep_wifi_passwords`, and
+nothing else. A key that is not on it is refused, and so is a value outside what that key may hold,
+with the bound named in the sentence. A test holds the list against the interface, so a preference
+the screen writes and the host does not keep is a red test rather than a choice that silently never
+comes back. **The theme lives here from F11**, out of the browser's storage where F0 left it, with
+the browser's copy kept as a mirror read in exactly one place — synchronously, before the first
+paint, so a person who chose dark is never shown a white window while a file is being opened. The
+table is the authority: it is written first and it corrects the mirror, never the other way round.
+
+**No foreign keys, and nothing secret.** A setting belongs to the person and not to any row, so
+there is nothing for it to point at and nothing to cascade from. And the closed list is what lets
+[`../SECURITY.md`](../SECURITY.md) say plainly that this table holds no secret: a Wi-Fi password is
+never a setting, and the one key that mentions passwords — `keep_wifi_passwords` — holds the word
+`true` or the word `false`. A table that refuses every key but five cannot be used as a store for
+anything else.
+
+**Absence is the answer, not an error.** A key that was never written means the default, which is
+the ordinary state of a workspace nobody has changed anything in. Every value is read through a
+reader that never throws and falls back to the default, because a value SQLite accepted is not
+necessarily a value this build understands — one written by a newer version, or typed into the file
+by hand.
+
 ## Conventions
 
 **Identifiers** are UUID v7, which sort by creation time — `batch_rows` included, where the plan
@@ -510,8 +558,10 @@ rather than guessing. `004_library` is F8's, and takes it to 4: `codes`, `brand_
 on `verifications`, nullable for the same reason — a row written before the library existed was
 about a code that was never saved. `005_batches` is F9's, and takes it to 5: `batches`, `batch_rows`
 and the two triggers that make the report append-only — a migration that only adds tables, so a
-workspace from before the batch existed simply gains them. Version 5 is then the number Diagnostics
-shows and the number the running build states.
+workspace from before the batch existed simply gains them. F10 adds none: Read stores nothing.
+`006_settings` is F11's, and takes it to 6: `settings`, one table and no column on any other, so a
+workspace from before the settings screen gains an empty table and every key in it reads as its
+default. Version 6 is then the number Diagnostics shows and the number the running build states.
 
 There is no down-migration. A mistake is corrected by a new migration, never by rewriting an
 applied one: an applied migration is history, and that history has already run on somebody's

@@ -103,7 +103,16 @@ seriously.
   code is saved without the password and asks for it again when it is reopened, so nothing about
   that network is in the file. Either way the printed code itself carries the password in plain
   text, because that is what a Wi-Fi code is; what this choice governs is only what the workspace
-  keeps afterwards.
+  keeps afterwards. Since F11 the tick starts from a workspace default — "Keep Wi-Fi passwords in
+  saved codes" on Settings, on unless it is turned off — and the Save form can still change it for
+  one code.
+- **The settings table keeps no secret, and cannot be made to.** What a person chooses — the
+  theme, the default width, resolution and quiet zone, and whether Wi-Fi passwords are kept — is a
+  `settings` table of key and value (ADR-031). The keys are a closed list in the host, refused on
+  write **and** on read, and every value is checked against its key's range before it is written;
+  a row that does not fit — a hand-edited file — is reported as unset and never thrown. A password
+  is never a setting: `keep_wifi_passwords` holds the word `true` or `false`. There is nothing in
+  that table worth reading and nothing it can be used to store.
 - **Minimum capabilities, and three doors that read a file.** Tauri 2 capabilities are declared
   explicitly, one by one. Files are read and written **only** through paths the person chose in a
   system dialog; nothing in the product enumerates a directory or follows a path it was not handed.
