@@ -52,10 +52,6 @@ The installers on the Releases page are **not code-signed**, so Windows SmartScr
 first run. Check the SHA-256 in the release notes against the file you downloaded, and download
 only from this repository's Releases page.
 
-<<ADR-024: centre alignment pattern — decided by the owner before the tag. If it is rejected, the
-sentence in the logo-placement entries below about the middle alignment pattern being allowed under
-the plate must be reconciled with the constant's final value.>>
-
 _"Signatum" is a trademark of Alex Justino. The Apache-2.0 licence grants rights to the source
 code; it does not grant permission to use the project name, logo or wordmark to endorse or promote
 derived products (Apache-2.0 §6). "QR Code" is a registered trademark of DENSO WAVE INCORPORATED;

@@ -29,7 +29,7 @@ part that matters most later — the cost we accepted.
 | [021](#adr-021) | One builder per payload kind, and the summary comes from the builder             | Accepted                      |
 | [022](#adr-022) | Three card formats, and a density warning at a nominal size                      | Accepted                      |
 | [023](#adr-023) | The logo is composed by the host into the bytes the gate decodes                 | Accepted                      |
-| [024](#adr-024) | The middle alignment pattern may sit under the plate                             | Proposed                      |
+| [024](#adr-024) | The middle alignment pattern may sit under the plate                             | Accepted                      |
 | [025](#adr-025) | A look is gated before the scan gate, and function patterns are never reshaped   | Accepted                      |
 | [026](#adr-026) | What is written is what was verified, with one named exception                   | Accepted                      |
 | [027](#adr-027) | The scan margin is a report, never a gate                                        | Accepted                      |
@@ -784,14 +784,14 @@ reads the link off it. If the two ever drift, that test fails on the artefact ra
 
 ## ADR-024 — The middle alignment pattern may sit under the plate {#adr-024}
 
-**Status: Proposed.** Every other record here was settled by a table or by a test. This one
-cannot be: no decoder in this repository can say what a phone will do with a symbol whose middle
-alignment pattern is gone. So it is written as the proposal it is, the code carries it behind a
-constant that is on by default, and it is accepted or rejected by the host proof — Alex, with two
-phones, at the printed size (SPEC §6). **Accepting it** makes this the behaviour of every logo on
-those twenty versions and turns the strict mode into an option nobody has to find.
-**Rejecting it** means flipping the constant to `false`, which is one line and no interface at
-all: the engine already knows how to walk past those versions, and a superseding record says why.
+**Status: Accepted** (2026-09-14, by the owner, for the 1.0.0 release). Every other record here
+was settled by a table or by a test. This one could not be: no decoder in this repository can say
+what a phone will do with a symbol whose middle alignment pattern is gone. So it was written as a
+proposal, the code carried it behind a constant that is on by default, and the owner accepted it
+for the release — the phone matrix of the release notes is the host proof it rests on (SPEC §6),
+and a failure there on a version 7–13 code is 1.0.1 work that would supersede this record. As
+accepted, this is the behaviour of every logo on those twenty versions, and the strict mode
+(`ALLOW_CENTRE_ALIGNMENT = false`) is one line nobody has to find.
 
 **Context.** Versions 7–13, 21–27 and 35–40 have an odd number of alignment centres, which puts
 one of them in the middle of the symbol — at the exact centre on most of them, up to four modules
@@ -805,7 +805,7 @@ a fixed printed size, modules under two thirds of the size they were. That is a 
 the smallest pattern on the symbol, and it is paid by every code on twenty of the forty
 versions.
 
-**Decision, proposed.** The plate may cover the middle alignment pattern, and only that one. It
+**Decision.** The plate may cover the middle alignment pattern, and only that one. It
 is left out of the function-pattern map, so the modules under the plate are knocked out with the
 rest and nothing of it shows at the plate's edge; the finders, the separators, both timing
 patterns, every other alignment pattern, the format and version information and the dark module
