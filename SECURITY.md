@@ -77,14 +77,18 @@ seriously.
   than after, and in a code somebody was sent as well as in one somebody is making.
 - **The address inside a code is said out loud, and never refused (1.1, ADR-034).** The host of a
   link, and the domain of an e-mail address, are checked by a pure function in the domain on
-  Create, on the link rows of a batch and on Read, and four things are named in a sentence each: a
+  Create, on the link rows of a batch and on Read, and five things are named in a sentence each: a
   label that mixes alphabets (judged by Unicode's highly restrictive profile, UTS #39 §5.2, so
   Japanese, Chinese and Korean names stay quiet), a label in another alphabet that reads as a Latin
-  word away from its home domains, a known link shortener, and an IP address instead of a name —
+  word away from its home domains, a character that is not a letter, a digit or a hyphen (named by
+  its code point, so a label cannot add words to the sentence that quotes it), a known link
+  shortener, and an IP address instead of a name —
   with the note that a private one opens only on its own network. It is a warning and never a
   gate: nothing is disabled and no verdict changes. Its limits are stated rather than hidden. **It
   is not a phishing database**: it knows nothing about who owns a domain or what a page serves, and
-  a correctly spelled malicious name passes in silence. **It uses no network**: no list is
+  a correctly spelled malicious name passes in silence, as does a swap inside plain ASCII
+  (`paypa1`, `rn` for `m`) or an accented Latin letter that imitates a plain one. On Read every
+  recipient of an e-mail code is checked, not only the first. **It uses no network**: no list is
   downloaded, nothing is looked up and no redirect is followed, so a shortener that is not on its
   fixed list says nothing. Its table of look-alike letters is the lower-case Cyrillic, Greek and
   Armenian letters and the Latin `ɡ` used to imitate domains, not Unicode's whole confusables

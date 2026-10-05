@@ -1575,7 +1575,7 @@ where, and what it does not do.
 
 **Decision.** The host of a link, and the domain of an e-mail address, go through a pure function
 in the domain (`checkHost` and `checkLink` in `src/domain/lookalike.ts`), and each thing it finds is
-one sentence, shown before the code is made and again when a code is read. Four things are named:
+one sentence, shown before the code is made and again when a code is read. Five things are named:
 
 - **A label that mixes alphabets.** `аpple.com`, with a Cyrillic `а`: one letter from another
   alphabet is the cheapest way to make an address that reads as a known one and belongs to somebody
@@ -1584,7 +1584,15 @@ one sentence, shown before the code is made and again when a code is read. Four 
   different address."_ — and otherwise it says that real names rarely mix alphabets in one name.
 - **A label in another alphabet that imitates a Latin word.** `ѕсоре.com` is Cyrillic from end to
   end, so nothing in it is mixed, and every letter of it is drawn like a Latin one: it reads as
-  `scope`. The sentence names the Latin word and says it is a different address.
+  `scope`. The sentence names the Latin word and says it is a different address. A Latin letter that
+  is not the plain one — `ɡ`, U+0261, in `ɡoogle.com` — is named the same way.
+- **A character that is not a letter, a digit or a hyphen.** A host name needs none, and every one of
+  them can be drawn as punctuation that is not there: a fraction slash in `bank.com⁄login.evil.com`
+  makes a host that reads as a path on `bank.com`. Kana that look like a slash or a dash count too
+  when they stand alone among Latin letters (`paypalーlogin.com`); inside a Japanese name they are
+  letters and say nothing. The sentence names each character by its code point, `U+2044`, and every
+  label quoted in any sentence has such characters written that way, so a label cannot add words,
+  quotes or spaces to the sentence that quotes it.
 - **A known link shortener.** `bit.ly`, `t.co`, `tinyurl.com` and the rest of a fixed list
   (`SHORTENERS`), matched as the host or a parent of it, so `www.tinyurl.com` counts and
   `notbit.ly.example.com` does not. A shortener is a dynamic code somebody else made: the printed
@@ -1592,8 +1600,9 @@ one sentence, shown before the code is made and again when a code is read. Four 
   day of the print run and every day after. It is the thing this product refuses to make
   ([ADR-014](#adr-014)), and the person holding the code deserves to know when it is in there.
 - **An IP address instead of a name.** A raw address tells nobody reading it whose server it is.
-  When it is on a private network — `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, loopback and
-  link-local, and their IPv6 counterparts — the sentence says what somebody printing it most needs
+  When it is on a private network — `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, the
+  carrier-grade `100.64.0.0/10`, `0.0.0.0/8`, loopback and link-local, their IPv6 counterparts, and an
+  IPv4 address carried inside IPv6 — the sentence says what somebody printing it most needs
   to hear: it opens only on that network, and not from a phone outside it.
 
 What is judged is the host a URL parser finds: the one the summary names and the phone will open.
@@ -1628,8 +1637,10 @@ word, and under `.gr` it is a Greek address; the same letters under `.com` read 
 and that is what a look-alike is made of. So a label written wholly in Cyrillic, Greek or Armenian
 that reads as a Latin word is named unless its top-level domain is one where that alphabet is at
 home — the country-code domains of the countries that write it, and the top-level domains written
-in it (`HOME_DOMAINS`). It is the rule browsers apply to whole-script confusables, and without it
-the corpus row `οικο.gr` would be a false alarm about somebody's own language. A mixture is named
+in it (`HOME_DOMAINS`). It is the idea browsers apply to whole-script confusables, kept narrower
+than they do: a country-code domain that is sold to everybody — `.me`, `.am` — is nobody's home and
+exempts nothing. Without the rule the corpus row `οικο.gr` would be a false alarm about somebody's
+own language. A mixture is named
 wherever it is: a Latin word with one Cyrillic letter in it is a word in no language.
 
 **The corpus is the specification.** `src/domain/lookalike.test.ts` lists hosts with the warnings
@@ -1647,8 +1658,9 @@ Greek and Armenian letters, and the Latin `ɡ`, that are actually used to imitat
 (`IMITATES`), not Unicode's
 whole confusables table. A mixed label that imitates a word with a letter not on it is still named
 as a mixture, but the sentence cannot say which word it reads as; a label written wholly in another
-alphabet with such a letter says nothing. Letters of an alphabet outside the fifteen the guard knows
-are not counted at all. The whole table runs to thousands of entries, most of them characters no
+alphabet with such a letter says nothing. Latin letters with an accent or a dot that imitate the
+plain one (`ạpple`, `lınkedin`), and those built with combining marks, are not in it and say
+nothing. Letters of an alphabet outside the fifteen the guard knows are not counted at all. The whole table runs to thousands of entries, most of them characters no
 registry accepts in a domain, and a guard that named every theoretical confusion would be the mark
 that is always on ([`DESIGN_SYSTEM.md`](../../DESIGN_SYSTEM.md) §2).
 
@@ -1660,9 +1672,12 @@ says it is: the guard names what it found, and it has no "this address is fine".
 
 **Third cost: it is not a phishing filter.** It knows nothing of who owns a domain, of whether a
 correctly spelled name is malicious, or of whether a page changed after the code was printed. An
-ordinary-looking `.com` that serves a fake login page passes in silence. What it does is narrower,
-and can be checked against its corpus: it says the four things an address can be that a person
-cannot see by looking at it.
+ordinary-looking `.com` that serves a fake login page passes in silence, and so does a swap that
+stays inside plain ASCII — `paypa1` for `paypal`, `rn` for `m`. What it does is narrower, and can be
+checked against its corpus: it says the five things an address can be that a person cannot see by
+looking at it. On Read an e-mail code is checked on every address it writes to — the list before
+the `?` and the `to`, `cc` and `bcc` fields after it — so a second recipient cannot hide behind the
+first.
 
 **Fourth cost: it reads links and e-mail domains, and nothing else.** The link and the e-mail
 address inside a contact card are not checked — not on Create, not in a batch of contact cards, not
