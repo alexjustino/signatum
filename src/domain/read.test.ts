@@ -128,6 +128,24 @@ describe('describeBytes — the address inside the code', () => {
     expect(read.warnings[0]).toMatch(/mixes Latin and Cyrillic letters/);
   });
 
+  it('checks every recipient of an e-mail, not only the first', () => {
+    for (const text of [
+      'mailto:a@аpple.com,b@example.com',
+      'mailto:b@example.com,a@аpple.com',
+      'mailto:?to=a@аpple.com',
+      'mailto:b@example.com?cc=a@аpple.com',
+      'mailto:b@example.com?subject=hi&bcc=a@аpple.com',
+    ]) {
+      expect(describeBytes(enc(text)).warnings[0], text).toMatch(/mixes Latin and Cyrillic/);
+    }
+  });
+
+  it('reads a malformed escape in an e-mail instead of failing', () => {
+    const read = describeBytes(enc('mailto:%E0%A4%A'));
+    expect(read.kind).toBe('email');
+    expect(read.summary).toBe('Writes to %E0%A4%A');
+  });
+
   it('says nothing about an ordinary link or a code that is not an address', () => {
     expect(describeBytes(enc('https://example.com/menu')).warnings).toEqual([]);
     expect(describeBytes(enc('tel:+5511912345678')).warnings).toEqual([]);

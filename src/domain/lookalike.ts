@@ -15,7 +15,7 @@
 
 import { decodePunycodeLabel } from './punycode';
 
-export type HostWarningKind = 'mixed-script' | 'imitation' | 'shortener' | 'ip-address';
+export type HostWarningKind = 'mixed-script' | 'imitation' | 'symbol' | 'shortener' | 'ip-address';
 
 export interface HostWarning {
   kind: HostWarningKind;
@@ -111,20 +111,17 @@ const IMITATES: Readonly<Record<string, string>> = {
  * reported as tricks.
  */
 const HOME_DOMAINS: Readonly<Record<string, readonly string[]>> = {
+  // Country codes of countries that write Cyrillic, and the Cyrillic domains. Not `.me`, `.rs`
+  // or `.mk` and the like: those are sold to everybody, and a home exemption there is an
+  // exemption for anybody.
   Cyrillic: [
     'ru',
     'su',
     'by',
     'ua',
     'kz',
-    'kg',
-    'tj',
     'bg',
-    'rs',
-    'mk',
-    'mn',
-    'me',
-    'ba',
+    'uz',
     'рф',
     'бг',
     'срб',
@@ -135,8 +132,9 @@ const HOME_DOMAINS: Readonly<Record<string, readonly string[]>> = {
     'мкд',
     'рус',
   ],
-  Greek: ['gr', 'cy', 'ελ', 'ευ'],
-  Armenian: ['am', 'հայ'],
+  Greek: ['gr', 'ελ'],
+  // `.am` is sold worldwide as a word, so only the Armenian-script domain is home.
+  Armenian: ['հայ'],
 };
 
 /** Services whose links are redirects somebody else controls. Matched as the host or its parent. */
@@ -178,6 +176,48 @@ function scriptsIn(label: string): Set<string> {
   return found;
 }
 
+/**
+ * Kana that look like a slash or a dash. In a Japanese name they are letters; standing alone among
+ * Latin letters they are a separator that is not one — `bank.comノlogin` — and are treated as the
+ * symbol they are being used as.
+ */
+const KANA_SEPARATORS = new Set(['ノ', 'ソ', 'ン', 'ー', 'ヽ', 'ゝ', 'ヾ', 'ゞ']);
+
+/**
+ * The characters of a label that are not a letter, a digit or a hyphen — or that are kana used
+ * as separators. A host name needs none of them, and every one of them can be drawn to look like
+ * punctuation that is not there.
+ */
+function symbolsIn(label: string): string[] {
+  const letters = [...label];
+  const otherKana = letters.some(
+    (c) =>
+      !KANA_SEPARATORS.has(c) && /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u.test(c),
+  );
+  const found: string[] = [];
+  for (const c of letters) {
+    const symbol = !/[\p{L}\p{N}-]/u.test(c) || (KANA_SEPARATORS.has(c) && !otherKana);
+    if (symbol && !found.includes(c)) found.push(c);
+  }
+  return found;
+}
+
+/** A code point the way a reader can look it up: `U+2044`. */
+function codePoint(c: string): string {
+  return `U+${(c.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}`;
+}
+
+/**
+ * The label as it goes into a sentence: anything that is not a letter, a digit or a hyphen is
+ * written as its code point, so a label cannot add words, quotes or spaces to the sentence it is
+ * quoted in.
+ */
+function shown(label: string): string {
+  let out = '';
+  for (const c of label) out += /[\p{L}\p{N}-]/u.test(c) ? c : `[${codePoint(c)}]`;
+  return out;
+}
+
 function allowedMixture(scripts: Set<string>): boolean {
   if (scripts.size <= 1) return true;
   return ALLOWED_MIXTURES.some((allowed) => [...scripts].every((s) => allowed.has(s)));
@@ -208,7 +248,9 @@ function ipv4(host: string): number[] | null {
 
 function privateIpv4([a, b]: number[]): boolean {
   return (
+    a === 0 ||
     a === 10 ||
+    (a === 100 && (b ?? 0) >= 64 && (b ?? 0) <= 127) ||
     a === 127 ||
     (a === 172 && (b ?? 0) >= 16 && (b ?? 0) <= 31) ||
     (a === 192 && b === 168) ||
@@ -218,6 +260,13 @@ function privateIpv4([a, b]: number[]): boolean {
 
 function privateIpv6(host: string): boolean {
   const bare = host.replace(/^\[|\]$/g, '').toLowerCase();
+  // An IPv4 address carried in IPv6, `::ffff:c0a8:1`, is as private as the IPv4 one it carries.
+  const mapped = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(bare);
+  if (mapped !== null) {
+    const high = parseInt(mapped[1] ?? '0', 16);
+    const low = parseInt(mapped[2] ?? '0', 16);
+    return privateIpv4([high >> 8, high & 0xff, low >> 8, low & 0xff]);
+  }
   return bare === '::1' || /^f[cd]/.test(bare) || /^fe[89ab]/.test(bare);
 }
 
@@ -257,6 +306,13 @@ export function checkHost(host: string): HostWarning[] {
     .map((raw) => (raw.startsWith('xn--') ? (decodePunycodeLabel(raw.slice(4)) ?? raw) : raw));
   const topLevel = labels.at(-1) ?? '';
   for (const label of labels) {
+    const symbols = symbolsIn(label);
+    if (symbols.length > 0) {
+      warnings.push({
+        kind: 'symbol',
+        sentence: `“${shown(label)}” contains ${symbols.map(codePoint).join(', ')}, which ${symbols.length === 1 ? 'is' : 'are'} not a letter, a digit or a hyphen: a name with ${symbols.length === 1 ? 'it' : 'them'} in can be drawn to look like a different address.`,
+      });
+    }
     const scripts = scriptsIn(label);
     const imitated = skeleton(label);
     const imitatesLatin = imitated !== label && /^[a-z0-9-]+$/.test(imitated);
@@ -264,8 +320,8 @@ export function checkHost(host: string): HostWarning[] {
       warnings.push({
         kind: 'mixed-script',
         sentence: imitatesLatin
-          ? `“${label}” mixes ${listOf(scripts)} letters: it reads as “${imitated}”, but it is a different address.`
-          : `“${label}” mixes ${listOf(scripts)} letters in one name, which real names rarely do.`,
+          ? `“${shown(label)}” mixes ${listOf(scripts)} letters: it reads as “${imitated}”, but it is a different address.`
+          : `“${shown(label)}” mixes ${listOf(scripts)} letters in one name, which real names rarely do.`,
       });
     } else if (
       imitatesLatin &&
@@ -275,8 +331,8 @@ export function checkHost(host: string): HostWarning[] {
         kind: 'imitation',
         sentence:
           scripts.size === 1 && scripts.has('Latin')
-            ? `“${label}” uses a letter that only looks like a plain Latin one: it reads as “${imitated}”, but it is a different address.`
-            : `“${label}” is written in ${listOf(scripts)} letters that look like the Latin “${imitated}”: it is a different address from the one it resembles.`,
+            ? `“${shown(label)}” uses a letter that only looks like a plain Latin one: it reads as “${imitated}”, but it is a different address.`
+            : `“${shown(label)}” is written in ${listOf(scripts)} letters that look like the Latin “${imitated}”: it is a different address from the one it resembles.`,
       });
     }
   }

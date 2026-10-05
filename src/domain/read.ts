@@ -91,18 +91,51 @@ export function describeBytes(bytes: Uint8Array): ReadDescription {
 function warningsFor({ kind, content }: Omit<ReadDescription, 'warnings'>): string[] {
   if (kind === 'link') return checkLink(content).map((w) => w.sentence);
   if (kind === 'email') {
-    const address = content.slice('mailto:'.length).split('?')[0] ?? '';
-    const domain = address.slice(address.lastIndexOf('@') + 1);
-    if (address.lastIndexOf('@') < 0 || domain.length === 0) return [];
-    try {
-      return checkHost(new URL(`http://${decodeURIComponent(domain)}`).hostname).map(
-        (w) => w.sentence,
-      );
-    } catch {
-      return [];
+    const sentences = new Set<string>();
+    for (const address of recipients(content)) {
+      const at = address.lastIndexOf('@');
+      const domain = address.slice(at + 1);
+      if (at < 0 || domain.length === 0) continue;
+      try {
+        for (const w of checkHost(new URL(`http://${domain}`).hostname)) sentences.add(w.sentence);
+      } catch {
+        /* not a host a URL parser accepts: nothing to say about it */
+      }
     }
+    return [...sentences];
   }
   return [];
+}
+
+/**
+ * Every address a `mailto:` writes to (RFC 6068): the comma-separated list before the `?`, and
+ * the `to`, `cc` and `bcc` fields after it. A code that hides a second address behind the first
+ * is checked on both.
+ */
+function recipients(content: string): string[] {
+  const body = content.slice('mailto:'.length);
+  const query = body.indexOf('?');
+  const head = query < 0 ? body : body.slice(0, query);
+  const found = head.split(',').map(safeDecode);
+  if (query >= 0) {
+    for (const pair of body.slice(query + 1).split('&')) {
+      const eq = pair.indexOf('=');
+      const key = safeDecode(eq < 0 ? pair : pair.slice(0, eq)).toLowerCase();
+      if (['to', 'cc', 'bcc'].includes(key) && eq >= 0) {
+        found.push(...safeDecode(pair.slice(eq + 1)).split(','));
+      }
+    }
+  }
+  return found.map((a) => a.trim()).filter((a) => a.length > 0);
+}
+
+/** Percent-decoding that never throws: a malformed escape is shown as it was written. */
+function safeDecode(text: string): string {
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
 }
 
 function describeContent(bytes: Uint8Array): Omit<ReadDescription, 'warnings'> {
@@ -139,7 +172,7 @@ function describeContent(bytes: Uint8Array): Omit<ReadDescription, 'warnings'> {
     const address = text.slice(7).split('?')[0] ?? '';
     return {
       kind: 'email',
-      summary: `Writes to ${decodeURIComponent(address)}`,
+      summary: `Writes to ${safeDecode(address)}`,
       details: [],
       content: text,
       sensitive: false,

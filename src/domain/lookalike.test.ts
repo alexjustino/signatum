@@ -42,6 +42,16 @@ describe('checkHost — the corpus', () => {
     ['ροκ.example', ['imitation']],
     // Two alphabets that are not a known mixture, without an imitation.
     ['shopмагазин.com', ['mixed-script']],
+    // A separator that is not one: a fraction slash, a division slash, kana drawn as / or -.
+    ['bank.com⁄login.evil.com', ['symbol']],
+    ['bank.com∕login.evil.com', ['symbol']],
+    ['bank.comノlogin.evil.com', ['symbol']],
+    ['paypalーlogin.com', ['symbol']],
+    // Kana in a Japanese name are letters, not separators.
+    ['ソニー.jp', []],
+    // A global domain is nobody's home: `.me` and `.am` exempt nothing.
+    ['раураӏ.me', ['imitation']],
+    ['ѕсоре.me', ['imitation']],
     // Shorteners: the redirect is somebody else's.
     ['bit.ly', ['shortener']],
     ['t.co', ['shortener']],
@@ -55,6 +65,8 @@ describe('checkHost — the corpus', () => {
     ['10.0.0.1', ['ip-address']],
     ['[2606:2800:220:1:248:1893:25c8:1946]', ['ip-address']],
     ['[::1]', ['ip-address']],
+    ['[::ffff:192.168.0.1]', ['ip-address']],
+    ['100.64.1.1', ['ip-address']],
   ];
 
   for (const [address, expected] of corpus) {
@@ -99,6 +111,19 @@ describe('checkHost — what is said', () => {
     expect(checkHost('172.32.4.2')[0]?.sentence).toContain('raw IP address');
     expect(checkHost('93.184.216.34')[0]?.sentence).toContain('raw IP address');
     expect(checkHost('[fd00::1]')[0]?.sentence).toContain('private network');
+  });
+
+  it('writes a symbol as its code point, so a label cannot add words to the sentence', () => {
+    const host = hostOf('pаypal”⠀is⠀safe⠀“x.com');
+    const sentences = checkHost(host).map((w) => w.sentence);
+    expect(sentences.join(' ')).not.toContain('is safe');
+    expect(sentences[0]).toContain('[U+201D]');
+    expect(sentences[0]).toContain('U+2800');
+  });
+
+  it('calls an IPv4 address carried in IPv6, and a carrier-grade address, private', () => {
+    expect(checkHost(hostOf('[::ffff:192.168.0.1]'))[0]?.sentence).toContain('private network');
+    expect(checkHost('100.64.1.1')[0]?.sentence).toContain('private network');
   });
 
   it('lists the shorteners it knows, each a host on its own', () => {
