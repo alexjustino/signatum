@@ -27,6 +27,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does is printed in one line under the heading when the sheet's font can draw every character of
   it, and replaced by a sentence saying so when it cannot — never printed with question marks where
   the letters were.
+- **The address inside a code, said out loud before anybody follows it.** When the link in a code
+  is not what it looks like, the product says so in a sentence: a name that mixes alphabets, such as
+  `аpple.com` with a Cyrillic `а`, and which word it reads as; a name written wholly in another
+  alphabet that reads as a Latin word, away from the domains where that alphabet is at home; a link
+  shortener, whose owner decides where the code lands; and an IP address instead of a name, with
+  the warning that a private one opens only on its own network. It is shown on Create under the
+  line that says what the code does — for a link, and for the domain of an e-mail address — on the
+  link rows of a batch plan, and on Read before anybody opens what a code holds. It warns and
+  never refuses: nothing is disabled and no verdict changes, because a shortener can be your own
+  and a private address can be the point. Japanese, Chinese and Korean names, and a Greek or
+  Cyrillic word under its own country's domain, stay quiet. It is worked out on the machine from the
+  address alone — no list is downloaded and nothing is looked up — so it is not a phishing filter,
+  and a shortener it does not know says nothing (ADR-034).
 
 ### Fixed
 
