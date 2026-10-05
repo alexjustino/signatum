@@ -619,7 +619,7 @@ fn canonical_folder(folder: &str) -> Result<PathBuf> {
             "A batch needs the full path of a folder to write into.".to_string(),
         ));
     }
-    if folder.starts_with("\\\\") || folder.starts_with("//") {
+    if !crate::os::paths::is_local(folder) {
         return Err(network());
     }
 
@@ -694,7 +694,7 @@ fn read_text_file_at(path: &str) -> Result<TextFile> {
             "A batch is read from the full path of a file.".to_string(),
         ));
     }
-    if path.starts_with("\\\\") || path.starts_with("//") {
+    if !crate::os::paths::is_local(path) {
         return Err(Error::InvalidInput(
             "A batch is read from a local drive, not from a network path.".to_string(),
         ));

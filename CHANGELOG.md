@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it, and replaced by a sentence saying so when it cannot — never printed with question marks where
   the letters were.
 
+### Fixed
+
+- **A network path is refused in every spelling.** Every door that reads or writes a file a person
+  chose refused a path beginning with `\\` or `//`; Windows also reads `\/server/share` as a network
+  path, and that spelling passed. The check now asks Windows how it parses the path, accepts only a
+  drive letter, and refuses a drive letter mapped to a network share as well.
+
 ## [1.0.0] — 2026-09-14 — The mark
 
 Signatum makes QR codes with a brand mark in the middle, on your own machine, and refuses to let
