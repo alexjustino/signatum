@@ -529,7 +529,7 @@ pub(crate) fn export_once(
 
 /// The sentence for a code that did not read back, with a fallback for the
 /// report that somehow carries none: a refusal always owes a reason.
-fn refusal(report: &VerificationReport) -> String {
+pub(crate) fn refusal(report: &VerificationReport) -> String {
     report
         .reason
         .clone()
@@ -604,7 +604,7 @@ fn scan_margin_with(conn: &Connection, asked: &Asked) -> Result<ScanMargin> {
 /// A logo that is not in the workspace is a refusal rather than a silently
 /// logo-less code: the person asked for one, and a code that quietly comes back
 /// without it is a code they will print.
-fn load_logo(
+pub(crate) fn load_logo(
     conn: &Connection,
     logo: Option<&LogoRef>,
 ) -> Result<Option<(NormalisedLogo, LogoBox)>> {
@@ -631,7 +631,7 @@ fn load_logo(
 }
 
 /// Everything the host refuses before it renders anything.
-fn check_inputs(asked: &Asked) -> Result<()> {
+pub(crate) fn check_inputs(asked: &Asked) -> Result<()> {
     if !(MIN_PIXEL_SIZE..=MAX_PIXEL_SIZE).contains(&asked.pixel_size) {
         return Err(Error::InvalidInput(format!(
             "a code is made between {MIN_PIXEL_SIZE} and {MAX_PIXEL_SIZE} pixels square"
@@ -740,6 +740,34 @@ fn record(
     format: Option<&str>,
     code_id: Option<&str>,
 ) -> Result<String> {
+    record_as(
+        conn,
+        &crate::db::new_id(),
+        kind,
+        report,
+        path,
+        dpi,
+        format,
+        code_id,
+    )
+}
+
+/// [`record`], under an identifier the caller already holds — the proof sheet
+/// prints each size's identifier on the page before the page is written, and
+/// writes the rows after it, as every export does.
+#[allow(clippy::too_many_arguments)]
+// One value per column the evidence has; a struct for it would be a second
+// `VerificationRow`.
+pub(crate) fn record_as(
+    conn: &Connection,
+    id: &str,
+    kind: &str,
+    report: &VerificationReport,
+    path: Option<&str>,
+    dpi: Option<u32>,
+    format: Option<&str>,
+    code_id: Option<&str>,
+) -> Result<String> {
     let linked = match code_id {
         Some(id) if !library::exists(conn, id)? => {
             log::warn!("a verification named a saved code that is no longer in the workspace");
@@ -748,8 +776,9 @@ fn record(
         other => other,
     };
 
-    let id = verifications::record(
+    let id = verifications::record_as(
         conn,
+        id,
         &VerificationRow {
             kind,
             decoder: &report.decoder,

@@ -55,7 +55,17 @@ pub struct VerificationRow<'a> {
 /// recording a different decoded hash, so this function cannot write a lie even
 /// if a caller hands it one.
 pub fn record(conn: &Connection, row: &VerificationRow) -> Result<String> {
-    let id = new_id();
+    record_as(conn, &new_id(), row)
+}
+
+/// Write one verification under an identifier the caller already holds.
+///
+/// For the one artefact that has to *print* the identifier of its own evidence:
+/// a proof sheet names each size's verification on the page, so the identifier
+/// exists before the page does — and the row is still written only after the
+/// file is, exactly as for every other export. The CHECK that refuses a lie
+/// applies here as it does to [`record`].
+pub fn record_as(conn: &Connection, id: &str, row: &VerificationRow) -> Result<String> {
     conn.execute(
         "INSERT INTO verifications
            (id, created_at, kind, decoder, verified, payload_sha256, decoded_sha256,
@@ -80,7 +90,7 @@ pub fn record(conn: &Connection, row: &VerificationRow) -> Result<String> {
             row.code_id,
         ],
     )?;
-    Ok(id)
+    Ok(id.to_string())
 }
 
 #[cfg(test)]
