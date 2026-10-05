@@ -59,6 +59,15 @@
 //!   sizes that read drawn — the rest are boxes with the reason — and a 50 mm
 //!   bar that tells a person whether the printer scaled the page. One
 //!   verification row per size attempted; nothing written when no size reads.
+//! - P2: the stamp. Every exported PNG, SVG and PDF — every batch file and the
+//!   proof sheet — carries a stamp saying what was verified and never when: a
+//!   UUID v4 reference, the payload's digest, the decoder, and a digest of the
+//!   file by its kind's rule (`export::stamp`). The row keeps the reference and
+//!   the digest (migration 007). `check_file` is Read's third door: it finds
+//!   the stamp in a `.png`, `.svg` or `.pdf` without rendering or decoding
+//!   anything, and says whether the file is unchanged and whether this
+//!   workspace is the one that verified it. The setting `stamp_exports` turns
+//!   stamping off; the clipboard is never stamped.
 
 pub mod commands;
 pub mod db;
@@ -133,6 +142,7 @@ pub fn run() {
             commands::batch::write_batch_report,
             commands::read::read_image,
             commands::read::read_clipboard,
+            commands::read::check_file,
             commands::settings::settings_get,
             commands::settings::settings_set,
             commands::settings::settings_all,
