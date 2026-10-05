@@ -37,6 +37,7 @@ part that matters most later — the cost we accepted.
 | [029](#adr-029) | A batch is the Create pipeline in a loop, written only inside the chosen folder  | Accepted                      |
 | [030](#adr-030) | Read is the gate's own decoder on somebody else's pixels, and nothing is stored  | Accepted                      |
 | [031](#adr-031) | Settings are a closed list of keys the host owns, and the theme lives there      | Accepted                      |
+| [032](#adr-032) | A proof sheet is the export at several sizes, each proved, with a printer check  | Accepted                      |
 
 ---
 
@@ -1453,3 +1454,106 @@ until a person cannot find the one they are looking for — the closed list is w
 short screen a year from now, and what lets `SECURITY.md` say plainly that the table holds no
 secret: `keep_wifi_passwords` holds the word `true` or the word `false`, and a table that refuses
 every key but five cannot be used as a store for anything at all.
+
+## ADR-032 — A proof sheet is the export at several sizes, each one proved, on a page that checks the printer {#adr-032}
+
+**Status: Accepted.**
+
+**Context.** The scan gate ([ADR-010](#adr-010)) proves a file: the bytes written are bytes a
+decoder read back, at the pixels they were rendered at. It cannot prove a print, and a print is
+what a person is about to pay for. Between the file and the paper stand a print dialog that may
+scale the page, a paper that spreads ink, and a phone camera in a room nobody measured — and the
+question somebody actually has, _what is the smallest size this code still reads at, from my
+printer_, is answered today by exporting four PDFs, printing four pages and hoping each was
+printed at 100 %. The cheapest test of a print is a print. The first slice of 1.1 makes that one
+page, and this record fixes what may be on it.
+
+**Decision.** The proof sheet is the PDF export ([ADR-026](#adr-026)) run at several sizes onto
+one A4 page. Nothing is drawn on it that was not proved, and one thing on it proves the printer.
+
+- **Which sizes.** 15, 20, 25 and 30 mm — a lapel badge, a label, a business card, a table tent —
+  and the size chosen on the Create screen when it is none of them, smallest first (`proofSizes`
+  in `src/domain/proof.ts`). A chosen size wider than the page can hold — 190 mm, the A4 width less
+  a 10 mm margin on each side — is left off, and a sentence at the foot of the sheet says so.
+  Shrinking it to fit would be the very scaling the sheet exists to catch.
+- **Each size is verified at its own raster, and only a verified size is drawn.** The domain gives
+  each size the pixels an export of that size would have, by the same rounding (`pixelsFor`), so
+  25 mm at 300 dpi on the sheet is the 295-pixel raster a 25 mm export would be. The host checks
+  each pixel count against its millimetres and the resolution before it renders anything, then
+  verifies each size exactly as a single export is verified — the same decoder, the same logo
+  placement, the same resolution — and the image placed on the page is **that** raster, at exactly
+  the size in points that `points` in `src-tauri/src/export/pdf.rs` gives its millimetres.
+  Verifying the largest size once and scaling it down for the others would be a proof of one size
+  and a claim about four: the second render [ADR-010](#adr-010) forbids, at another size instead
+  of in another format.
+- **A size that does not read is a box with its reason, never a picture.** A size is refused in
+  one of two places. The decoder refuses a size that rendered and did not read back — the case that
+  matters, because it is a dense code at 15 mm, and it is what the sheet is for. The domain refuses
+  a size whose raster falls outside the 64 to 4,096 pixels the host renders ([ADR-026](#adr-026),
+  second cost), and the host never renders that one; with the resolutions the Create screen offers
+  and a size it accepted, no size on the sheet falls outside, so this is a guard rather than a
+  case. Either way the cell is a dashed square with the sentence inside it. The box stays on the
+  sheet rather than being dropped, because the lesson of the sheet is the smallest size that reads,
+  and a sheet that quietly began at 20 mm would teach that 15 mm was never tried. If **no** size
+  reads, nothing is written: the command refuses with a sentence, and the attempts are recorded
+  without a path.
+- **A 50 mm bar against "fit to page".** The most common way a 25 mm code becomes 23 mm is not the
+  code: it is a print dialog shrinking an A4 page into the printable area of a printer that cannot
+  print to the edge. So the sheet carries a filled bar exactly 50 mm long, ticked every 10 mm, and
+  under it the sentence that says what a different measurement means — the printer scaled the page,
+  and the sizes above are wrong. The header asks for the page to be printed at 100 %. A ruler is
+  the only instrument the person needs.
+- **Ten times the width, said as a rule of thumb.** Under each code are its size, how far away to
+  hold a phone — `Hold about 25 cm away` for 25 mm (`readingDistanceCm`) — and a reference to the
+  verification that proved it. The distance is the rule of thumb printers use, ten times the width,
+  and it is printed as one, with _about_ in front of it: it is not something this product measured,
+  and the sheet itself is how the person finds out.
+- **No date, no author, no title, no path.** The sheet's document information says
+  `/Producer (Signatum)` and nothing else, as every PDF this product writes (`one_page`, F7): a
+  file that records when a code was made records something about the person who made it. That
+  holds for the page as well as the metadata, and it decides which part of the verification id is
+  printed: an id here is a UUID v7, whose leading digits are the millisecond it was made, so its
+  first eight characters would put the time of the print on the paper to within about a minute — a
+  date in all but name. The reference under each code is taken from the id's random end instead.
+  The stamp planned for 1.1 (P2) will put what was verified into every exported file, and it too
+  is planned without a date; it is not part of this record.
+- **The text is WinAnsi, and a summary the font cannot draw is replaced by a sentence.** The sheet
+  sets its text in Helvetica and Helvetica-Bold, the fonts every PDF reader carries, with no font
+  embedded, so the text it can draw is the Windows-1252 set. The product's own sentences are
+  written to fit it. The one line that comes from the person — what scanning the code does, "Opens
+  example.com", "Adds Ana Souza to contacts" — may not, since a domain in another script or a name
+  in Cyrillic is a perfectly good code. That line is never printed with letters replaced: when any
+  character falls outside the font's set, or the line is longer than 200 characters, it is replaced
+  by _"What this code does is shown in Signatum; this sheet prints only the characters its font can
+  draw."_ A summary with question marks where the letters were would be a printed sentence saying
+  something the code does not. A line that fits the font is wrapped to at most four lines and, in
+  the rare case it needs more — a long name with no space to break on — the fourth line ends in an
+  ellipsis: shortened, never altered.
+- **One verification row per size the host rendered.** Each is recorded in `verifications` as an
+  export would be — `kind` `export`, `format` `pdf`, the resolution, the saved code when one is
+  attached — and the sheet's path is written only on the rows whose image is on the page. A size
+  that read and a size that did not are both evidence; a row naming the sheet for a size the sheet
+  shows as a box would be a row saying a file holds something it does not. A size the domain
+  refused was never rendered and has no row: no decoder answered for anything. As for the
+  single-page PDF, the artefact each row hashes is the verified raster, which is the image the page
+  carries.
+
+**Why one page and not five exports.** Five exports printed separately are five chances for a print
+dialog to treat them differently, and none of them carries the bar. One page printed once puts
+every size under the same driver, the same paper and the same scaling, so the sizes can be compared
+with each other — and the bar beside them says whether any of them can be trusted.
+
+**Cost accepted: the sheet proves the raster, not the print.** What a decoder read is the picture
+on the page. What the printer, the paper and the phone then do to it is still the person's to find
+out, which is why the sheet asks to be printed and scanned rather than claiming to have done either.
+Each code on it is a picture of a code, as in the single-page PDF ([ADR-026](#adr-026)), for the
+same reason.
+
+**Second cost: up to five render-and-decode passes per press.** A sheet is up to five verifications
+where an export is one, so the command runs off the window's thread and the screen waits on it.
+That is the price of verifying each size rather than one.
+
+**Third cost: some people do not get their summary printed.** A code whose summary is in Greek gets
+the replacement sentence on its sheet. Embedding a font would lift that, at the cost of a font file
+in the binary and in every sheet; that is a decision for the day the replacement turns out to be
+common, and it is not made here.

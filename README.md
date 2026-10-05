@@ -207,6 +207,18 @@ as 1.0.x — bug fixes only, no schema change and no new surface — by the flow
 release is opened when there is a theme worth opening one for, and this page will say so when there
 is.
 
+P1 has started 1.1 with the proof sheet. The gate proves a file; a print is proved by printing it,
+so **Proof sheet…**, beside the exports on the Create screen, writes one A4 PDF with the code at 15,
+20, 25 and 30 mm, and at the size chosen when it is none of those. Every size is rendered at the
+pixels an export of that size would have and read back by the same independent decoder before it
+is drawn, and the picture on the page is the one that read. A size that does not read is a box
+with the reason in it, never a picture, so the sheet shows where this code stops reading rather
+than hiding it. Under each code are its size, how far away a phone should read it — ten times the
+width, said as the rule of thumb it is — and a reference to the verification that proved it. At the
+foot is a bar exactly 50 mm long: if it measures anything else, the printer scaled the page, and
+the sizes above it are wrong. Like every file this product writes, the sheet carries no date, no
+author and no path.
+
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 
 ## What 1.0.0 holds
