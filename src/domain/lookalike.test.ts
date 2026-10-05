@@ -37,6 +37,8 @@ describe('checkHost — the corpus', () => {
     ['οικο.gr', []],
     ['οικο.com', ['imitation']],
     ['ѕсоре.ru', []],
+    // A Latin letter that is not the ASCII one it imitates.
+    ['ɡoogle.com', ['imitation']],
     ['ροκ.example', ['imitation']],
     // Two alphabets that are not a known mixture, without an imitation.
     ['shopмагазин.com', ['mixed-script']],
@@ -74,6 +76,13 @@ describe('checkHost — what is said', () => {
     const [warning] = checkHost(hostOf('ѕсоре.com'));
     expect(warning?.sentence).toContain(
       '“ѕсоре” is written in Cyrillic letters that look like the Latin “scope”',
+    );
+  });
+
+  it('names a Latin letter that only looks like the plain one', () => {
+    const [warning] = checkHost(hostOf('ɡoogle.com'));
+    expect(warning?.sentence).toBe(
+      '“ɡoogle” uses a letter that only looks like a plain Latin one: it reads as “google”, but it is a different address.',
     );
   });
 

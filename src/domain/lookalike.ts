@@ -63,6 +63,8 @@ const ALLOWED_MIXTURES: ReadonlyArray<ReadonlySet<string>> = [
  * domains, which is what a person typing or reading a link meets.
  */
 const IMITATES: Readonly<Record<string, string>> = {
+  // Latin: a letter of the Latin script itself that is not the ASCII one it imitates
+  ɡ: 'g',
   // Cyrillic
   а: 'a',
   с: 'c',
@@ -79,7 +81,7 @@ const IMITATES: Readonly<Record<string, string>> = {
   ԝ: 'w',
   х: 'x',
   у: 'y',
-  ɡ: 'g',
+
   // Greek
   α: 'a',
   ϲ: 'c',
@@ -267,12 +269,14 @@ export function checkHost(host: string): HostWarning[] {
       });
     } else if (
       imitatesLatin &&
-      !scripts.has('Latin') &&
       ![...scripts].some((script) => HOME_DOMAINS[script]?.includes(topLevel))
     ) {
       warnings.push({
         kind: 'imitation',
-        sentence: `“${label}” is written in ${listOf(scripts)} letters that look like the Latin “${imitated}”: it is a different address from the one it resembles.`,
+        sentence:
+          scripts.size === 1 && scripts.has('Latin')
+            ? `“${label}” uses a letter that only looks like a plain Latin one: it reads as “${imitated}”, but it is a different address.`
+            : `“${label}” is written in ${listOf(scripts)} letters that look like the Latin “${imitated}”: it is a different address from the one it resembles.`,
       });
     }
   }
