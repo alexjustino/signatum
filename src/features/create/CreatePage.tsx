@@ -4,6 +4,7 @@ import {
   Chat20Regular,
   ContactCard20Regular,
   Copy20Regular,
+  DocumentPrint20Regular,
   Link20Regular,
   Location20Regular,
   Mail20Regular,
@@ -21,6 +22,7 @@ import {
   useCopyPng,
   useExportPdf,
   useExportPng,
+  useExportProofSheet,
   useExportSvg,
   useSaveCode,
   useScanMargin,
@@ -45,8 +47,16 @@ import {
   type PayloadKind,
 } from '@/domain/payload';
 import type { Plan } from '@/domain/placement';
+import { proofFileName, proofSizes } from '@/domain/proof';
 import type { Style } from '@/domain/scene';
-import { checkPrintSize, pixelsFor, sizedSvg, toMillimetres, type PrintSize } from '@/domain/size';
+import {
+  checkPrintSize,
+  formatMillimetres,
+  pixelsFor,
+  sizedSvg,
+  toMillimetres,
+  type PrintSize,
+} from '@/domain/size';
 import { checkContrast } from '@/domain/style';
 import { announce } from '@/ui/announce';
 import { Button } from '@/ui/Button';
@@ -152,12 +162,17 @@ interface Answer {
 /** The outcome of an export, and the code it wrote. */
 interface Written {
   key: string;
-  tone: 'success' | 'danger';
+  /** `caution` is the proof sheet refused whole: no size read, so nothing was written. */
+  tone: 'success' | 'caution' | 'danger';
   /** The heading: what happened, or that nothing did. */
   title: string;
   text: string;
   /** True when the sentence carries a path — a path is read character by character. */
   mono: boolean;
+  /** The proof sheet's own path, on a line of its own, when the sentence does not carry it. */
+  path?: string;
+  /** The sizes on a proof sheet that did not read — `15 mm`, and why — smallest first. */
+  unread?: { size: string; reason: string }[];
 }
 
 /** What the scan margin knows about the code on screen. */
@@ -182,6 +197,8 @@ interface Margin {
  */
 export interface AttachedCode {
   id: string;
+  /** The name it was saved under — what the proof sheet's file is called by default. */
+  name: string;
   /** The digest of the scene at save time; the rebuilt scene must hash the same. */
   sceneSha256: string;
   /** True when it arrived from the library rather than from a save on this screen. */
@@ -194,7 +211,10 @@ interface Kept {
   name: string;
 }
 
-/** The three files this screen writes. The clipboard is the fourth way out, without a path. */
+/**
+ * The three formats one code is written in. The clipboard is another way out, without a path, and
+ * the proof sheet is a PDF of its own — several sizes on a page, written by `proof`.
+ */
 type ExportKind = 'png' | 'svg' | 'pdf';
 
 /**
@@ -446,6 +466,7 @@ export function CreatePage({
   const { mutateAsync: writeSvg, isPending: writingSvg } = useExportSvg();
   const { mutateAsync: writePdf, isPending: writingPdf } = useExportPdf();
   const { mutateAsync: copyToClipboard, isPending: copying } = useCopyPng();
+  const { mutateAsync: writeProof, isPending: writingProof } = useExportProofSheet();
   const { mutateAsync: measure } = useScanMargin();
   const { mutateAsync: keep, isPending: saving } = useSaveCode();
 
@@ -456,8 +477,8 @@ export function CreatePage({
    * different artefact.
    */
   const codeId = attached?.id ?? null;
-  // One busy state for the row: four ways out of the same code, one at a time.
-  const exporting = writingPng || writingSvg || writingPdf || copying;
+  // One busy state for the row: five ways out of the same code, one at a time.
+  const exporting = writingPng || writingSvg || writingPdf || copying || writingProof;
 
   // Only an answer about the code on screen is an answer at all; everything
   // else is derived from that, so nothing has to be reset when the payload
@@ -618,6 +639,73 @@ export function CreatePage({
   };
 
   /**
+   * Write the proof sheet (P1): the same code at the sizes people print, so the smallest one that
+   * reads is found on one sheet of paper before a thousand copies are made.
+   *
+   * The domain plans the sizes and their rasters with the export's own rounding; the host renders
+   * each one, reads it back, and draws only the ones that read — a size that did not is a box
+   * with its reason, and is listed here with the same reason. Everything else is what the PDF
+   * export sends: the scene the gate verified, the logo's placement, the saved code it is about.
+   */
+  const proof = async () => {
+    if (svg === null || payload === null || artefact === null || !result.ok) return;
+    try {
+      const path = await save({
+        defaultPath: proofFileName(attached?.name ?? null),
+        filters: [{ name: FILE.pdf.filter, extensions: [FILE.pdf.extension] }],
+      });
+      if (path === null) return;
+
+      const sheet = proofSizes(printSize);
+      const done = await writeProof({
+        svg,
+        payload,
+        logo: placement,
+        dpi: printSize.dpi,
+        sizes: sheet.sizes,
+        summary: result.summary,
+        note: sheet.note,
+        path,
+        codeId,
+      });
+
+      const read = done.sizes.filter((size) => size.verified).length;
+      const total = done.sizes.length;
+      const text =
+        `${read === total ? `All ${total}` : `${read} of ${total}`} sizes read. ` +
+        'Print it at 100 % and scan each size with a phone.';
+      setWritten({
+        key: artefact,
+        tone: 'success',
+        title: 'Proof sheet written',
+        text,
+        mono: false,
+        path: done.path,
+        unread: done.sizes
+          .filter((size) => !size.verified)
+          .map((size) => ({
+            size: `${formatMillimetres(size.mm)} mm`,
+            reason: size.reason ?? 'The decoder did not read it back.',
+          })),
+      });
+      announce(`Proof sheet written. ${text}`);
+    } catch (error) {
+      // No size read, so there is no sheet: the gate doing its job on every size at once, said in
+      // the host's own sentence. Anything else is a failure to write, said as every export says it.
+      const text = describeError(error);
+      const refused = errorKind(error) === 'refused';
+      setWritten({
+        key: artefact,
+        tone: refused ? 'caution' : 'danger',
+        title: 'Nothing was written',
+        text,
+        mono: false,
+      });
+      if (refused) announce(`Nothing was written. ${text}`);
+    }
+  };
+
+  /**
    * The scan margin, asked for once a code has passed — and only then, because
    * there is no margin worth measuring around a code that does not read at all.
    *
@@ -676,7 +764,7 @@ export function CreatePage({
       });
       setNaming(null);
       setKept({ key: artefact, name: saved.name });
-      onAttach({ id: saved.id, sceneSha256: saved.sceneSha256, opened: false });
+      onAttach({ id: saved.id, name: saved.name, sceneSha256: saved.sceneSha256, opened: false });
       announce(`Saved as ${saved.name}`);
     } catch (error) {
       setSaveProblem(describeError(error));
@@ -832,19 +920,21 @@ export function CreatePage({
             </InfoBar>
           )}
 
-          {/* Four ways out of one code, and one gate in front of all of them: the
+          {/* Five ways out of one code, and one gate in front of all of them: the
               row is enabled by the verdict beside it and by nothing else. PNG is
               the accented one because it is what most codes are printed from;
-              the other three are the same action in another format, not lesser
-              ones (DESIGN_SYSTEM §8).
+              the others are the same action in another form, not lesser ones
+              (DESIGN_SYSTEM §8).
 
               Two columns rather than a row that wraps (F11). This pane is half of a page that
-              stops at `max-w-5xl`, which is narrower than the five buttons laid end to end at
-              any window size — so a flexible row always wrapped, and wrapped raggedly: three
-              buttons and then two. A grid wraps in the same place every time, the buttons come
-              out the same width, and Copy — the one way out that writes no file — is last. */}
+              stops at `max-w-5xl`, which is narrower than the six buttons laid end to end at
+              any window size — so a flexible row always wrapped, and wrapped raggedly. A grid
+              wraps in the same place every time and the buttons come out the same width: six
+              in three even rows. Copy — the one way out that writes no file — comes after the
+              files, and the proof sheet is last, because it prepares a print rather than
+              delivering a file. */}
           <div className="grid grid-cols-2 gap-2">
-            {/* Keeping a code is the fifth way out of it, and behind the same gate: a saved
+            {/* Keeping a code is one more way out of it, and behind the same gate: a saved
                 code is a verified code (ADR-010). It sits first because it is the one that
                 does not leave the workspace. */}
             <Button
@@ -879,15 +969,19 @@ export function CreatePage({
             >
               Export PDF…
             </Button>
-            {/* Five peers in two columns leave one alone; the last spans the row on purpose, so
-                the odd one out is a deliberate wide button and not a wrap. */}
             <Button
-              className="col-span-2"
               icon={<Copy20Regular />}
               disabled={!verified || exporting}
               onClick={() => void copy()}
             >
               Copy
+            </Button>
+            <Button
+              icon={<DocumentPrint20Regular />}
+              disabled={!verified || exporting}
+              onClick={() => void proof()}
+            >
+              Proof sheet…
             </Button>
           </div>
 
@@ -961,15 +1055,36 @@ export function CreatePage({
 
           {keptNow !== null && <InfoBar severity="success" title={`Saved as ${keptNow.name}`} />}
 
+          {/* The sizes that did not read sit under the message rather than inside it, as the
+              batch's rows do: the message is a live region, and it says the count — the reasons
+              are there to be read at the person's own pace (DESIGN_SYSTEM §7). */}
           {message !== null && (
-            <InfoBar
-              severity={message.tone === 'success' ? 'success' : 'danger'}
-              title={message.title}
-            >
-              <span data-selectable className={message.mono ? 'font-mono' : ''}>
-                {message.text}
-              </span>
-            </InfoBar>
+            <div className="flex flex-col gap-2">
+              <InfoBar severity={message.tone} title={message.title}>
+                <span data-selectable className={message.mono ? 'font-mono' : ''}>
+                  {message.text}
+                </span>
+                {message.path !== undefined && (
+                  <span data-selectable className="mt-1 block font-mono break-all">
+                    {message.path}
+                  </span>
+                )}
+              </InfoBar>
+
+              {message.unread !== undefined && message.unread.length > 0 && (
+                <ul
+                  aria-label="Sizes that did not read"
+                  className="flex flex-col gap-1 text-caption text-fg-secondary"
+                >
+                  {message.unread.map((each) => (
+                    <li key={each.size}>
+                      <span className="font-semibold text-fg">{`${each.size}: `}</span>
+                      {each.reason}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
 
           {/* Only for a code that passed: there is no margin around a code that

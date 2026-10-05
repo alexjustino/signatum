@@ -211,7 +211,12 @@ export function App({ settings }: { settings: Settings }) {
       setStyle(saved.style);
       setEcl(saved.eclFloor);
       setPrintSize(saved.size);
-      setAttached({ id: saved.id, sceneSha256: saved.sceneSha256, opened: true });
+      setAttached({
+        id: saved.id,
+        name: saved.name,
+        sceneSha256: saved.sceneSha256,
+        opened: true,
+      });
       setDestination('create');
       return { ok: true };
     },
