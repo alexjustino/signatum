@@ -87,6 +87,15 @@ pub fn now() -> String {
 pub fn new_id() -> String {
     uuid::Uuid::now_v7().to_string()
 }
+
+/// A stamp's reference: a UUID **v4** — 122 random bits, and no time.
+///
+/// Not [`new_id`]. A v7's leading 48 bits are the moment it was made, so a stamp
+/// carrying one would put the time of the export inside the file — which no
+/// export of this product does (migration 007).
+pub fn new_stamp_ref() -> String {
+    uuid::Uuid::new_v4().to_string()
+}
 #[cfg(test)]
 mod tests {
     use super::*;

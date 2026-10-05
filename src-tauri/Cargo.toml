@@ -25,7 +25,8 @@ serde_json = "1"
 thiserror = "2"
 rusqlite = { version = "0.32", features = ["bundled"] }
 log = "0.4"
-uuid = { version = "1", features = ["v7"] }
+# v7 for row identifiers (time-ordered); v4 for the stamp reference, which must carry no time.
+uuid = { version = "1", features = ["v4", "v7"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
 # The scan gate (ADR-010): render, decode, compare.

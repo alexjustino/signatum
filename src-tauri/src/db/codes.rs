@@ -451,6 +451,8 @@ mod tests {
                 dpi: Some(300),
                 format: Some("png"),
                 code_id: Some(&saved.id),
+                stamp_ref: None,
+                stamp_digest: None,
             },
         )
         .expect("record");

@@ -14,7 +14,11 @@
 //! asked for with the verified raster on it — and, from P1, the proof sheet: the
 //! same code at several sizes on one A4 page, each one a verified raster of its
 //! own size, with a bar that checks the printer.
+//!
+//! From P2 every one of those files carries a stamp (`stamp`): a reference, the payload's
+//! digest, the decoder, and a digest of what was verified — and no date, no name, no path.
 
 pub mod pdf;
 pub mod proof;
+pub mod stamp;
 pub mod svg;
