@@ -201,11 +201,10 @@ export button, into the library and through a dialog that has to give the focus 
 
 1.0.0 is released: the eight payload kinds, the logo placement engine, the scan gate in front of
 every way out, the look and the printed size, the library and brand kits, batch, Read, and the
-defaults that mean a choice is made once. What comes after it is not decided here. Corrections land
-as 1.0.x — bug fixes only, no schema change and no new surface — by the flow in
-[`VERSIONING.md`](VERSIONING.md) and the checklist in [`docs/RELEASE.md`](docs/RELEASE.md). A minor
-release is opened when there is a theme worth opening one for, and this page will say so when there
-is.
+defaults that mean a choice is made once. 1.1 "The proof" is under way and carries the same promise
+further, to the print and to the file in somebody else's hands — its slices are in
+[`docs/SPEC.md`](docs/SPEC.md) §10. Corrections to 1.0.0 land through the flow in
+[`VERSIONING.md`](VERSIONING.md) and the checklist in [`docs/RELEASE.md`](docs/RELEASE.md).
 
 P1 has started 1.1 with the proof sheet. The gate proves a file; a print is proved by printing it,
 so **Proof sheet…**, beside the exports on the Create screen, writes one A4 PDF with the code at 15,
