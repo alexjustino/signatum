@@ -671,11 +671,10 @@ pub(crate) fn check_destination(path: &str, extension: &str) -> Result<()> {
             "an export needs the full path of the file to write".to_string(),
         ));
     }
-    // `is_absolute` is true of a UNC path (`\\host\share\code.png`) and of a verbatim one
-    // (`\\?\...`). Writing there would make the host open a network connection on the
-    // interface's word, in a product that promises nothing leaves the machine. The system's
-    // save dialog never produces one for a local file, so a request that carries one is refused.
-    if path.starts_with("\\\\") || path.starts_with("//") {
+    // `is_absolute` is true of a network path in any of its spellings. Writing there would
+    // make the host open a connection on the interface's word, in a product that promises
+    // nothing leaves the machine; `os::paths` decides from the prefix Windows parses.
+    if !crate::os::paths::is_local(path) {
         return Err(Error::InvalidInput(
             "an export is written to a local drive, not to a network path".to_string(),
         ));
@@ -1359,6 +1358,9 @@ mod tests {
             "\\\\server\\share\\code.png",
             "\\\\?\\C:\\code.png",
             "//server/share/code.png",
+            "\\/server/share/code.png",
+            "/\\server\\share\\code.png",
+            "\\\\.\\C:\\code.png",
         ] {
             let error = check_destination(path, "png").expect_err(path);
             assert!(matches!(error, Error::InvalidInput(_)), "{path}: {error:?}");

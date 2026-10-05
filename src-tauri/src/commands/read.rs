@@ -246,7 +246,7 @@ fn check_source(path: &str) -> Result<&Path> {
     // absolute too, and reading there would make this host open a network
     // connection on the interface's word, in a product that promises nothing
     // leaves the machine.
-    if path.starts_with("\\\\") || path.starts_with("//") {
+    if !crate::os::paths::is_local(path) {
         return Err(Error::InvalidInput(
             "A picture is read from a local drive, not from a network path.".to_string(),
         ));
