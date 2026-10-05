@@ -7,6 +7,7 @@
 
 import { MIN_MODULE_MM, moduleSizeMm } from './density';
 import { describeLink } from './payload/link';
+import { checkHost, checkLink } from './lookalike';
 import { unicodeHost } from './punycode';
 
 export type ReadKind =
@@ -22,6 +23,11 @@ export interface ReadDescription {
   content: string;
   /** True when the content holds a secret worth masking on screen. */
   sensitive: boolean;
+  /**
+   * What the address inside the code is, when it is worth saying before anybody follows it: a
+   * look-alike, a shortener, a raw IP (ADR-034). Empty for everything else.
+   */
+  warnings: string[];
 }
 
 function decodeUtf8(bytes: Uint8Array): string | null {
@@ -77,6 +83,29 @@ function vcardField(text: string, name: string): string | null {
 
 /** What the bytes of a read code mean, in the same sentences the Create screen uses. */
 export function describeBytes(bytes: Uint8Array): ReadDescription {
+  const described = describeContent(bytes);
+  return { ...described, warnings: warningsFor(described) };
+}
+
+/** The look-alike guard over the address a link or an e-mail code carries. */
+function warningsFor({ kind, content }: Omit<ReadDescription, 'warnings'>): string[] {
+  if (kind === 'link') return checkLink(content).map((w) => w.sentence);
+  if (kind === 'email') {
+    const address = content.slice('mailto:'.length).split('?')[0] ?? '';
+    const domain = address.slice(address.lastIndexOf('@') + 1);
+    if (address.lastIndexOf('@') < 0 || domain.length === 0) return [];
+    try {
+      return checkHost(new URL(`http://${decodeURIComponent(domain)}`).hostname).map(
+        (w) => w.sentence,
+      );
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function describeContent(bytes: Uint8Array): Omit<ReadDescription, 'warnings'> {
   const text = decodeUtf8(bytes);
   if (text === null) {
     return {

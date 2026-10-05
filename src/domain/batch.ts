@@ -5,6 +5,7 @@
  * inside the folder that was chosen and nowhere else.
  */
 
+import { checkLink } from './lookalike';
 import { defaultName } from './library';
 import { buildPayload, type PayloadForm } from './payload';
 import type { ContactForm } from './payload/contact';
@@ -273,6 +274,8 @@ export interface PlannedRow {
   scene: Scene;
   plan: Extract<Plan, { ok: true }>;
   pixelSize: number;
+  /** What the row's link is, when it is worth saying before it is printed (ADR-034). */
+  warnings: string[];
 }
 
 export interface BatchPlan {
@@ -341,6 +344,7 @@ export function planBatch(
       scene,
       plan,
       pixelSize,
+      warnings: form.kind === 'link' ? checkLink(built.payload).map((w) => w.sentence) : [],
     });
   });
   problems.sort((a, b) => a.line - b.line);

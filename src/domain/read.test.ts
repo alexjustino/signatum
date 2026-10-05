@@ -112,6 +112,29 @@ describe('describeBytes with a lowercase Wi-Fi key', () => {
   });
 });
 
+describe('describeBytes — the address inside the code', () => {
+  const enc = (text: string) => new TextEncoder().encode(text);
+
+  it('says a link goes through a shortener', () => {
+    const read = describeBytes(enc('https://bit.ly/3abc'));
+    expect(read.warnings).toEqual([
+      'bit.ly is a link shortener: the code opens a redirect, and where it lands is decided by whoever controls that short link, not by this code.',
+    ]);
+  });
+
+  it('says an e-mail domain mixes alphabets', () => {
+    const read = describeBytes(enc('mailto:ana@аpple.com'));
+    expect(read.kind).toBe('email');
+    expect(read.warnings[0]).toMatch(/mixes Latin and Cyrillic letters/);
+  });
+
+  it('says nothing about an ordinary link or a code that is not an address', () => {
+    expect(describeBytes(enc('https://example.com/menu')).warnings).toEqual([]);
+    expect(describeBytes(enc('tel:+5511912345678')).warnings).toEqual([]);
+    expect(describeBytes(enc('just text')).warnings).toEqual([]);
+  });
+});
+
 describe('wouldScanAt', () => {
   it('answers reads, tight or too small from the module size', () => {
     // A version-2 code is 25 modules a side; with its quiet zone it prints as 33.
