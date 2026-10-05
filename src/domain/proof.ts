@@ -49,9 +49,11 @@ export interface ProofPlan {
 
 /**
  * The sizes on the sheet, smallest first: the four standard ones and the chosen size when it is
- * none of them. A size whose raster would fall outside what the host renders is still listed —
- * the sheet shows the box and says why, so the person learns that 15 mm at 150 dpi is not a size
- * this resolution can make.
+ * none of them. A size whose raster would fall outside what the host renders is still listed,
+ * as a box with the reason, rather than dropped without a word. With the resolutions the Create
+ * screen offers that never happens — 15 mm at 150 dpi is 89 pixels, inside the range — so this is
+ * a guard for a resolution typed elsewhere; the box a sheet shows in practice is the decoder's
+ * refusal of a size too small for the code's density, which the host decides.
  */
 export function proofSizes(size: PrintSize): ProofPlan {
   const chosenMm = Number(formatMillimetres(toMillimetres(size)));
