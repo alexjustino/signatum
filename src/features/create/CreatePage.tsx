@@ -38,6 +38,7 @@ import {
   type ScanVariant,
 } from '@/domain/describe';
 import { checkName, defaultName, redactForSave, sceneHash } from '@/domain/library';
+import { checkHost, checkLink } from '@/domain/lookalike';
 import {
   buildPayload,
   emptyForm,
@@ -69,6 +70,7 @@ import { Input } from '@/ui/Input';
 import { ScanGateStatus } from '@/ui/ScanGateStatus';
 import { TabStrip } from '@/ui/TabStrip';
 
+import { AddressSentences } from './AddressSentences';
 import { BrandKitCard } from './BrandKitCard';
 import { PayloadFields } from './forms/PayloadFields';
 import { LogoCard, type ChosenLogo } from './LogoCard';
@@ -276,6 +278,29 @@ function untouched(form: PayloadForm): boolean {
   return Object.entries(form).every(([field, value]) => pristine.get(field) === value);
 }
 
+/**
+ * What the address inside an accepted payload is, when it is worth saying before it is printed:
+ * a look-alike, a shortener, a raw IP (ADR-034). The sentences are the domain's; this only picks
+ * the host a kind carries — a link's, or the domain of an e-mail address — and says nothing for
+ * the kinds that carry none.
+ *
+ * It is a reading of the same accepted payload the summary is a reading of, so it changes when
+ * the summary does and never between: no timer of its own.
+ */
+function addressWarnings(form: PayloadForm, payload: string): string[] {
+  if (form.kind === 'link') return checkLink(payload).map((warning) => warning.sentence);
+  if (form.kind === 'email') {
+    const address = form.to.trim();
+    const domain = address.slice(address.lastIndexOf('@') + 1);
+    try {
+      return checkHost(new URL(`http://${domain}`).hostname).map((warning) => warning.sentence);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 interface CreatePageProps {
   /** The kind being edited. It lives in the shell, which keeps one draft per kind. */
   kind: PayloadKind;
@@ -344,6 +369,15 @@ export function CreatePage({
 }: CreatePageProps) {
   const result = useMemo(() => buildPayload(form), [form]);
   const payload = result.ok ? result.payload : null;
+
+  /**
+   * What the address is, in sentences, for an accepted payload. A warning and never a refusal:
+   * nothing below reads it — not the plan, not the gate, not the export row (ADR-034).
+   */
+  const addressCheck = useMemo(
+    () => (result.ok ? addressWarnings(form, result.payload) : []),
+    [form, result],
+  );
 
   /**
    * Whether the printed size is one a code can be printed at, and the raster it
@@ -826,6 +860,16 @@ export function CreatePage({
             >
               {helper}
             </p>
+            {/* Under the summary, because it is about the same address: true, and worth reading
+                before the code is printed — never a disabled button (ADR-034). The InfoBar is a
+                status region of its own, so nothing is announced beside it. */}
+            {addressCheck.length > 0 && (
+              <div className="mt-3">
+                <InfoBar severity="caution" title="Check this address">
+                  <AddressSentences sentences={addressCheck} />
+                </InfoBar>
+              </div>
+            )}
           </Card>
 
           {scene.failure !== null && (

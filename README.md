@@ -216,7 +216,10 @@ than hiding it. Under each code are its size, how far away a phone should read i
 width, said as the rule of thumb it is — and a reference to the verification that proved it. At the
 foot is a bar exactly 50 mm long: if it measures anything else, the printer scaled the page, and
 the sizes above it are wrong. Like every file this product writes, the sheet carries no date, no
-author and no path.
+author and no path. P3 adds the look-alike guard: before a link is printed and when a code is read,
+the address inside it is said in a sentence when it mixes alphabets, imitates a Latin word in
+another alphabet, goes through a link shortener or is an IP address rather than a name — a warning
+worked out on the machine, never a refusal.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 

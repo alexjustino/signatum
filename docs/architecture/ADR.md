@@ -38,6 +38,7 @@ part that matters most later — the cost we accepted.
 | [030](#adr-030) | Read is the gate's own decoder on somebody else's pixels, and nothing is stored  | Accepted                      |
 | [031](#adr-031) | Settings are a closed list of keys the host owns, and the theme lives there      | Accepted                      |
 | [032](#adr-032) | A proof sheet is the export at several sizes, each proved, with a printer check  | Accepted                      |
+| [034](#adr-034) | The address inside a code is said out loud, and never refused                    | Accepted                      |
 
 ---
 
@@ -1557,3 +1558,128 @@ That is the price of verifying each size rather than one.
 the replacement sentence on its sheet. Embedding a font would lift that, at the cost of a font file
 in the binary and in every sheet; that is a decision for the day the replacement turns out to be
 common, and it is not made here.
+
+## ADR-034 — The address inside a code is said out loud, and never refused {#adr-034}
+
+**Status: Accepted.**
+
+**Context.** A printed code is followed by somebody who cannot see where it goes. Whoever holds the
+flyer, the menu or the sticker on a parking meter sees a square; the phone shows the address for a
+moment, in a font made for small screens, to a person whose thumb is already on it. The product
+already shows a link both ways, before it is printed and when it is read (SPEC §5): an
+internationalised domain in Unicode **and** in punycode, `bücher.example (xn--bcher-kva.example)`.
+That makes a look-alike visible to somebody who knows what the second form means. It does not say
+why it matters, and it says nothing about three other things an address can be that a person
+cannot tell by looking at it. The third slice of 1.1 says them, and this record fixes what is said,
+where, and what it does not do.
+
+**Decision.** The host of a link, and the domain of an e-mail address, go through a pure function
+in the domain (`checkHost` and `checkLink` in `src/domain/lookalike.ts`), and each thing it finds is
+one sentence, shown before the code is made and again when a code is read. Five things are named:
+
+- **A label that mixes alphabets.** `аpple.com`, with a Cyrillic `а`: one letter from another
+  alphabet is the cheapest way to make an address that reads as a known one and belongs to somebody
+  else. When every foreign letter in the label stands for a Latin one, the sentence names the word
+  it reads as — _"“аpple” mixes Latin and Cyrillic letters: it reads as “apple”, but it is a
+  different address."_ — and otherwise it says that real names rarely mix alphabets in one name.
+- **A label in another alphabet that imitates a Latin word.** `ѕсоре.com` is Cyrillic from end to
+  end, so nothing in it is mixed, and every letter of it is drawn like a Latin one: it reads as
+  `scope`. The sentence names the Latin word and says it is a different address. A Latin letter that
+  is not the plain one — `ɡ`, U+0261, in `ɡoogle.com` — is named the same way.
+- **A character that is not a letter, a digit or a hyphen.** A host name needs none, and every one of
+  them can be drawn as punctuation that is not there: a fraction slash in `bank.com⁄login.evil.com`
+  makes a host that reads as a path on `bank.com`. Kana that look like a slash or a dash count too
+  when they stand alone among Latin letters (`paypalーlogin.com`); inside a Japanese name they are
+  letters and say nothing. The sentence names each character by its code point, `U+2044`, and every
+  label quoted in any sentence has such characters written that way, so a label cannot add words,
+  quotes or spaces to the sentence that quotes it.
+- **A known link shortener.** `bit.ly`, `t.co`, `tinyurl.com` and the rest of a fixed list
+  (`SHORTENERS`), matched as the host or a parent of it, so `www.tinyurl.com` counts and
+  `notbit.ly.example.com` does not. A shortener is a dynamic code somebody else made: the printed
+  code opens a redirect, and where it lands is decided by whoever controls the short link, on the
+  day of the print run and every day after. It is the thing this product refuses to make
+  ([ADR-014](#adr-014)), and the person holding the code deserves to know when it is in there.
+- **An IP address instead of a name.** A raw address tells nobody reading it whose server it is.
+  When it is on a private network — `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, the
+  carrier-grade `100.64.0.0/10`, `0.0.0.0/8`, loopback and link-local, their IPv6 counterparts, and an
+  IPv4 address carried inside IPv6 — the sentence says what somebody printing it most needs
+  to hear: it opens only on that network, and not from a phone outside it.
+
+What is judged is the host a URL parser finds: the one the summary names and the phone will open.
+Where it is said is the interface's half of the slice. On Create, under the line that says what the
+code does, a caution `InfoBar` titled _Check this address_ lists the sentences, for a link and for
+the domain of an e-mail address. On Batch, a link row's status reads _Planned · check the address_,
+and the sentences are listed under the plan by line number. On Read, each code's card carries
+_Check this address before you open it_ above what the code holds. Each is computed from the payload
+the screen already has: no second build and no second timer.
+
+**It warns, and it never refuses.** No button is disabled, no verdict changes, no batch row is held
+back, and Read still offers to make a code like the one it found. Each of the four has an honest
+use. A shortener can be somebody's own, on an account they control. A private address is exactly
+right for a code on the door of a plant room, read only from inside that network. A brand can mix
+alphabets on purpose. A product that refused them would be wrong for those people, and would send
+them with the same link to a generator that says nothing at all — so the warning would end up
+reaching nobody. Said in a sentence, it costs the person who meant it one line of reading; the
+person who did not — who pasted a link from a message, or is about to follow one off a sticker —
+learns it while it can still change something. This is the scan margin's rule
+([ADR-027](#adr-027)) applied to the address: a fact worth knowing is information, and the one gate
+in this product is the one with a single correct answer ([ADR-010](#adr-010)).
+
+**Mixed scripts are judged by Unicode's "highly restrictive" profile (UTS #39 §5.2).** A label in a
+single alphabet is quiet, and so are the mixtures real names use: Japanese writes Han, Hiragana and
+Katakana together, Chinese pairs Han with Bopomofo, Korean pairs Han with Hangul — each with Latin
+beside it. Anything else in one label is named. A simpler rule, "two alphabets is a warning", would
+speak on every Japanese domain and teach the people who read them to stop reading it; the corpus
+carries `日本語とカタカナ.jp`, `中文.example` and `한국어.kr` as names that must stay quiet.
+
+**A whole label in another alphabet is named only away from its home domains.** `οικο` is a Greek
+word, and under `.gr` it is a Greek address; the same letters under `.com` read as the Latin `oiko`,
+and that is what a look-alike is made of. So a label written wholly in Cyrillic, Greek or Armenian
+that reads as a Latin word is named unless its top-level domain is one where that alphabet is at
+home — the country-code domains of the countries that write it, and the top-level domains written
+in it (`HOME_DOMAINS`). It is the idea browsers apply to whole-script confusables, kept narrower
+than they do: a country-code domain that is sold to everybody — `.me`, `.am` — is nobody's home and
+exempts nothing. Without the rule the corpus row `οικο.gr` would be a false alarm about somebody's
+own language. A mixture is named
+wherever it is: a Latin word with one Cyrillic letter in it is a word in no language.
+
+**The corpus is the specification.** `src/domain/lookalike.test.ts` lists hosts with the warnings
+each must produce, in order: ordinary names in Latin, Chinese, Japanese, Korean, Cyrillic and Greek
+that must produce none; mixtures; imitations at home and away from it; shorteners, and a name that
+only contains one; public and private addresses, in both IP versions. A change to the tables is a
+change to that list first.
+
+**No network.** The guard is a function of the characters of a host. It looks nothing up, asks no
+service, downloads no list, and does not follow a redirect to see where it lands
+([ADR-006](#adr-006)).
+
+**Cost accepted: the table of look-alike letters is a short one.** It holds the lower-case Cyrillic,
+Greek and Armenian letters, and the Latin `ɡ`, that are actually used to imitate domains
+(`IMITATES`), not Unicode's
+whole confusables table. A mixed label that imitates a word with a letter not on it is still named
+as a mixture, but the sentence cannot say which word it reads as; a label written wholly in another
+alphabet with such a letter says nothing. Latin letters with an accent or a dot that imitate the
+plain one (`ạpple`, `lınkedin`), and those built with combining marks, are not in it and say
+nothing. Letters of an alphabet outside the fifteen the guard knows are not counted at all. The whole table runs to thousands of entries, most of them characters no
+registry accepts in a domain, and a guard that named every theoretical confusion would be the mark
+that is always on ([`DESIGN_SYSTEM.md`](../../DESIGN_SYSTEM.md) §2).
+
+**Second cost: a shortener that is not on the list says nothing.** The list is a list. A new
+service, a company's own short domain, a redirect served from an ordinary one — none of them can be
+told from the host, and finding out would mean following the link, which this product does not do.
+Silence from the guard is therefore not a statement that a link is safe, and nothing on the screen
+says it is: the guard names what it found, and it has no "this address is fine".
+
+**Third cost: it is not a phishing filter.** It knows nothing of who owns a domain, of whether a
+correctly spelled name is malicious, or of whether a page changed after the code was printed. An
+ordinary-looking `.com` that serves a fake login page passes in silence, and so does a swap that
+stays inside plain ASCII — `paypa1` for `paypal`, `rn` for `m`. What it does is narrower, and can be
+checked against its corpus: it says the five things an address can be that a person cannot see by
+looking at it. On Read an e-mail code is checked on every address it writes to — the list before
+the `?` and the `to`, `cc` and `bcc` fields after it — so a second recipient cannot hide behind the
+first.
+
+**Fourth cost: it reads links and e-mail domains, and nothing else.** The link and the e-mail
+address inside a contact card are not checked — not on Create, not in a batch of contact cards, not
+on Read — and a text code that happens to contain a URL is text. They are left as they are in this
+slice; taking one of them in is a call to the same function.

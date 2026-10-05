@@ -7,6 +7,7 @@ import { useReadClipboard, useReadImage } from '@/data/hooks';
 import type { ReadCode, Reading } from '@/data/read';
 import { describeBytes, wouldScanAt, type ReadKind, type ScanVerdict } from '@/domain/read';
 import { LENGTH_UNIT_LABELS, LENGTH_UNITS, toMillimetres, type LengthUnit } from '@/domain/size';
+import { AddressSentences } from '@/features/create/AddressSentences';
 import { announce } from '@/ui/announce';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -356,6 +357,15 @@ function CodeCard({
     <Card label={name} title={name}>
       <div className="flex flex-col gap-4">
         <p className="text-body-lg text-fg">{description.summary}</p>
+
+        {/* Above the facts, because it is the one worth reading before anybody follows the
+            address: a look-alike, a shortener, a raw IP (ADR-034). It says, and never refuses —
+            "Make a code like this" stays where it was. */}
+        {description.warnings.length > 0 && (
+          <InfoBar severity="caution" title="Check this address before you open it">
+            <AddressSentences sentences={description.warnings} />
+          </InfoBar>
+        )}
 
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-body">
           <dt className="text-fg-secondary">Kind</dt>

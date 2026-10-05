@@ -417,6 +417,25 @@ before** — a primitive built ahead of the screen that needs it is a guess with
   A control the host refused keeps what was typed, so the person can correct it rather than watch
   it revert. A default is a starting point: it fills the control on the screen that uses it, and
   changing it there changes that code and not the setting.
+- **"True, and worth reading before you act" is a caution `InfoBar` under the summary** (P3) — not
+  a primitive, and not a disabled button. The look-alike guard (ADR-034) has things to say that are
+  facts about an address and not reasons to stop: a link shortener, a name that mixes alphabets, a
+  private IP address. Their shape is the canonical `InfoBar` in the `caution` tone, placed directly
+  under the line that says what the code does — on Create _"Check this address"_, on each Read card
+  _"Check this address before you open it"_ — titled for the action it asks for, with each sentence
+  as its own line: plain text for one, a list for more, written once (`AddressSentences`) so that
+  both screens say it the same way. On the batch plan the same fact is a word in
+  the row's status, _Planned · check the address_, coloured from `--color-caution` and carried by
+  the words, with the sentences listed under the table by line number. Three things it never does.
+  It never **disables** anything: the export, the run and _Make a code like this_ stay exactly as
+  they were, because a disabled button says _you may not_, and the product's position here is _you
+  should know_ (§10 keeps disabled buttons for the scan gate, which has one correct answer). It
+  never **changes the verdict** beside it: the code is verified or it is not, and an address worth
+  reading about is not a code that failed to read. And it never **appears without something to
+  say**: no "this address looks fine", because the guard cannot know that, and a caution present on
+  every code would be the mark that is always on (§2). It announces itself once, as the status
+  region `InfoBar` already is, and adds no live region of its own. The sentences are the domain's,
+  shown as given, for the reason a verdict's sentence is.
 
 ### Asking "are you sure"
 
