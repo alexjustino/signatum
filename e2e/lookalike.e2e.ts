@@ -93,8 +93,9 @@ describe('look-alike guard', () => {
     await setLink(LOOKALIKE);
     await driver.waitForText('mixes Latin and Cyrillic letters');
     await driver.waitForText('it reads as “apple”, but it is a different address');
-    await driver.waitForText(VERIFIED);
-    expect(await exportOpen()).toBe(true);
+    // The verdict line may still be the previous code's; the export button is enabled by the
+    // verdict about the code now on screen and by nothing else.
+    await driver.waitFor('the export open again', exportOpen);
   });
 
   it('says nothing about an ordinary link', async () => {
