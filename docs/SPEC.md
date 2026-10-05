@@ -92,9 +92,10 @@ Linux · plugins · auto-update.
 
 | Release   | Theme               | Contents                                                                                                  |
 | --------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
-| **1.0.0** | The mark            | the list above                                                                                            |
-| 1.1.0     | The card            | business-card and badge layouts (print-ready PDF sheets) · frames with a call to action · calendar events |
-| 1.2.0     | The payment         | PIX BR Code (EMV, CRC16) · EPC SEPA · payload templates per country                                       |
+| **1.0.0** | The mark            | the list above — released 2026-09-14                                                                      |
+| **1.1.0** | The proof           | the promise carried from the file to the paper and to whoever receives the code — §10                     |
+| 1.2.0     | The card            | business-card and badge layouts (print-ready PDF sheets) · frames with a call to action · calendar events |
+| 1.3.0     | The payment         | PIX BR Code (EMV, CRC16) · EPC SEPA · payload templates per country                                       |
 | 2.0       | Only if it earns it | macOS and Linux                                                                                           |
 
 ## 3. Architecture
@@ -279,3 +280,25 @@ A slice is done when **all nine** are true.
 | R6  | Library licences, maintenance, or a C++ toolchain requirement on Windows                                          | Medium       | pure-Rust decoder preferred; every dependency through the audit gate and `NOTICE`; vendored encoder with its licence                             |
 | R7  | Scope overruns — dynamic codes, analytics, AI art, barcodes, payments                                             | High         | the release train; 1.0.0 is a closed list; dynamic codes are refused on principle, not deferred                                                  |
 | R8  | The name collides with a product or a trademark after it is public                                                | Medium       | §0 — collision evidence shown before the repository existed; no "QR Code" in the name; the sweep is repeated once before 1.0.0 is published      |
+
+## 10. The 1.1 line — The proof
+
+1.0.0 proves that a **file** scans. It does not prove that the **print** scans, that the file in
+somebody's hands is the one that was proved, or that the link inside a code is the address it
+looks like. 1.1 carries the promise those three steps further, and nothing else: no new payload
+kind, no new look. Every slice keeps the 1.0.0 rules — the scan gate is never weakened, nothing
+leaves unverified, nothing is sent anywhere, and dynamic codes stay refused.
+
+| Slice | Name                        | Proof of done (verified running, both themes captured)                                                                                                                                                                                                                                                                                                                                                                         |
+| ----- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P1    | The proof sheet             | one A4 PDF with the code at 15, 20, 25 and 30 mm (and the chosen size when it is none of those), **each verified at its own pixel size before it is drawn**; a size that does not read is a box with the reason, never a picture; a 50 mm calibration bar; **every image on the page decodes with jsQR and measures its size in the PDF's own units**                                                                          |
+| P2    | The verification stamp      | every exported PNG, SVG and PDF, and every batch file, carries a stamp — verification id, payload digest, decoder, and a digest of what was verified, **and no date** (the workspace knows when; the file does not say); **Read says "verified by this workspace, unchanged" for a stamped file, and "changed after it was verified" when one pixel or byte is edited**; the stamp never carries the payload, a path or a name |
+| P3    | The look-alike guard        | a host that mixes alphabets in one label, a label that imitates a Latin word in another alphabet, a known link shortener, and an IP address instead of a name are each named in a sentence — on Create, on Batch and on Read; **a corpus of hosts with their expected warnings is green**; it warns and never refuses                                                                                                          |
+| P4    | Print conditions            | the scan margin gains ink spread on coated and on uncoated paper, a 30° tilt and dim light; still a report and never a gate; **a code that reads clean and fails under ink spread says so in the margin, by name**                                                                                                                                                                                                             |
+| P5    | The library, checked again  | one press rebuilds every saved code, compares it with the scene it was saved as, and verifies it again, with progress; **a code that rebuilds differently is named, and so is one that no longer reads**                                                                                                                                                                                                                       |
+| P6    | A print against the library | a code found by Read is matched against the saved codes by what it carries; **"matches your saved code Menu", with Open**; a stamped file names the saved code its verification belongs to                                                                                                                                                                                                                                     |
+| P7    | Dependencies                | the open dependency updates, one concern each; **a decoder or renderer update lands only with the 10 000-payload corpus and the end-to-end suite green**, and one that changes a verdict is held with the reason                                                                                                                                                                                                               |
+| P8    | Release 1.1.0               | as F12: version in six files, changelog closed, `release:check`, the end-to-end suite against the release binary, **and the proof sheet printed and scanned by the owner** before the tag                                                                                                                                                                                                                                      |
+
+The owner's UAT runs on the release candidate of P8. Corrections found there land before the tag;
+findings against 1.0.0 that 1.1 does not already fix land as 1.0.x only if 1.1 is held.

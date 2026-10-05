@@ -319,12 +319,14 @@ npm run gates
 | Release   | Theme               | Contents                                                                                                  |
 | --------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
 | **1.0.0** | The mark            | **released 2026-09-14** — the list above, on the Releases page                                            |
-| 1.1.0     | The card            | business-card and badge layouts (print-ready PDF sheets) · frames with a call to action · calendar events |
-| 1.2.0     | The payment         | PIX BR Code (EMV, CRC16) · EPC SEPA · payload templates per country                                       |
+| **1.1.0** | The proof           | **in progress** — a proof sheet to print, a stamp in every file, a look-alike guard, print conditions     |
+| 1.2.0     | The card            | business-card and badge layouts (print-ready PDF sheets) · frames with a call to action · calendar events |
+| 1.3.0     | The payment         | PIX BR Code (EMV, CRC16) · EPC SEPA · payload templates per country                                       |
 | 2.0       | Only if it earns it | macOS and Linux                                                                                           |
 
-The rows after 1.0.0 are candidate themes, not commitments: the next minor is opened when there is
-a theme worth opening one for, and this page says so when it is.
+1.1.0 "The proof" is open: it carries the promise from the file to the paper and to whoever
+receives the code — the slices and their proofs are in [`docs/SPEC.md`](docs/SPEC.md) §10. The rows
+after it are candidate themes, not commitments.
 
 Deliberately out of scope: **dynamic codes are refused on principle, not deferred** — a dynamic
 code is a redirect through a server that learns who scanned what, when, and that is precisely the
