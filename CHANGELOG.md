@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A proof sheet: the code at the sizes people print, on one page, each one read back first.**
+  **Proof sheet…** on the Create screen writes one A4 PDF with the code at 15, 20, 25 and 30 mm,
+  and at the chosen size when it is none of those. Each size is rendered at the pixels an export of
+  that size would have and read back by the same independent decoder before it is drawn, and the
+  picture on the page is the one that read. A size that does not read is a box with the reason
+  inside it, never a picture, so the sheet shows where this code stops reading instead of leaving
+  it out; when no size reads, nothing is written. Under each code are its size, how far away to
+  hold a phone — ten times the width, printed as the rule of thumb it is — and a reference to the
+  verification that proved it. Each size is a verification of its own in the workspace (ADR-032).
+- **A bar that checks the printer.** At the foot of the sheet is a bar exactly 50 mm long, ticked
+  every 10 mm. If it measures anything else, the print dialog scaled the page — "fit to page" is
+  the most common way a 25 mm code becomes 23 mm — and the sizes above it are wrong. The sheet asks
+  to be printed at 100 %.
+- **Nothing on the sheet about who made it, or when.** Like every PDF this product writes, the
+  sheet says what produced it and nothing else: no date, no author, no title, no path. What the code
+  does is printed in one line under the heading when the sheet's font can draw every character of
+  it, and replaced by a sentence saying so when it cannot — never printed with question marks where
+  the letters were.
+
 ## [1.0.0] — 2026-09-14 — The mark
 
 Signatum makes QR codes with a brand mark in the middle, on your own machine, and refuses to let

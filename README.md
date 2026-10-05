@@ -201,11 +201,22 @@ export button, into the library and through a dialog that has to give the focus 
 
 1.0.0 is released: the eight payload kinds, the logo placement engine, the scan gate in front of
 every way out, the look and the printed size, the library and brand kits, batch, Read, and the
-defaults that mean a choice is made once. What comes after it is not decided here. Corrections land
-as 1.0.x — bug fixes only, no schema change and no new surface — by the flow in
-[`VERSIONING.md`](VERSIONING.md) and the checklist in [`docs/RELEASE.md`](docs/RELEASE.md). A minor
-release is opened when there is a theme worth opening one for, and this page will say so when there
-is.
+defaults that mean a choice is made once. 1.1 "The proof" is under way and carries the same promise
+further, to the print and to the file in somebody else's hands — its slices are in
+[`docs/SPEC.md`](docs/SPEC.md) §10. Corrections to 1.0.0 land through the flow in
+[`VERSIONING.md`](VERSIONING.md) and the checklist in [`docs/RELEASE.md`](docs/RELEASE.md).
+
+P1 has started 1.1 with the proof sheet. The gate proves a file; a print is proved by printing it,
+so **Proof sheet…**, beside the exports on the Create screen, writes one A4 PDF with the code at 15,
+20, 25 and 30 mm, and at the size chosen when it is none of those. Every size is rendered at the
+pixels an export of that size would have and read back by the same independent decoder before it
+is drawn, and the picture on the page is the one that read. A size that does not read is a box
+with the reason in it, never a picture, so the sheet shows where this code stops reading rather
+than hiding it. Under each code are its size, how far away a phone should read it — ten times the
+width, said as the rule of thumb it is — and a reference to the verification that proved it. At the
+foot is a bar exactly 50 mm long: if it measures anything else, the printer scaled the page, and
+the sizes above it are wrong. Like every file this product writes, the sheet carries no date, no
+author and no path.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 

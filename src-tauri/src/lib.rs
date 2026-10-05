@@ -54,6 +54,11 @@
 //!   becomes a place the interface leaves notes for itself. The theme moves out
 //!   of the browser store and into the file, which is where a preference that
 //!   has to survive a reinstall of the web view belongs.
+//! - P1: the proof sheet. The export at several sizes on one A4 page, each size
+//!   rendered at its own pixels and verified exactly as an export is, only the
+//!   sizes that read drawn — the rest are boxes with the reason — and a 50 mm
+//!   bar that tells a person whether the printer scaled the page. One
+//!   verification row per size attempted; nothing written when no size reads.
 
 pub mod commands;
 pub mod db;
@@ -109,6 +114,7 @@ pub fn run() {
             commands::codes::export_pdf,
             commands::codes::copy_png,
             commands::codes::scan_margin,
+            commands::proof::export_proof_sheet,
             commands::logos::import_logo,
             commands::logos::list_logos,
             commands::logos::logo_data_url,

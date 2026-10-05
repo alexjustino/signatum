@@ -144,23 +144,28 @@ One row per attempt, kept — a verification and a refused export alike. The sca
 
 **As shipped in F0:**
 
-| Column            | Type    | Meaning                                                                                              |
-| ----------------- | ------- | ---------------------------------------------------------------------------------------------------- |
-| `id`              | TEXT    | UUID v7                                                                                              |
-| `created_at`      | TEXT    | when the attempt was made                                                                            |
-| `kind`            | TEXT    | `verify` or `export` — whether a file was being asked for                                            |
-| `decoder`         | TEXT    | the independent decoder, name and version in one string: `rqrr 0.10.1` (ADR-011, ADR-019)            |
-| `verified`        | INTEGER | 0 or 1                                                                                               |
-| `payload_sha256`  | TEXT    | the encoded payload the code was built from                                                          |
-| `decoded_sha256`  | TEXT    | what the decoder read back; `NULL` when it read nothing                                              |
-| `artefact_sha256` | TEXT    | the exact bytes that were decoded — and, when the export succeeds, the exact bytes that were written |
-| `width`, `height` | INTEGER | the artefact's pixels                                                                                |
-| `duration_ms`     | INTEGER | how long the render and the decode took together                                                     |
-| `path`            | TEXT    | where the file went; `NULL` for a verification, and `NULL` for a refused export — no file went there |
-| `reason`          | TEXT    | the sentence shown when the code was not verified; `NULL` when it was                                |
+| Column            | Type    | Meaning                                                                                                                                                    |
+| ----------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`              | TEXT    | UUID v7                                                                                                                                                    |
+| `created_at`      | TEXT    | when the attempt was made                                                                                                                                  |
+| `kind`            | TEXT    | `verify` or `export` — whether a file was being asked for                                                                                                  |
+| `decoder`         | TEXT    | the independent decoder, name and version in one string: `rqrr 0.10.1` (ADR-011, ADR-019)                                                                  |
+| `verified`        | INTEGER | 0 or 1                                                                                                                                                     |
+| `payload_sha256`  | TEXT    | the encoded payload the code was built from                                                                                                                |
+| `decoded_sha256`  | TEXT    | what the decoder read back; `NULL` when it read nothing                                                                                                    |
+| `artefact_sha256` | TEXT    | the exact PNG bytes that were decoded; for a PNG export also the bytes written, for an SVG, a PDF or a proof-sheet size the raster the file was decided on |
+| `width`, `height` | INTEGER | the artefact's pixels                                                                                                                                      |
+| `duration_ms`     | INTEGER | how long the render and the decode took together                                                                                                           |
+| `path`            | TEXT    | where the file went; `NULL` for a verification, and `NULL` for a refused export — no file went there                                                       |
+| `reason`          | TEXT    | the sentence shown when the code was not verified; `NULL` when it was                                                                                      |
 
 Only hashes. The payload is never stored by this table, which is why a refusal can be kept
 forever without keeping what somebody typed.
+
+A proof sheet (1.1, ADR-032) writes one row per size the host rendered: `kind` `export`,
+`format` `pdf`, its own `artefact_sha256` and pixels, and `path` only on the rows whose picture is
+on the page — a size the decoder refused has a row with no path, and a size the domain refused
+before anything was rendered has no row at all.
 
 ```sql
 CHECK (verified = 0 OR decoded_sha256 IS payload_sha256)

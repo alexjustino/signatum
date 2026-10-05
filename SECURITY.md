@@ -150,10 +150,16 @@ seriously.
   **verified image** on the clipboard and never the payload text: a payload on the clipboard is a
   paste into the wrong window — into the message somebody was writing, or into a terminal — and
   nothing about a code needs the clipboard to carry it as text. An export writes only through the
-  path a save dialog produced, and the SVG and the PDF (F7) join the PNG under the same three checks
-  the host already applies: the path came from the dialog, its extension is the kind being written,
-  and it is on a local drive — a network path is refused. The bytes written are always a code that
-  read back (ADR-010, ADR-026).
+  path a save dialog produced, and the SVG and the PDF (F7) join the PNG under the same checks. The
+  interface takes the path from the save dialog; the host does not trust that and checks it again on
+  its own side: the path must be absolute, its extension must be the kind being written, and a
+  network path is refused. A drive letter mapped to a network share is not detected — it looks local
+  to the host. The bytes written are always a code that read back (ADR-010, ADR-026). The proof sheet
+  (1.1, ADR-032) is one more PDF under the same checks: written only to an absolute local path
+  through the same staged rename, and only
+  when at least one of its sizes read back, with nothing drawn on it that did not. Like every PDF
+  this product writes, it carries no date, no author and no path; the line on it that says what the
+  code does tells a reader no more than scanning the code would.
 
 ### What the tests must refuse
 

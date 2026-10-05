@@ -172,11 +172,13 @@ belongs where the reading order puts it, not pinned over the form.
 A wrapped row that leaves the last button by itself on a second line reads as a different kind of
 action rather than the last of four, and it is the default window width that does it. A row of
 peer actions is `grid grid-cols-2`, and `lg:flex` only where the column can hold the whole row
-without wrapping — Create's export row, five buttons in half of `max-w-5xl`, cannot, so it stays a
-grid at every width, with its fifth button spanning the last row (`col-span-2`) so the odd one out
-is a deliberate wide button and not a wrap. The order is the same either way — the destructive or
-secondary one last, never promoted by the wrap. `flex-wrap` on a row of peers is what this rule
-replaces.
+without wrapping. An odd count spans its last button across the last row (`col-span-2`), so the
+odd one out is a deliberate wide button and not a wrap. Create's export row, six buttons in half of
+`max-w-5xl`, cannot hold one row, so it stays a grid at every width: three even rows — Save…,
+Export PNG…, Export SVG…, Export PDF…, Copy, Proof sheet… — and, at six, no button spans. The proof
+sheet is last because it prepares a print rather than delivering a file. The order is the same
+either way — the destructive or secondary one last, never promoted by the wrap. `flex-wrap` on a
+row of peers is what this rule replaces.
 
 ## 5. Icons
 

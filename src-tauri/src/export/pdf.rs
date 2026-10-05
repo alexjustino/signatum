@@ -80,11 +80,7 @@ pub fn check_width(width_mm: f64) -> Result<()> {
 pub fn one_page(png: &[u8], width_mm: f64) -> Result<Vec<u8>> {
     check_width(width_mm)?;
 
-    let image = image::load_from_memory_with_format(png, ImageFormat::Png)
-        .map_err(|error| Error::Render(format!("the artefact could not be read back: {error}")))?
-        .to_rgb8();
-    let (width, height) = (image.width(), image.height());
-    let samples = deflate(image.as_raw())?;
+    let artefact = Picture::from_png(png)?;
 
     let side = points(width_mm) as f32;
     let catalogue = Ref::new(1);
@@ -107,15 +103,7 @@ pub fn one_page(png: &[u8], width_mm: f64) -> Result<Vec<u8>> {
         written.finish();
     }
 
-    {
-        let mut embedded = pdf.image_xobject(picture, &samples);
-        embedded.filter(Filter::FlateDecode);
-        embedded.width(width as i32);
-        embedded.height(height as i32);
-        embedded.color_space().device_rgb();
-        embedded.bits_per_component(8);
-        embedded.finish();
-    }
+    artefact.embed(&mut pdf, picture);
 
     // The image's own coordinate system is the unit square, so the matrix that
     // places it is the page size itself: no offset, no scale to work out, and
@@ -133,6 +121,50 @@ pub fn one_page(png: &[u8], width_mm: f64) -> Result<Vec<u8>> {
     pdf.document_info(about).producer(TextStr("Signatum"));
 
     Ok(pdf.finish())
+}
+
+/// The verified artefact, ready to be embedded: its samples as RGB, eight bits
+/// each, deflated.
+///
+/// Shared with the proof sheet (`export::proof`), so a code on the sheet is
+/// embedded exactly as a code on its own page is — one way of putting a verified
+/// raster into a PDF, not two.
+pub(crate) struct Picture {
+    width: u32,
+    height: u32,
+    samples: Vec<u8>,
+}
+
+impl Picture {
+    /// Read the artefact back and compress its samples.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Render`] when the PNG cannot be read or its samples cannot be
+    /// compressed — both are this host's own bytes.
+    pub(crate) fn from_png(png: &[u8]) -> Result<Self> {
+        let image = image::load_from_memory_with_format(png, ImageFormat::Png)
+            .map_err(|error| {
+                Error::Render(format!("the artefact could not be read back: {error}"))
+            })?
+            .to_rgb8();
+        Ok(Self {
+            width: image.width(),
+            height: image.height(),
+            samples: deflate(image.as_raw())?,
+        })
+    }
+
+    /// Write the image XObject: `/FlateDecode`, `/DeviceRGB`, eight bits.
+    pub(crate) fn embed(&self, pdf: &mut Pdf, id: Ref) {
+        let mut embedded = pdf.image_xobject(id, &self.samples);
+        embedded.filter(Filter::FlateDecode);
+        embedded.width(self.width as i32);
+        embedded.height(self.height as i32);
+        embedded.color_space().device_rgb();
+        embedded.bits_per_component(8);
+        embedded.finish();
+    }
 }
 
 /// Deflate the samples, as `/FlateDecode` means them.

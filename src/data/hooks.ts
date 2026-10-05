@@ -27,6 +27,7 @@ import {
   saveCode,
 } from './library';
 import { deleteLogo, importLogo, listLogos, logoDataUrl } from './logos';
+import { exportProofSheet } from './proof';
 import { readClipboard, readImage } from './read';
 import { fetchSettings, writeSetting, type SettingKey } from './settings';
 import { fetchAccentRamp, fetchSystemInfo } from './system';
@@ -100,6 +101,14 @@ export function useExportSvg() {
 /** The same code as a page, measured in millimetres. */
 export function useExportPdf() {
   return useMutation({ mutationFn: exportPdf });
+}
+
+/**
+ * The same code at the sizes people print, each one read back before it is drawn (P1). A
+ * mutation for the reason every export is: a file written at a moment a person chose.
+ */
+export function useExportProofSheet() {
+  return useMutation({ mutationFn: exportProofSheet });
 }
 
 /** The verified picture on the clipboard — the image, never the payload text. */
