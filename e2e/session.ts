@@ -18,15 +18,42 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { connect } from 'node:net';
+import { connect, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { Driver } from './webdriver';
 
-const DRIVER_PORT = 4444;
-const NATIVE_PORT = 4445;
-const BASE = `http://127.0.0.1:${DRIVER_PORT}`;
+/**
+ * The two ports this session's drivers use, chosen by the operating system when the session
+ * starts. Not a fixed 4444: other projects on the same machine run the same `tauri-driver`, and
+ * a suite that finds a driver already answering on a fixed port talks to somebody else's — and
+ * launches somebody else's application.
+ */
+let driverPort = 0;
+let nativePort = 0;
+const base = () => `http://127.0.0.1:${driverPort}`;
+
+/** A port nothing is listening on right now, as the operating system hands it out. */
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address !== null ? address.port : 0;
+      server.close(() => resolve(port));
+    });
+  });
+}
+
+/** Two distinct free ports for the next driver pair. */
+async function choosePorts(): Promise<void> {
+  driverPort = await freePort();
+  do {
+    nativePort = await freePort();
+  } while (nativePort === driverPort);
+}
 
 export interface Session {
   driver: Driver;
@@ -57,14 +84,14 @@ async function waitForDriver(): Promise<void> {
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(`${BASE}/status`);
+      const response = await fetch(`${base()}/status`);
       if (response.ok) return;
     } catch {
       // not up yet
     }
     await new Promise((resolve) => setTimeout(resolve, 150));
   }
-  throw new Error('tauri-driver did not come up on port 4444');
+  throw new Error(`tauri-driver did not come up on port ${driverPort}`);
 }
 
 function startDriverProcess(dataDir: string): ChildProcess {
@@ -72,9 +99,9 @@ function startDriverProcess(dataDir: string): ChildProcess {
     'tauri-driver',
     [
       '--port',
-      String(DRIVER_PORT),
+      String(driverPort),
       '--native-port',
-      String(NATIVE_PORT),
+      String(nativePort),
       '--native-driver',
       nativeDriver(),
     ],
@@ -94,7 +121,7 @@ function startDriverProcess(dataDir: string): ChildProcess {
 }
 
 async function createSession(): Promise<Driver> {
-  const driver = await Driver.create(BASE, {
+  const driver = await Driver.create(base(), {
     'tauri:options': { application: appPath() },
   });
   await selectMainWindow(driver);
@@ -175,14 +202,18 @@ function killProcess(child: ChildProcess): Promise<void> {
  */
 function stopStrayInstances(): Promise<void> {
   const binary = appPath().replace(/'/g, "''");
-  const driverBinary = nativeDriver().replace(/'/g, "''");
-  // Three processes, each matched narrowly: our application by path, the
-  // native driver by the path this suite was told to use, and tauri-driver by
-  // name — it exists for this suite and nothing else.
+  // Our application by its path, and our two drivers by the ports this session gave them —
+  // never by name and never by the driver's path: the same `tauri-driver`, and the same
+  // `msedgedriver` under a shared tools folder, are used by other projects on this machine, and
+  // their suites are not ours to stop.
   const script = [
     `Get-Process signatum -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq '${binary}' } | Stop-Process -Force -ErrorAction SilentlyContinue`,
-    `Get-Process msedgedriver -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq '${driverBinary}' } | Stop-Process -Force -ErrorAction SilentlyContinue`,
-    `Get-Process tauri-driver -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue`,
+    ...(driverPort === 0
+      ? []
+      : [
+          `Get-CimInstance Win32_Process -Filter "Name='tauri-driver.exe'" | Where-Object { $_.CommandLine -match '--port ${driverPort}( |$)' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
+          `Get-CimInstance Win32_Process -Filter "Name='msedgedriver.exe'" | Where-Object { $_.CommandLine -match '--port=${nativePort}( |$)' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
+        ]),
   ].join('; ');
   return new Promise((resolve) => {
     spawn('pwsh', ['-NoProfile', '-NonInteractive', '-Command', script], {
@@ -222,11 +253,11 @@ async function waitForDriverGone(): Promise<void> {
   while (Date.now() < deadline) {
     let talking = true;
     try {
-      await fetch(`${BASE}/status`);
+      await fetch(`${base()}/status`);
     } catch {
       talking = false;
     }
-    if (!talking && !(await portAnswers(NATIVE_PORT))) return;
+    if (!talking && !(await portAnswers(nativePort))) return;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 }
@@ -256,6 +287,7 @@ export async function startSession(options: SessionOptions = {}): Promise<Sessio
   if (options.seedWorkspace !== undefined) {
     await copyFile(options.seedWorkspace, path.join(dataDir, 'signatum.sqlite3'));
   }
+  await choosePorts();
   let process_ = startDriverProcess(dataDir);
   let driver: Driver;
   try {
@@ -286,6 +318,7 @@ export async function startSession(options: SessionOptions = {}): Promise<Sessio
     },
     async restart() {
       await teardown(driver, process_);
+      await choosePorts();
       process_ = startDriverProcess(dataDir);
       await waitForDriver();
       driver = await createSession();
