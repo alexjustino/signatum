@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A print, held against the library.** When Read finds a code that carries exactly what a saved
+  code carries — the same bytes, compared one by one, not a resemblance — it says so above the
+  details: _Matches your saved code Menu_, with **Open**, which reopens that saved code exactly as
+  it was saved. A code that is not in the library says nothing. So a printed code on a wall, a
+  menu or a label can be photographed and traced back to the code it came from, without anybody
+  having to remember its name. A Wi-Fi code saved without its password is never matched, because
+  what it would carry is not known.
 - **The library, checked again in one press.** "Check all again" on the Library rebuilds every
   saved code the way Open does, compares it with the drawing it was saved as, and asks the decoder
   again — one at a time, with a progress bar — then says on each row whether it rebuilds
