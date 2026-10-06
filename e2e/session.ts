@@ -13,6 +13,7 @@
  * Environment:
  *   SIGNATUM_E2E_APP         path to the debug binary (default: src-tauri/target/debug/signatum.exe)
  *   SIGNATUM_E2E_EDGEDRIVER  path to msedgedriver.exe (default: `msedgedriver` on PATH)
+ *   SIGNATUM_E2E_TAURI_DRIVER  path to tauri-driver (default: `tauri-driver` on PATH)
  *   SIGNATUM_E2E_KEEP        set to keep the temporary workspace for inspection
  */
 
@@ -94,9 +95,18 @@ async function waitForDriver(): Promise<void> {
   throw new Error(`tauri-driver did not come up on port ${driverPort}`);
 }
 
+/**
+ * The `tauri-driver` to run: `SIGNATUM_E2E_TAURI_DRIVER` when set, else the one on PATH. A copy
+ * under a name of its own keeps this suite's driver out of reach of another project's cleanup on
+ * the same machine, which may stop every `tauri-driver` by name.
+ */
+function tauriDriver(): string {
+  return process.env.SIGNATUM_E2E_TAURI_DRIVER ?? 'tauri-driver';
+}
+
 function startDriverProcess(dataDir: string): ChildProcess {
   const child = spawn(
-    'tauri-driver',
+    tauriDriver(),
     [
       '--port',
       String(driverPort),
@@ -211,8 +221,8 @@ function stopStrayInstances(): Promise<void> {
     ...(driverPort === 0
       ? []
       : [
-          `Get-CimInstance Win32_Process -Filter "Name='tauri-driver.exe'" | Where-Object { $_.CommandLine -match '--port ${driverPort}( |$)' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
-          `Get-CimInstance Win32_Process -Filter "Name='msedgedriver.exe'" | Where-Object { $_.CommandLine -match '--port=${nativePort}( |$)' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
+          `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match '--port ${driverPort} --native-port ${nativePort}( |$)' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
+          `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match '--port=${nativePort}( |$)' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
         ]),
   ].join('; ');
   return new Promise((resolve) => {
