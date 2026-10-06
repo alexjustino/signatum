@@ -34,9 +34,9 @@ pub fn decode_png(png: &[u8]) -> Result<Option<Vec<u8>>> {
 /// Read a QR code out of the grey pixels a camera would have seen.
 ///
 /// The same decode, one step later: the caller has already got the luminance,
-/// which is what the scan margin needs — it shrinks, blurs and recompresses the
-/// artefact and asks this question of each variant, and encoding nine PNGs to
-/// ask it would be nine encodes nobody reads.
+/// which is what the scan margin needs — it shrinks, blurs, recompresses, inks,
+/// tilts and dims the artefact and asks this question of each variant, and
+/// encoding thirteen PNGs to ask it would be thirteen encodes nobody reads.
 ///
 /// `None` means the decoder found nothing it could read. There is no error case:
 /// by this point the pixels exist, and a picture with no code in it is an

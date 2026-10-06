@@ -439,6 +439,9 @@ export function CreatePage({
   // said beside the export button as well as beside the field it is about.
   const refusal = planRefusal ?? lookRefusal ?? sizeRefusal;
   const box = plan !== null && plan.ok ? plan.box : null;
+  // The code's side in modules, quiet zone included — the one fact about the code the raster
+  // does not carry, and what the margin needs to make ink spread a share of a module (ADR-035).
+  const modules = plan !== null && plan.ok ? plan.matrix.size + 2 * style.quietZone : null;
 
   /** What the figure is called, and what the exported SVG carries as its title. */
   const name = result.ok && refusal === null ? describeCode(result.summary) : 'No code yet';
@@ -559,13 +562,15 @@ export function CreatePage({
    * margin measured about a code the window has moved on from is no margin.
    */
   useEffect(() => {
-    if (!verified || svg === null || payload === null || artefact === null) return;
+    if (!verified || svg === null || payload === null || artefact === null || modules === null) {
+      return;
+    }
 
     const timer = window.setTimeout(() => {
-      measure({ svg, payload, pixelSize: pixels, logo: placement })
+      measure({ svg, payload, pixelSize: pixels, logo: placement, modules })
         .then((next) => {
           setMargin({ key: artefact, variants: next.variants, failure: null });
-          // One sentence rather than nine: the lines are on screen to be read,
+          // One sentence rather than thirteen: the lines are on screen to be read,
           // and a live region that recites all of them is one a person turns off
           // (DESIGN_SYSTEM §7).
           const reads = next.variants.filter((variant) => variant.verified).length;
@@ -581,7 +586,7 @@ export function CreatePage({
     }, MARGIN_MS);
 
     return () => window.clearTimeout(timer);
-  }, [verified, artefact, svg, payload, placement, pixels, measure]);
+  }, [verified, artefact, svg, payload, placement, pixels, modules, measure]);
 
   /**
    * Write the code, in the format asked for.

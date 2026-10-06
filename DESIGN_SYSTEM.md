@@ -451,6 +451,24 @@ before** — a primitive built ahead of the screen that needs it is a guess with
   anybody can write a stamp and a file that matches its own proves only that. The tone is carried by
   the icon and the words as well as the colour (§2), and the switch that turns stamping off is one
   more `Checkbox` on the Defaults card, **Stamp exported files**, saved on change like the others.
+- **The scan margin card is two lists, one per kind of harm** (P4) — not a primitive: a `Card`
+  titled `Scan margin` on Create, whose thirteen lines (ADR-027, ADR-035) are split in two groups,
+  each under a small heading and each its own `ul` whose `aria-label` is that heading. **"On screen
+  and in chat"** holds the nine a screen or a chat application does to a picture — shrunk, blurred,
+  recompressed. **"In print"** holds the four that paper and a phone do — ink spread on coated and
+  on uncoated paper, a 30° tilt, dim light — with one caption under it that says what they are:
+  _"Ink spread is a share of a module; the tilt is 30° from square; dim light is a third of the
+  contrast."_ Two lists rather than one with a divider, because the grouping has to be a fact for
+  somebody listening to the card rather than looking at it, and a list named for its heading says
+  which half a line belongs to without a word added to the line. The line itself is unchanged and
+  is the domain's (`describeVariant`): the host's label and one word, _"Ink spread, uncoated paper
+  — fails"_, with a tick or a cross beside it that is decoration — the word carries the answer
+  (§2, §5). The labels are the host's and the screen prints them as given; it never builds one. The
+  card has no live region of its own: thirteen lines read out unasked is a live region a person
+  turns off, and the screen announces the measurement once, in one sentence, when it lands (§7).
+  And **nothing on it ever disables anything** — a failing line, in either group, is information
+  for choosing a size, a look or a paper, and the export beside it does not hear about it (§10
+  keeps disabled buttons for the scan gate).
 
 ### Asking "are you sure"
 

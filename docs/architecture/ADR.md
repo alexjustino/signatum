@@ -40,6 +40,7 @@ part that matters most later — the cost we accepted.
 | [032](#adr-032) | A proof sheet is the export at several sizes, each proved, with a printer check  | Accepted                      |
 | [033](#adr-033) | A stamp says what was verified, and never when                                   | Accepted                      |
 | [034](#adr-034) | The address inside a code is said out loud, and never refused                    | Accepted                      |
+| [035](#adr-035) | Print is a degradation of its own, and the margin says so                        | Accepted                      |
 
 ---
 
@@ -1043,6 +1044,12 @@ gate an export, it does not change the verdict, and a code the gate passed is ex
 the nine lines say. Nothing in F7 writes the margin down: it is a report about one render at one
 moment, not evidence about a file that was written.
 
+**From 1.1, the margin is thirteen lines ([ADR-035](#adr-035)).** Four print conditions follow the
+nine above — ink spread on coated and on uncoated paper, a 30° tilt and dim light — under this
+record's rule unchanged: each is read by the same decoder, shown as a line, and blocks nothing.
+Where this record says nine, it means the half of the margin that a screen and a chat application
+do to a picture.
+
 **Why.** The two questions are different, and answering the second one with a refusal would be a
 category error. The gate answers _does this file read_ — a fact about one artefact, with one
 correct answer, and it is requirement one (SPEC §4). The margin answers _how much abuse before it
@@ -1838,3 +1845,103 @@ first.
 address inside a contact card are not checked — not on Create, not in a batch of contact cards, not
 on Read — and a text code that happens to contain a URL is text. They are left as they are in this
 slice; taking one of them in is a call to the same function.
+
+## ADR-035 — Print is a degradation of its own, and the margin says so {#adr-035}
+
+**Status: Accepted.**
+
+**Context.** The scan margin ([ADR-027](#adr-027)) degrades the verified render nine ways — shrunk,
+blurred, recompressed — and asks the gate's decoder about each. Those are what a screen and a chat
+application do to a picture. Print does something else. Ink spreads into the paper, so the dark
+modules grow and the light gaps between them close, more on uncoated stock than on coated. A phone
+is held at an angle, not square to the page. And the light on a wall, a table or a shop window is
+not the light of a monitor. These are the questions a printer asks before a run, and a margin that
+answered only the screen's left the print's to the proof sheet ([ADR-032](#adr-032)) — after the
+paper. The fourth slice of 1.1 adds them, and this record fixes which, how each is made, and what
+the answers are worth.
+
+**Decision.** Four variants follow the nine, in this order and with exactly these labels — the
+labels are a contract with the screen, which prints them and does not build them
+(`src-tauri/src/imaging/margin.rs`):
+
+| Line                         | What is done to the verified raster                                                                            | The question it answers                                 |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `Ink spread, coated paper`   | every dark area grows by 8 % of a module on each edge                                                          | will it survive a coated label, a glossy card           |
+| `Ink spread, uncoated paper` | the same at 18 % of a module                                                                                   | will it survive office paper, a paper bag, a newspaper  |
+| `Tilted 30°`                 | the plane turned 30° about its vertical centre line, seen in perspective                                       | will it read from a phone that is not held square to it |
+| `Dim light`                  | the contrast cut to 35 % around the mid-grey, a fixed-seed noise of up to 12 grey levels, then a 1 px box blur | will it read in the room it hangs in, not on a monitor  |
+
+- **Ink spread is a grey-scale erosion.** A minimum filter over a square window of radius
+  `max(1, round(share × module_px))` pixels, with `share` 0.08 for coated paper and 0.18 for
+  uncoated, grows every dark area by that radius on each edge, and a light gap narrower than twice
+  the radius closes — which is how ink takes a code: not by blurring it, but by filling the white
+  between its modules. The window is square because a module is: its edges are horizontal and
+  vertical, where a square and a disc grow it by the same amount. The edge of the raster is
+  extended outwards, as the paper continues past what was printed on it.
+- **The radius is a share of a module, so the screen says how many modules there are.**
+  `module_px` is the raster's width divided by the code's side in modules, and the raster does not
+  know that number; the domain does. So `scan_margin` takes `modules` — the matrix size plus twice
+  the quiet zone — and refuses one outside 21 to 209, a version-1 symbol with no quiet zone to a
+  version-40 symbol with the widest quiet zone the Create screen allows, sixteen modules a side, as
+  invalid input before anything is rendered. A spread in pixels would mean something different at
+  every size: two pixels is a fifth of a 10-pixel module and a twentieth of a 40-pixel one, and the
+  margin is measured on the export's raster or on 1,024 pixels, whichever is smaller
+  (`MARGIN_MAX_PIXELS`), so the same code would get a different answer from a different cap. A
+  share of a module is the same part of the code at any raster.
+- **The tilt is a projective warp, not a shear.** The plane is turned 30° about its vertical centre
+  line and seen from three times its width, with a focal length equal to that distance, so the
+  centre line keeps its size, the near half grows and the far half shrinks, as a camera sees a page
+  at an angle. Sampling is bilinear, because a camera's pixels average what falls on them; the
+  image keeps its size, and whatever the turned code no longer covers is white, as the paper around
+  it would be.
+- **Dim light is deterministic.** Each grey `v` becomes `127.5 + (v − 127.5) × 0.35` — black and
+  white land near 83 and 172, about a third of the range — then gains uniform noise of up to 12
+  grey levels either way, drawn from SplitMix64 with a fixed seed, and a 1 px box blur follows. The
+  seed is fixed so the same artefact gets the same verdict on every machine and every run: a margin
+  that changed its answer between two asks would be measuring the dice, not the code.
+- **Each is read by the same decoder as the nine**, `rqrr` ([ADR-019](#adr-019)), and reported the
+  same way: a label, and whether the payload came back byte for byte.
+- **On the screen they are a group of their own.** The margin card lists the nine under _On screen
+  and in chat_ and the four under _In print_, with a caption that says what the four are
+  ([`DESIGN_SYSTEM.md`](../../DESIGN_SYSTEM.md) §8). The line is unchanged: _"Ink spread, uncoated
+  paper — fails"_.
+
+**Still a report, never a gate.** [ADR-027](#adr-027) holds as written. Nothing about the four
+disables an export, changes the verdict or is recorded: the margin writes no row. The case the slice
+was built to show is a code that reads clean and fails under ink spread, and the margin says so on
+the line named for it. A test draws one by hand — a heavy look at 12 pixels a module, every dark
+module grown 3 pixels on each edge, so a lone light module is a 6-pixel gap. It reads clean; coated
+paper spreads it by one pixel, the gap keeps four, and it reads; uncoated paper spreads it by two,
+the gap keeps two, and it fails. That code is still a true code, and on a coated label it may be
+exactly right. A failing line is information for choosing a size, a look or a paper, and the person
+who knows what the code is going onto is the one who chooses. The real test of a print is a print:
+the proof sheet ([ADR-032](#adr-032)), on the paper that will be used, read with a phone.
+
+**Why these four.** They are the conditions that separate a print from a file and that a raster can
+stand in for without knowing anything about the printer: paper on two common kinds of stock, an
+angle, and a room. Glare, a curved surface, a crease and a press's halftone screen are not
+modelled; each is better answered by the proof sheet than by a synthetic picture of it.
+
+**Cost accepted: the figures are conventional, not calibrated.** 8 % and 18 % stand for coated and
+uncoated stock as approximations of how far apart the two are — uncoated paper drinks more ink and
+spreads it further — and not as a measurement of any press, paper or ink. 30° is an angle somebody
+plausibly holds a phone at, and dim light a room somebody plausibly reads in; neither was measured
+against a camera. And ink spreads by a distance on the paper, not by a share of anything: a fixed
+share is kinder than paper to a code printed small and harsher to one printed large. The margin is
+not told the printed size — it measures pixels — so a share of a module is the simplification the
+raster allows. The honest reading of _"Ink spread, uncoated paper — reads"_ is therefore "this code
+has room for 18 % of a module of spread", not "this code reads from any uncoated paper". The
+figures sit in constants beside their reasons (`INK_SPREAD`, `TILT_DEGREES`, `DIM_CONTRAST`,
+`DIM_NOISE`), so changing one is one line and one record.
+
+**Second cost: a spread is never less than one pixel.** A spread that rounded to nothing would
+report a small code as surviving print because the arithmetic could not see it, so the radius has a
+floor of one pixel. On a very small raster, where a module is not a whole number of pixels, that
+pixel is a large share of the narrowest light gap, and both ink-spread lines can fail while the
+clean read passes — coated and uncoated then say the same thing. What they lead to, printing it
+larger, is what a code that small needs anyway, and the proof sheet is where it is settled.
+
+**Third cost: thirteen decodes, not nine.** The margin takes about 40 % longer to arrive. It is
+still asked for after the verdict and off the window's thread, never between a verdict and a file,
+and the bound it is held to is unchanged: three seconds on the release build at the largest raster
+it measures.
