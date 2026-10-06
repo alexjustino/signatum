@@ -32,7 +32,7 @@
 //!   byte for byte, the artefact that was decoded. The clipboard is never
 //!   stamped: the system copies pixels, not files.
 //! - P4: `scan_margin` takes `modules` — the code's side in modules, quiet zone
-//!   included, 21 to 193 — and reports thirteen variants instead of nine: the
+//!   included, 21 to 209 — and reports thirteen variants instead of nine: the
 //!   four new ones are print (ink spread on coated and on uncoated paper, a 30°
 //!   tilt, dim light), and ink spread is a share of a module, which is what the
 //!   count is for (ADR-035). Still a report and never a gate (ADR-027).
@@ -1775,7 +1775,7 @@ mod tests {
     fn the_scan_margin_refuses_a_module_count_no_code_has() {
         let conn = workspace();
 
-        for modules in [0, 20, 194, u32::MAX] {
+        for modules in [0, 20, 210, u32::MAX] {
             let refused = scan_margin_with(
                 &conn,
                 &Asked {
@@ -1788,11 +1788,11 @@ mod tests {
                 },
                 modules,
             )
-            .expect_err("a module count outside 21..=193 must be refused");
+            .expect_err("a module count outside 21..=209 must be refused");
 
             assert_eq!(kind_of(&refused), "invalid_input", "{modules} modules");
         }
-        for modules in [21, 193] {
+        for modules in [21, 209] {
             assert!(
                 scan_margin_with(
                     &conn,

@@ -61,9 +61,9 @@ const JPEG_QUALITIES: [u8; 3] = [80, 50, 25];
 /// version-1 symbol with no quiet zone at all.
 pub const MIN_MODULES: u32 = 21;
 
-/// The most: a version-40 symbol (177 modules) with a quiet zone of eight on
-/// each side.
-pub const MAX_MODULES: u32 = 193;
+/// The most: a version-40 symbol (177 modules) with the widest quiet zone the
+/// screen offers, sixteen modules on each side.
+pub const MAX_MODULES: u32 = 209;
 
 /// How far ink spreads into the paper, as a share of a module, on each edge of
 /// every dark area — the label it is reported under, and the share. The figures
