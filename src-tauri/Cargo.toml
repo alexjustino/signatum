@@ -41,7 +41,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 # a code we drew ourselves needs, and every one of which is a decoder that would
 # be reachable from a file. The SVG this host renders is one background rect and
 # one path (spec §3).
-resvg = { version = "0.45", default-features = false }
+resvg = { version = "0.48", default-features = false }
 # The decoder. Independent of the encoder by design: nothing on this side of the
 # gate shares a line of code with what drew the code (ADR-011).
 rqrr = "0.10"
