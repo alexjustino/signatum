@@ -44,7 +44,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 resvg = { version = "0.45", default-features = false }
 # The decoder. Independent of the encoder by design: nothing on this side of the
 # gate shares a line of code with what drew the code (ADR-011).
-rqrr = "0.10"
+rqrr = "0.11"
 # Two jobs: turn the PNG this host just encoded back into the grey pixels
 # `rqrr` reads, and decode a logo somebody else's file brought in. Default
 # features stay off — the four formats a logo may arrive as are named one by
