@@ -12,8 +12,8 @@
  * nobody looks up.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
 
 import { cancelBatch, readTextFile, runBatch, writeBatchReport } from './batch';
 import { copyPng, exportPdf, exportPng, exportSvg, scanMargin, verifyCode } from './codes';
@@ -26,6 +26,7 @@ import {
   renameCode,
   saveBrandKit,
   saveCode,
+  type SavedCode,
 } from './library';
 import { deleteLogo, importLogo, listLogos, logoDataUrl } from './logos';
 import { exportProofSheet } from './proof';
@@ -203,6 +204,54 @@ export function useCodes() {
 /** One saved code in full: the fields a row draws its preview from, and Open loads. */
 export function useCode(id: string) {
   return useQuery({ queryKey: keys.code(id), queryFn: () => getCode(id) });
+}
+
+/** Every saved code in full, in the list's order, and how many of them could not be read. */
+export interface SavedCodesInFull {
+  codes: SavedCode[];
+  /** Saved codes the host would not give back: they were not compared, and the screen says so. */
+  unread: number;
+  /** The list itself could not be read: nothing was compared, and the screen says that too. */
+  listFailed: boolean;
+}
+
+/**
+ * Every saved code in full (P6), for matching a code Read found against the library.
+ *
+ * The list is `useCodes()`'s and carries no fields — `list_codes` returns a row without its
+ * `payload_json` — so each code is fetched once, under the same key a Library row and `useCode`
+ * read from: the window's cache holds it after that (it is never stale on its own), whichever
+ * screen asked first, and saving, renaming or forgetting a code invalidates it with the list.
+ *
+ * `enabled` is false until there is something to match: a Read screen with nothing read on it
+ * does not ask the host for every saved code.
+ */
+export function useSavedCodesInFull(enabled: boolean): SavedCodesInFull {
+  const list = useCodes();
+  const fetched = useQueries({
+    queries: (list.data ?? []).map((summary) => ({
+      queryKey: keys.code(summary.id),
+      queryFn: () => getCode(summary.id),
+      enabled,
+    })),
+    combine: inFull,
+  });
+  const listFailed = list.isError;
+  return useMemo(() => ({ ...fetched, listFailed }), [fetched, listFailed]);
+}
+
+/**
+ * The fetched codes as one answer. A function of the module rather than of the render, so the
+ * query library can keep the same answer while nothing changed — a screen that memoises on it
+ * would otherwise recompute on every render.
+ */
+function inFull(
+  results: ReadonlyArray<{ data: SavedCode | undefined; isError: boolean }>,
+): Omit<SavedCodesInFull, 'listFailed'> {
+  return {
+    codes: results.flatMap((result) => (result.data === undefined ? [] : [result.data])),
+    unread: results.filter((result) => result.isError).length,
+  };
 }
 
 /**
