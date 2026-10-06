@@ -13,6 +13,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 
 import { cancelBatch, readTextFile, runBatch, writeBatchReport } from './batch';
 import { copyPng, exportPdf, exportPng, exportSvg, scanMargin, verifyCode } from './codes';
@@ -202,6 +203,23 @@ export function useCodes() {
 /** One saved code in full: the fields a row draws its preview from, and Open loads. */
 export function useCode(id: string) {
   return useQuery({ queryKey: keys.code(id), queryFn: () => getCode(id) });
+}
+
+/**
+ * Fetch one saved code now, through the same cache key a row reads from (P5).
+ *
+ * A function rather than a query because the library's check asks for the codes one after the
+ * other, at the moment a person pressed the button, and has to wait for each: a hook per row
+ * cannot be awaited in order. It asks the host every time — a check that trusted a copy from
+ * earlier would be checking the copy — and what it gets back is what the row then shows.
+ */
+export function useFetchCode() {
+  const client = useQueryClient();
+  return useCallback(
+    (id: string) =>
+      client.fetchQuery({ queryKey: keys.code(id), queryFn: () => getCode(id), staleTime: 0 }),
+    [client],
+  );
 }
 
 /** Keep the code on screen. The list says so without being asked again. */
