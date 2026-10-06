@@ -251,17 +251,23 @@ describe('size and export', () => {
     expect(printLines[2]).toMatch(/^Tilted 30° — (reads|fails)$/);
     expect(printLines[3]).toMatch(/^Dim light — (reads|fails)$/);
     expect(await driver.findAll('ul[aria-label="On screen and in chat"] li')).toHaveLength(9);
-    // The margin card sits at the foot of the sticky pane, which scrolls on its own (F11).
-    await driver.execute(
-      `const pane = document.querySelector('[aria-label="The code and how it leaves"]');
-       pane.scrollTo({ top: pane.scrollHeight });`,
-    );
-    await new Promise((resolve) => setTimeout(resolve, 250));
-    await session.screenshot('export-margin');
-    // And in the dark theme: the failing lines are caution, which has to read on both grounds.
-    await driver.execute(`document.documentElement.setAttribute('data-theme', 'dark');`);
-    await new Promise((resolve) => setTimeout(resolve, 250));
-    await session.screenshot('export-margin-dark');
+    // The margin card sits at the foot of the sticky pane, which scrolls on its own (F11); bring
+    // its last group fully into view, in each theme set explicitly rather than taken from Windows.
+    const showPrintGroup = () =>
+      driver.execute(
+        `document.querySelector('ul[aria-label="In print"]').scrollIntoView({ block: 'end' });`,
+      );
+    for (const [themeName, capture] of [
+      ['light', 'export-margin'],
+      ['dark', 'export-margin-dark'],
+    ] as const) {
+      await driver.execute(
+        `document.documentElement.setAttribute('data-theme', ${JSON.stringify(themeName)});`,
+      );
+      await showPrintGroup();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await session.screenshot(capture);
+    }
     await driver.execute(`document.documentElement.removeAttribute('data-theme');`);
   });
 });
