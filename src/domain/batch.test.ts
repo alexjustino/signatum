@@ -95,6 +95,8 @@ describe('file names', () => {
     expect(sanitiseFileStem('CON')).toBe('code-CON');
     expect(sanitiseFileStem('con.txt')).toBe('code-con.txt');
     expect(sanitiseFileStem('COM3')).toBe('code-COM3');
+    expect(sanitiseFileStem('COM0')).toBe('code-COM0');
+    expect(sanitiseFileStem('lpt².png')).toBe('code-lpt².png');
     expect(sanitiseFileStem('conin$')).toBe('code-conin$');
     expect(sanitiseFileStem('  . . ')).toBe('code');
     expect(sanitiseFileStem('..')).toBe('code');
