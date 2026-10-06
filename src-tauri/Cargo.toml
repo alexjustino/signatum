@@ -64,7 +64,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 # The logo importer and Read's file door still pick their decoder from the magic
 # bytes against a closed list, so a `.bmp` somebody was sent is one sentence and
 # no decode (ADR-016).
-sha2 = "0.10"
+sha2 = "0.11"
 hex = "0.4"
 # The normalised logo reaches the screen as a `data:` URL, because the interface
 # cannot read a file and the host will not hand it a path. Already in the tree
