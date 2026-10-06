@@ -2,8 +2,8 @@
 -- that proved it.
 --
 -- From P2 every file this product writes — a PNG, an SVG, a PDF, every file of a
--- batch and the proof sheet — carries a stamp: a reference, the payload's digest,
--- the decoder, and a digest of what was verified. The row that proved the file keeps
+-- batch and the proof sheet — carries a stamp: a reference, the decoder, and a
+-- digest of what was verified (no digest of the payload: see ADR-033). The row that proved the file keeps
 -- the two halves the file cannot vouch for on its own: which reference it was given,
 -- and which digest was written into it. Read finds the row by the reference and says
 -- "verified by this workspace" only when the digest in the file is the digest here.

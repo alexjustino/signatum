@@ -280,7 +280,6 @@ fn export_proof_sheet_with(db: &Mutex<Connection>, asked: &ProofAsked) -> Result
     let mark = stamped_row.and_then(|index| match &attempts[index] {
         Attempt::Rendered { verification, .. } => Some(Mark {
             reference: &reference,
-            payload: &verification.report.payload_sha256,
             decoder: &verification.report.decoder,
         }),
         Attempt::Planned(_) => None,
@@ -1051,7 +1050,14 @@ mod tests {
             .expect("read")
             .expect("the sheet carries a stamp");
         assert!(found.intact);
-        assert_eq!(found.stamp.payload, sha256_hex(HELLO_WORLD.as_bytes()));
+        assert!(
+            !found
+                .stamp
+                .json()
+                .expect("json")
+                .contains(&sha256_hex(HELLO_WORLD.as_bytes())),
+            "the payload's digest is not in the stamp"
+        );
         assert_eq!(found.stamp.decoder, decoder());
 
         let chosen = report

@@ -2,19 +2,26 @@
 //!
 //! One line of ASCII JSON, keys in this order and no whitespace:
 //!
-//! `{"signatum":1,"ref":"<uuid v4>","payload":"<sha256>","decoder":"<decoder>","digest":"<sha256>"}`
+//! `{"signatum":1,"ref":"<uuid v4>","decoder":"<name> <x.y.z>","digest":"<sha256>"}`
 //!
 //! - `ref` is a UUID **v4** made for the stamp and kept on the row that proved the file
 //!   (migration 007) — never the row's own identifier, which is a v7 and starts with the
 //!   moment it was made.
-//! - `payload` is the digest of what the code carries, which anybody holding the code can
-//!   read anyway.
-//! - `decoder` is the name and version that read the artefact back.
+//! - `decoder` is the name and version that read the artefact back, in exactly one form:
+//!   a name of `a-z 0-9 _ -` (at most 32), one space, and a three-part version.
+//!
+//! There is deliberately no digest of the payload. The reference and the digest already
+//! find the row and prove the file; a payload hash added nothing to that, and for a code
+//! with little in it — a Wi-Fi password — whose picture was removed but whose metadata
+//! survived, it was something a guesser could test candidates against offline.
 //! - `digest` is what makes "unchanged" checkable, and each format defines it so that a
 //!   reader can recompute it from the file alone:
 //!   - **PNG** — the stamp is one `tEXt` chunk, keyword `signatum`, text the JSON, placed
 //!     immediately before `IEND`. `digest` is the SHA-256 of the file with that chunk
-//!     removed — which is, byte for byte, the PNG the decoder read.
+//!     removed — which is, byte for byte, the PNG the decoder read. On reading, the chunk
+//!     is accepted only where it is written: a well-formed chunk with a correct CRC whose
+//!     next chunk is `IEND`. Anywhere else — before `IHDR`, between `IDAT`s — it is not a
+//!     stamp this product wrote.
 //!   - **SVG** — the stamp is the comment `<!-- signatum:{json} -->` right after the root
 //!     element's opening tag. `digest` is the SHA-256 of the whole file with the 64 hex
 //!     characters of the `digest` value replaced by 64 `0`s: the placeholder the file was
@@ -43,7 +50,8 @@ use crate::imaging::verify::sha256_hex;
 /// The version of the stamp this build writes and reads.
 pub const VERSION: u32 = 1;
 
-/// The longest stamp JSON this build reads. One it writes is about 230 bytes.
+/// The longest stamp JSON this build reads. One it writes is 159 bytes with this
+/// product's decoder (`rqrr 0.10.1`).
 pub const MAX_JSON_BYTES: usize = 512;
 
 /// The keyword of the PNG `tEXt` chunk that carries the stamp.
@@ -115,8 +123,6 @@ impl Kind {
 pub struct Mark<'a> {
     /// The stamp's reference, a UUID v4 (`db::new_stamp_ref`).
     pub reference: &'a str,
-    /// The payload's digest, as the verification report has it.
-    pub payload: &'a str,
     /// The decoder that read the artefact back, name and version.
     pub decoder: &'a str,
 }
@@ -133,11 +139,12 @@ impl Mark<'_> {
         let stamp = Stamp {
             signatum: VERSION,
             reference: self.reference.to_string(),
-            payload: self.payload.to_string(),
             decoder: self.decoder.to_string(),
             digest: digest.to_string(),
         };
-        if !stamp.is_well_formed() {
+        // On the way out the decoder also never holds `--`, which an XML comment cannot
+        // carry; the form allows it inside a name, and this product's decoder has none.
+        if !stamp.is_well_formed() || stamp.decoder.contains("--") {
             log::error!("a stamp was composed from values that are not a stamp's");
             return Err(Error::Render("the export could not be stamped".to_string()));
         }
@@ -145,7 +152,7 @@ impl Mark<'_> {
     }
 }
 
-/// The stamp, exactly as it is written: five keys, in this order, and no other.
+/// The stamp, exactly as it is written: four keys, in this order, and no other.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Stamp {
@@ -154,8 +161,6 @@ pub struct Stamp {
     /// The stamp's reference, a UUID v4.
     #[serde(rename = "ref")]
     pub reference: String,
-    /// Hex SHA-256 of the payload.
-    pub payload: String,
     /// The decoder, name and version.
     pub decoder: String,
     /// Hex SHA-256 of what was verified, by the rule of the file's kind.
@@ -175,14 +180,12 @@ impl Stamp {
 
     /// Whether every field is the shape a stamp's field has.
     ///
-    /// Checked on the way in as well as on the way out: the decoder's characters are
-    /// limited so the JSON needs no escaping anywhere it is written — not in a PDF string,
-    /// where a parenthesis would end it, and not in an XML comment, where `--` is not
-    /// allowed.
+    /// Checked on the way in as well as on the way out: the decoder's form is closed, so
+    /// the JSON needs no escaping anywhere it is written — not in a PDF string, where a
+    /// parenthesis would end it — and says nothing but a name and a version.
     fn is_well_formed(&self) -> bool {
         self.signatum == VERSION
             && is_v4(&self.reference)
-            && is_digest(&self.payload)
             && is_digest(&self.digest)
             && is_decoder(&self.decoder)
     }
@@ -308,7 +311,8 @@ pub fn seal_pdf(pdf: Vec<u8>, stamped: bool) -> Result<Sealed> {
 ///
 /// [`Error::InvalidInput`] with [`MORE_THAN_ONE`] for a file with two stamps, with
 /// [`UNREADABLE`] for one whose stamp is not a stamp this build writes — too long, not the
-/// five keys, not in their order, not their shapes — and with [`NOT_A_PNG`] for a PNG whose
+/// four keys, not in their order, not their shapes, or (in a PNG) a chunk with a wrong CRC
+/// or anywhere but immediately before `IEND` — and with [`NOT_A_PNG`] for a PNG whose
 /// signature is not a PNG's.
 pub fn read_stamp(bytes: &[u8], kind: Kind) -> Result<Option<Found>> {
     match kind {
@@ -421,28 +425,50 @@ fn read_png(png: &[u8]) -> Result<Option<Found>> {
     Ok(Some(Found { stamp, intact }))
 }
 
-/// The stamp chunk of a PNG — where it is, and its text — when there is exactly one.
+/// The stamp chunk of a PNG — where it is, and its text — when there is exactly one, and
+/// it is exactly where this product writes it.
+///
+/// Accepted only as a well-formed chunk whose CRC is correct and whose next chunk in the
+/// walk is `IEND`. A stamp chunk anywhere else — the first chunk, between two `IDAT`s,
+/// before another ancillary chunk, at the end of a file with no `IEND` — or with a CRC that
+/// does not match is [`UNREADABLE`]: it is not a stamp this product wrote, and reporting
+/// what it claims would be repeating a stranger's words.
 fn png_stamp(png: &[u8]) -> Result<Option<(Range<usize>, &[u8])>> {
     if !png.starts_with(&PNG_SIGNATURE) {
         return Err(Error::InvalidInput(NOT_A_PNG.to_string()));
     }
-    let mut found = None;
+    let mut found: Option<(Range<usize>, &[u8], bool)> = None;
+    let mut next_is_iend = false;
+    let mut previous_was_stamp = false;
     for chunk in Chunks::new(png) {
+        let is_iend = &png[chunk.kind.clone()] == b"IEND";
+        if previous_was_stamp {
+            next_is_iend = is_iend;
+        }
+        previous_was_stamp = false;
         if chunk.is_stamp(png) {
             if found.is_some() {
                 return Err(Error::InvalidInput(MORE_THAN_ONE.to_string()));
             }
             let text = &png[chunk.data.start + PNG_KEYWORD.len() + 1..chunk.data.end];
-            if text.len() > MAX_JSON_BYTES {
-                return Err(unreadable());
-            }
-            found = Some((chunk.whole.clone(), text));
+            let crc_ok = chunk.crc_is_correct(png);
+            found = Some((chunk.whole.clone(), text, crc_ok));
+            previous_was_stamp = true;
         }
-        if &png[chunk.kind] == b"IEND" {
+        if is_iend {
             break;
         }
     }
-    Ok(found)
+    let Some((range, text, crc_ok)) = found else {
+        return Ok(None);
+    };
+    if !crc_ok || !next_is_iend || text.len() > MAX_JSON_BYTES {
+        log::debug!(
+            "a PNG stamp chunk was refused: CRC correct {crc_ok}, followed by IEND {next_is_iend}"
+        );
+        return Err(unreadable());
+    }
+    Ok(Some((range, text)))
 }
 
 /// One chunk of a PNG, as ranges into the file.
@@ -463,6 +489,12 @@ impl Chunk {
             && data.len() > PNG_KEYWORD.len()
             && data.starts_with(PNG_KEYWORD)
             && data[PNG_KEYWORD.len()] == 0
+    }
+
+    /// Whether the CRC the chunk carries is the CRC of its type and data.
+    fn crc_is_correct(&self, png: &[u8]) -> bool {
+        let stored = &png[self.data.end..self.whole.end];
+        crc32(&png[self.kind.start..self.data.end]).to_be_bytes() == stored
     }
 }
 
@@ -611,14 +643,23 @@ fn is_digest(digest: &str) -> bool {
     digest.len() == DIGEST_HEX && digest.bytes().all(is_lower_hex)
 }
 
-/// Whether `decoder` is a name and version this product could have written: letters,
-/// digits, spaces and `. _ + -`, at most 64 of them, and never `--`.
-fn is_decoder(decoder: &str) -> bool {
-    (1..=64).contains(&decoder.len())
-        && decoder.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b' ' | b'.' | b'_' | b'+' | b'-')
-        })
-        && !decoder.contains("--")
+/// Whether `decoder` has the one form a stamp's decoder has —
+/// `^[a-z0-9_-]{1,32} \d+\.\d+\.\d+$`, with ASCII digits: a lower-case name, one space,
+/// and a three-part version.
+pub(crate) fn is_decoder(decoder: &str) -> bool {
+    let Some((name, version)) = decoder.split_once(' ') else {
+        return false;
+    };
+    let name_ok = (1..=32).contains(&name.len())
+        && name.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'_' | b'-')
+        });
+    let mut parts = 0;
+    let version_ok = version.split('.').all(|part| {
+        parts += 1;
+        !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit())
+    });
+    name_ok && version_ok && parts == 3
 }
 
 fn is_lower_hex(byte: u8) -> bool {
@@ -666,10 +707,6 @@ mod tests {
         crate::db::new_stamp_ref()
     }
 
-    fn payload() -> String {
-        sha256_hex(HELLO_WORLD.as_bytes())
-    }
-
     fn artefact(side: u32) -> Vec<u8> {
         render_png(hello_world_svg().as_bytes(), side)
             .expect("render")
@@ -679,12 +716,10 @@ mod tests {
     /// Stamp a PNG with a fresh mark.
     fn stamped_png(png: &[u8]) -> (Vec<u8>, Stamp) {
         let reference = reference();
-        let payload = payload();
         stamp_png(
             png,
             &Mark {
                 reference: &reference,
-                payload: &payload,
                 decoder: DECODER,
             },
         )
@@ -693,12 +728,10 @@ mod tests {
 
     fn stamped_svg(text: &str) -> (String, Stamp) {
         let reference = reference();
-        let payload = payload();
         stamp_svg(
             text,
             &Mark {
                 reference: &reference,
-                payload: &payload,
                 decoder: DECODER,
             },
         )
@@ -707,13 +740,11 @@ mod tests {
 
     fn stamped_pdf() -> (Vec<u8>, Stamp) {
         let reference = reference();
-        let payload = payload();
         let sealed = pdf::one_page(
             &artefact(295),
             25.0,
             Some(&Mark {
                 reference: &reference,
-                payload: &payload,
                 decoder: DECODER,
             }),
         )
@@ -775,19 +806,27 @@ mod tests {
     }
 
     #[test]
-    fn the_stamp_json_is_five_keys_in_order_and_carries_no_time() {
+    fn the_stamp_json_is_four_keys_in_order_and_carries_no_time() {
         let (_, stamp) = stamped_png(&artefact(128));
         let json = stamp.json().expect("json");
 
         assert_eq!(
             json,
             format!(
-                "{{\"signatum\":1,\"ref\":\"{}\",\"payload\":\"{}\",\"decoder\":\"{DECODER}\",\"digest\":\"{}\"}}",
-                stamp.reference, stamp.payload, stamp.digest
+                "{{\"signatum\":1,\"ref\":\"{}\",\"decoder\":\"{DECODER}\",\"digest\":\"{}\"}}",
+                stamp.reference, stamp.digest
             ),
-            "five keys, in order, and no whitespace"
+            "four keys, in order, and no whitespace"
         );
-        assert!(json.len() < MAX_JSON_BYTES);
+        assert!(
+            !json.contains("payload"),
+            "no digest of the payload: {json}"
+        );
+        assert!(
+            !json.contains(&sha256_hex(HELLO_WORLD.as_bytes())),
+            "the payload's digest is nowhere in it"
+        );
+        assert_eq!(json.len(), 159, "the size the documentation states");
 
         // A v4, not a v7: the version digit is the fifteenth character.
         assert_eq!(stamp.reference.as_bytes()[14], b'4', "{}", stamp.reference);
@@ -889,13 +928,11 @@ mod tests {
     fn a_png_cannot_be_stamped_twice() {
         let (stamped, _) = stamped_png(&artefact(128));
         let reference = reference();
-        let payload = payload();
 
         let refused = stamp_png(
             &stamped,
             &Mark {
                 reference: &reference,
-                payload: &payload,
                 decoder: DECODER,
             },
         )
@@ -976,13 +1013,11 @@ mod tests {
     fn an_svg_that_already_carries_a_stamp_is_not_stamped_again() {
         let (stamped, _) = stamped_svg(SCENE);
         let reference = reference();
-        let payload = payload();
 
         let refused = stamp_svg(
             &stamped,
             &Mark {
                 reference: &reference,
-                payload: &payload,
                 decoder: DECODER,
             },
         )
@@ -1017,6 +1052,38 @@ mod tests {
                 json.replacen(&stamp.digest, &stamp.digest.to_uppercase(), 1),
             ),
             ("not JSON", "this is not a stamp".to_string()),
+            (
+                "a payload digest",
+                json.replacen(
+                    ",\"decoder\"",
+                    &format!(",\"payload\":\"{}\",\"decoder\"", "a".repeat(64)),
+                    1,
+                ),
+            ),
+            (
+                "a decoder in capitals",
+                json.replacen(DECODER, "RQRR 0.10.1", 1),
+            ),
+            (
+                "a decoder with two parts",
+                json.replacen(DECODER, "rqrr 0.10", 1),
+            ),
+            (
+                "a decoder with a suffix",
+                json.replacen(DECODER, "rqrr 0.10.1-beta", 1),
+            ),
+            (
+                "a decoder with no version",
+                json.replacen(DECODER, "rqrr", 1),
+            ),
+            (
+                "a decoder with two spaces",
+                json.replacen(DECODER, "rqrr  0.10.1", 1),
+            ),
+            (
+                "a decoder name past 32",
+                json.replacen(DECODER, &format!("{} 0.10.1", "r".repeat(33)), 1),
+            ),
             (
                 "too long",
                 json.replacen(DECODER, &"r".repeat(MAX_JSON_BYTES), 1),
@@ -1128,5 +1195,103 @@ mod tests {
             assert!(!json.contains(fragment), "`{fragment}` is in {json}");
         }
         assert!(String::from_utf8_lossy(&pdf).contains(&json));
+    }
+
+    /// The one form a stamp's decoder has, on both sides: this product's own
+    /// decoder string has it, and anything else does not.
+    #[test]
+    fn a_decoder_is_a_lower_case_name_and_a_three_part_version() {
+        assert!(is_decoder(&crate::imaging::verify::decoder()));
+        for good in [
+            "rqrr 0.10.1",
+            "a 0.0.0",
+            "zx_ing-cpp 2.2.10",
+            &format!("{} 1.2.3", "r".repeat(32)),
+        ] {
+            assert!(is_decoder(good), "{good}");
+        }
+        for bad in [
+            "",
+            "rqrr",
+            "rqrr 0.10",
+            "rqrr 0.10.1.2",
+            "rqrr 0.10.1 ",
+            " rqrr 0.10.1",
+            "Rqrr 0.10.1",
+            "rqrr 0..1",
+            "rqrr 0.10.x",
+            "rqrr 0.10.\u{0661}",
+            "r(r) 0.10.1",
+            "rqrr\t0.10.1",
+        ] {
+            assert!(!is_decoder(bad), "{bad:?}");
+        }
+    }
+
+    /// M1: the chunk is a stamp only where this product writes it — a correct
+    /// CRC, immediately before IEND. A flipped CRC byte is not a stamp.
+    #[test]
+    fn a_stamp_chunk_with_a_wrong_crc_is_refused() {
+        let (mut stamped, _) = stamped_png(&artefact(128));
+        let crc_at = stamped.len() - 12 - 1;
+        stamped[crc_at] ^= 0x01;
+
+        let refused = read_stamp(&stamped, Kind::Png).expect_err("a wrong CRC");
+        assert_eq!(refused.to_string(), UNREADABLE);
+    }
+
+    #[test]
+    fn a_stamp_chunk_moved_to_the_front_is_refused() {
+        let (stamped, _) = stamped_png(&artefact(128));
+        let chunk = stamp_chunk(&stamped);
+        let plain = png_without_stamp(&stamped).expect("strip");
+        let moved = [&plain[..8], &chunk[..], &plain[8..]].concat();
+
+        let refused = read_stamp(&moved, Kind::Png).expect_err("before IHDR");
+        assert_eq!(refused.to_string(), UNREADABLE);
+    }
+
+    #[test]
+    fn a_stamp_chunk_between_idats_is_refused() {
+        // A PNG with two IDAT chunks: the encoder's one, split in two.
+        let plain = artefact(128);
+        let idat = Chunks::new(&plain)
+            .find(|chunk| &plain[chunk.kind.clone()] == b"IDAT")
+            .expect("an IDAT");
+        let data = &plain[idat.data.clone()];
+        let half = data.len() / 2;
+        let split = [
+            &plain[..idat.whole.start],
+            &chunk(b"IDAT", &data[..half])[..],
+            &chunk(b"IDAT", &data[half..])[..],
+            &plain[idat.whole.end..],
+        ]
+        .concat();
+        image::load_from_memory_with_format(&split, image::ImageFormat::Png)
+            .expect("two IDATs are still a PNG");
+        let (stamped, _) = stamped_png(&split);
+        let stamp = stamp_chunk(&stamped);
+
+        let second = Chunks::new(&split)
+            .filter(|chunk| &split[chunk.kind.clone()] == b"IDAT")
+            .nth(1)
+            .expect("the second IDAT")
+            .whole
+            .start;
+        let between = [&split[..second], &stamp[..], &split[second..]].concat();
+
+        let refused = read_stamp(&between, Kind::Png).expect_err("between IDATs");
+        assert_eq!(refused.to_string(), UNREADABLE);
+    }
+
+    /// A stamp chunk followed by anything but IEND — another ancillary chunk —
+    /// is refused too.
+    #[test]
+    fn a_stamp_chunk_not_followed_by_iend_is_refused() {
+        let (stamped, _) = stamped_png(&artefact(128));
+        let after = with_chunk_before_iend(&stamped, &chunk(b"tIME", &[7, 234, 1, 1, 0, 0, 0]));
+
+        let refused = read_stamp(&after, Kind::Png).expect_err("not before IEND");
+        assert_eq!(refused.to_string(), UNREADABLE);
     }
 }

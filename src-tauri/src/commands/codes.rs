@@ -25,7 +25,7 @@
 //!   (`format`, `dpi` — migration 003). `scan_margin` reports how much the
 //!   artefact survives, and never blocks anything.
 //! - P2: every file an export writes carries a stamp — a reference, the
-//!   payload's digest, the decoder and a digest of what was verified, and no
+//!   decoder and a digest of what was verified; no payload digest and no
 //!   date (`export::stamp`) — unless the setting `stamp_exports` is off. The row
 //!   keeps the stamp's reference and digest (migration 007). A PNG's stamp is a
 //!   chunk the decoder never saw, so the file minus that chunk is still,
@@ -511,7 +511,6 @@ pub(crate) fn export_once(
     let reference = crate::db::new_stamp_ref();
     let mark = super::settings::stamp_exports(conn)?.then_some(Mark {
         reference: &reference,
-        payload: &report.payload_sha256,
         decoder: &report.decoder,
     });
     let (bytes, stamp) = match written {
@@ -1797,7 +1796,14 @@ mod tests {
                 .expect("read")
                 .unwrap_or_else(|| panic!("{name} carries no stamp"));
             assert!(found.intact, "{name} does not match its own stamp");
-            assert_eq!(found.stamp.payload, export.report.payload_sha256);
+            assert!(
+                !found
+                    .stamp
+                    .json()
+                    .expect("json")
+                    .contains(&export.report.payload_sha256),
+                "{name}: the payload's digest is not in the stamp"
+            );
             assert_eq!(found.stamp.decoder, export.report.decoder);
             assert_eq!(
                 found.stamp.reference.as_bytes()[14],

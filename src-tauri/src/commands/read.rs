@@ -112,8 +112,9 @@ pub const NOT_CHECKABLE: &str = "A stamp is checked on a PNG, SVG or PDF file.";
 /// `decoder` is the only thing taken from the file, and only when it carries a
 /// stamp. Everything else that describes the verification — when, as what, of
 /// which saved code — is read from this workspace's row, and only when that row
-/// holds the same reference, the same payload digest and the same stamp digest:
-/// a file that matches no row here gets nothing but what its own stamp says.
+/// holds the same reference and the same stamp digest **and** the file is still
+/// intact: a file that matches no row here, or no longer matches its own stamp,
+/// gets nothing but what its stamp says.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub struct StampCheck {
@@ -127,7 +128,7 @@ pub struct StampCheck {
     pub decoder: Option<String>,
     /// This workspace holds a row with the stamp's reference.
     pub in_workspace: bool,
-    /// That row's payload digest and stamp digest are the stamp's.
+    /// That row's stamp digest is the stamp's.
     pub matches_record: bool,
     /// When the row was recorded — from the workspace, never from the file.
     pub verified_at: Option<String>,
@@ -377,21 +378,26 @@ fn kind_of(source: &Path) -> Result<Kind> {
 
 /// A stamp found — or not — checked against this workspace.
 ///
-/// The row is found by the stamp's reference. It *matches* when its payload
-/// digest and its stamp digest are the stamp's; only then does the answer carry
-/// what the row knows. A reference this workspace holds under a different digest
-/// is a stamp copied onto another file, or a file from another export under a
-/// forged reference — and in both cases the date of the row would be a date
-/// about some other file.
+/// The row is found by the stamp's reference. It *matches* when its stamp
+/// digest is the stamp's. A reference this workspace holds under a different
+/// digest is a stamp copied onto another file, or a file from another export
+/// under a forged reference — and in both cases the date of the row would be a
+/// date about some other file.
+///
+/// What the row knows — when, as what, of which saved code — is handed back
+/// only when the record matches **and** the file is intact. A real stamp
+/// copied verbatim onto edited pixels matches its row and is not intact: the
+/// row's date is then the date of a file that is no longer this one, and is
+/// not said.
 fn check_of(conn: &Connection, kind: Kind, found: Option<StampFound>) -> Result<StampCheck> {
     let Some(found) = found else {
         return Ok(StampCheck::unstamped(kind));
     };
     let record = verifications::find_by_stamp(conn, &found.stamp.reference)?;
     let in_workspace = record.is_some();
-    let known = record.filter(|row| {
-        row.payload_sha256 == found.stamp.payload && row.stamp_digest == found.stamp.digest
-    });
+    let matching = record.filter(|row| row.stamp_digest == found.stamp.digest);
+    let matches_record = matching.is_some();
+    let known = matching.filter(|_| found.intact);
 
     Ok(StampCheck {
         stamped: true,
@@ -399,7 +405,7 @@ fn check_of(conn: &Connection, kind: Kind, found: Option<StampFound>) -> Result<
         kind: kind.token(),
         decoder: Some(found.stamp.decoder),
         in_workspace,
-        matches_record: known.is_some(),
+        matches_record,
         verified_at: known.as_ref().map(|row| row.created_at.clone()),
         format: known.as_ref().and_then(|row| row.format.clone()),
         dpi: known.as_ref().and_then(|row| row.dpi),
@@ -501,6 +507,11 @@ fn check_source<'a>(path: &'a str, door: &Door) -> Result<&'a Path> {
         return Err(Error::InvalidInput(
             "That is a name Windows reserves for a device, not a file.".to_string(),
         ));
+    }
+    // A link's name was what the dialog showed; what it points at is a file
+    // nobody chose.
+    if crate::os::paths::is_link(path) {
+        return Err(Error::InvalidInput(crate::os::paths::A_LINK.to_string()));
     }
     Ok(source)
 }
@@ -1024,14 +1035,14 @@ mod tests {
         path
     }
 
-    /// A stamp written by hand onto a PNG, under a reference and a payload of
-    /// the test's choosing — what somebody forging one would do.
-    fn forged(png: &[u8], reference: &str, payload: &str) -> Vec<u8> {
+    /// A stamp written by hand onto a PNG, under a reference of the test's
+    /// choosing and with a digest computed correctly — what somebody forging
+    /// one would do.
+    fn forged(png: &[u8], reference: &str) -> Vec<u8> {
         stamp::stamp_png(
             png,
             &stamp::Mark {
                 reference,
-                payload,
                 decoder: "rqrr 0.10.1",
             },
         )
@@ -1122,7 +1133,58 @@ mod tests {
                 "{name}: one byte changed and it said unchanged"
             );
             assert!(check.in_workspace, "{name}");
+            assert!(
+                check.matches_record,
+                "{name}: the stamp itself is the row's"
+            );
+            assert_eq!(
+                (check.verified_at, check.format, check.dpi),
+                (None, None, None),
+                "{name}: the row's facts are about a file this no longer is"
+            );
         }
+    }
+
+    /// M2: a real stamp, copied byte for byte onto edited pixels. The record
+    /// matches — it is the row's own stamp — and the file does not, so nothing
+    /// the row knows is said about it.
+    #[test]
+    fn a_real_stamp_copied_onto_edited_pixels_says_nothing_about_the_row() {
+        let db = workspace();
+        let scratch = Scratch::new();
+        let original = exported(
+            &db,
+            &scratch,
+            "menu.png",
+            crate::commands::codes::Written::Png,
+            None,
+        );
+        let bytes = std::fs::read(&original).expect("written");
+        let stripped = stamp::png_without_stamp(&bytes).expect("a PNG");
+        // The stamp chunk sits immediately before the twelve bytes of IEND.
+        let chunk = &bytes[stripped.len() - 12..bytes.len() - 12];
+
+        let mut picture = image::load_from_memory(&bytes).expect("decode").to_rgba8();
+        picture.get_pixel_mut(3, 3).0[0] ^= 0xFF;
+        let mut edited = Vec::new();
+        DynamicImage::ImageRgba8(picture)
+            .write_to(&mut Cursor::new(&mut edited), ImageFormat::Png)
+            .expect("encode");
+        let iend = edited.len() - 12;
+        let edited = [&edited[..iend], chunk, &edited[iend..]].concat();
+        let path = scratch.holding("edited.png", &edited);
+
+        let check = check_file_at(&db, &path).expect("check");
+
+        assert!(check.stamped);
+        assert!(!check.intact);
+        assert!(check.in_workspace);
+        assert!(check.matches_record);
+        assert_eq!(check.verified_at, None);
+        assert_eq!(check.format, None);
+        assert_eq!(check.dpi, None);
+        assert_eq!(check.code_id, None);
+        assert_eq!(check.code_name, None);
     }
 
     /// Anyone can write a stamp. One with a valid digest under a reference this
@@ -1132,8 +1194,7 @@ mod tests {
         let db = workspace();
         let scratch = Scratch::new();
         let reference = crate::db::new_stamp_ref();
-        let payload = crate::imaging::verify::sha256_hex(HELLO_WORLD.as_bytes());
-        let path = scratch.holding("forged.png", &forged(&a_code(), &reference, &payload));
+        let path = scratch.holding("forged.png", &forged(&a_code(), &reference));
 
         let check = check_file_at(&db, &path).expect("check");
 
@@ -1145,10 +1206,11 @@ mod tests {
         assert_eq!((check.format, check.dpi, check.code_id), (None, None, None));
     }
 
-    /// A reference this workspace issued, written onto a file with a different
-    /// payload: the row is found, and it is about some other file.
+    /// A reference this workspace issued, re-stamped onto a different picture
+    /// with a correctly computed digest: the row is found, its digest is not
+    /// this one, and the row's date is about another file.
     #[test]
-    fn a_stamp_whose_reference_is_known_but_whose_payload_differs_does_not_match() {
+    fn a_known_reference_on_another_picture_does_not_match() {
         let db = workspace();
         let scratch = Scratch::new();
         let original = exported(
@@ -1159,41 +1221,17 @@ mod tests {
             None,
         );
         let reference = check_reference(&original);
-        let other = crate::imaging::verify::sha256_hex(b"something else entirely");
-        let path = scratch.holding("other.png", &forged(&a_code(), &reference, &other));
+        let path = scratch.holding("copy.png", &forged(&a_code(), &reference));
 
         let check = check_file_at(&db, &path).expect("check");
 
         assert!(check.stamped && check.intact);
         assert!(check.in_workspace, "the reference is this workspace's");
-        assert!(!check.matches_record, "but not for this payload");
+        assert!(!check.matches_record, "a different file under this stamp");
         assert_eq!(
             check.verified_at, None,
             "and its date is about another file"
         );
-    }
-
-    /// The same reference copied onto a different picture of the same code —
-    /// the payload matches, the digest does not.
-    #[test]
-    fn a_stamp_copied_onto_another_picture_of_the_same_code_does_not_match() {
-        let db = workspace();
-        let scratch = Scratch::new();
-        let original = exported(
-            &db,
-            &scratch,
-            "menu.png",
-            crate::commands::codes::Written::Png,
-            None,
-        );
-        let reference = check_reference(&original);
-        let payload = crate::imaging::verify::sha256_hex(HELLO_WORLD.as_bytes());
-        let path = scratch.holding("copy.png", &forged(&a_code(), &reference, &payload));
-
-        let check = check_file_at(&db, &path).expect("check");
-
-        assert!(check.in_workspace);
-        assert!(!check.matches_record, "a different file under this stamp");
     }
 
     /// The reference a stamped file carries, as written.
@@ -1294,6 +1332,87 @@ mod tests {
             refused.to_string(),
             "This file is 20.0 MB; a stamp is checked on a file of at most 20.0 MB."
         );
+    }
+
+    /// The device names that are easy to forget: port zero, and the ports
+    /// spelled with a superscript digit. Refused by every door that shares the
+    /// list, in any case, with the trailing dots and spaces Windows ignores.
+    #[test]
+    fn the_forgotten_device_names_are_refused_too() {
+        for path in [
+            "C:\\codes\\com0.png",
+            "C:\\codes\\LPT0.pdf",
+            "C:\\codes\\COM\u{b9}.png",
+            "C:\\codes\\com\u{b2} .svg",
+            "C:\\codes\\Com\u{b3}..png",
+            "C:\\codes\\lpt\u{b9}.png",
+            "C:\\codes\\LPT\u{b2}.pdf",
+            "C:\\codes\\lpt\u{b3}.svg",
+        ] {
+            for door in [&PICTURE, &CHECKED] {
+                let refused = check_source(path, door).expect_err(path);
+                assert_eq!(
+                    refused.to_string(),
+                    "That is a name Windows reserves for a device, not a file.",
+                    "{path}"
+                );
+            }
+        }
+        check_source("C:\\codes\\com10.png", &CHECKED).expect("COM10 is not a device name");
+    }
+
+    /// A link's name is what the dialog showed; what it points at is a file
+    /// nobody chose. Both of Read's file doors refuse it.
+    #[test]
+    fn a_file_behind_a_link_is_refused_by_both_doors() {
+        let db = workspace();
+        let scratch = Scratch::new();
+        let target = scratch.holding("photo.png", &a_code());
+        let link = scratch.0.join("link.png");
+        if !crate::os::paths::make_link(Path::new(&target), &link) {
+            return;
+        }
+        let link = link.to_string_lossy().into_owned();
+
+        let by_check = check_file_at(&db, &link).expect_err("check followed a link");
+        let by_read = read_image_at(&db, &link).expect_err("read followed a link");
+
+        for refused in [by_check, by_read] {
+            assert_eq!(refused.to_string(), crate::os::paths::A_LINK);
+        }
+        check_file_at(&db, &target).expect("the file itself is checked");
+    }
+
+    /// The same refusal where a symbolic link cannot be made without a
+    /// privilege: a junction is a link too, needs none, and is refused by name
+    /// before anything behind it is touched.
+    #[cfg(windows)]
+    #[test]
+    fn a_junction_named_like_a_file_is_refused_as_a_link() {
+        let db = workspace();
+        let scratch = Scratch::new();
+        let target = scratch.0.join("elsewhere");
+        std::fs::create_dir_all(&target).expect("a folder");
+        let junction = scratch.0.join("junction.png");
+        let made = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&junction)
+            .arg(&target)
+            .output()
+            .is_ok_and(|output| output.status.success());
+        if !made {
+            eprintln!("skipped: this system would not make a junction");
+            return;
+        }
+        let path = junction.to_string_lossy().into_owned();
+        assert!(crate::os::paths::is_link(&path));
+
+        for refused in [
+            check_file_at(&db, &path).expect_err("check followed a junction"),
+            read_image_at(&db, &path).expect_err("read followed a junction"),
+        ] {
+            assert_eq!(refused.to_string(), crate::os::paths::A_LINK);
+        }
     }
 
     #[test]

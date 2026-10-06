@@ -112,8 +112,6 @@ pub fn record_as(conn: &Connection, id: &str, row: &VerificationRow) -> Result<S
 pub struct StampedRecord {
     /// When the verification was recorded, as every timestamp column stores it.
     pub created_at: String,
-    /// The payload digest the row recorded.
-    pub payload_sha256: String,
     /// The digest the row says was written into the file.
     pub stamp_digest: String,
     /// What the export was: `png`, `svg` or `pdf`.
@@ -133,8 +131,7 @@ pub struct StampedRecord {
 /// [`crate::error::Error::Database`] when the table could not be read.
 pub fn find_by_stamp(conn: &Connection, stamp_ref: &str) -> Result<Option<StampedRecord>> {
     let mut statement = conn.prepare(
-        "SELECT v.created_at, v.payload_sha256, v.stamp_digest, v.format, v.dpi, v.code_id,
-                c.name
+        "SELECT v.created_at, v.stamp_digest, v.format, v.dpi, v.code_id, c.name
            FROM verifications AS v
            LEFT JOIN codes AS c ON c.id = v.code_id
           WHERE v.stamp_ref = ?1",
@@ -145,12 +142,11 @@ pub fn find_by_stamp(conn: &Connection, stamp_ref: &str) -> Result<Option<Stampe
     };
     Ok(Some(StampedRecord {
         created_at: row.get(0)?,
-        payload_sha256: row.get(1)?,
-        stamp_digest: row.get(2)?,
-        format: row.get(3)?,
-        dpi: row.get(4)?,
-        code_id: row.get(5)?,
-        code_name: row.get(6)?,
+        stamp_digest: row.get(1)?,
+        format: row.get(2)?,
+        dpi: row.get(3)?,
+        code_id: row.get(4)?,
+        code_name: row.get(5)?,
     }))
 }
 
