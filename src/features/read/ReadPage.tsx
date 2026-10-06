@@ -3,11 +3,13 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useMemo, useState } from 'react';
 
 import { describeError } from '@/data/errors';
-import { useReadClipboard, useReadImage } from '@/data/hooks';
-import type { ReadCode, Reading } from '@/data/read';
+import { useCheckFile, useCode, useReadClipboard, useReadImage } from '@/data/hooks';
+import type { SavedCode } from '@/data/library';
+import type { ReadCode, Reading, StampCheck } from '@/data/read';
 import { describeBytes, wouldScanAt, type ReadKind, type ScanVerdict } from '@/domain/read';
 import { LENGTH_UNIT_LABELS, LENGTH_UNITS, toMillimetres, type LengthUnit } from '@/domain/size';
 import { AddressSentences } from '@/features/create/AddressSentences';
+import { stampSentence } from '@/features/read/stampSentence';
 import { announce } from '@/ui/announce';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -21,7 +23,9 @@ import { Select } from '@/ui/Select';
  *
  * Two doors in — a file and the clipboard — and one thing on the way out: what the bytes mean,
  * how the symbol was built, and whether a code of that many modules survives being printed at a
- * width. The decoding is the host's and the meaning is the domain's; this screen owns neither,
+ * width. A third door (P2) checks a file this product exported: it is never drawn and never
+ * decoded, only its stamp is read, and the answer is one sentence on a Stamp card — the same card
+ * a stamped PNG opened through the first door shows above its codes. The decoding is the host's and the meaning is the domain's; this screen owns neither,
  * which is what makes a code that was read and a code that was made describe themselves in the
  * same sentences.
  *
@@ -62,8 +66,15 @@ export interface MadeFromRead {
   text: string;
 }
 
+/** A door that refused, in the door's own title and the host's own sentence. */
+export interface ReadRefusal {
+  title: string;
+  sentence: string;
+}
+
 /**
- * What the screen is looking at: one reading, or the sentence that refused it — never both.
+ * What the screen is looking at: one reading, one checked file, or the sentence that refused
+ * either — never two of them.
  *
  * It is held by the shell, for the reason the batch's rows are: a person goes to Settings to
  * switch the theme and comes back, and the photograph they were reading has to still be there.
@@ -71,8 +82,16 @@ export interface MadeFromRead {
  */
 export interface ReadState {
   reading: Reading | null;
-  problem: string | null;
+  check: StampCheck | null;
+  problem: ReadRefusal | null;
 }
+
+/** What Open answers — the Library's own contract, because it is the Library's own path. */
+type OpenSaved = (saved: SavedCode) => Promise<{ ok: true } | { ok: false; reason: string }>;
+
+/** The titles a refusal carries, one per kind of door. */
+const IMAGE_REFUSED = 'The image could not be read';
+const FILE_REFUSED = 'The file could not be checked';
 
 /** `1 code`, `2 codes` — a count that reads as English at both ends. */
 function codes(n: number): string {
@@ -83,35 +102,45 @@ export function ReadPage({
   state,
   onState,
   onMake,
+  onOpen,
 }: {
   state: ReadState;
   onState: (state: ReadState) => void;
   onMake: (made: MadeFromRead) => void;
+  /** Open a saved code in Create — the path the Library's Open button takes. */
+  onOpen: OpenSaved;
 }) {
-  const { reading, problem } = state;
+  const { reading, check, problem } = state;
 
   const { mutateAsync: readFile, isPending: opening } = useReadImage();
   const { mutateAsync: readPasted, isPending: pasting } = useReadClipboard();
-  const busy = opening || pasting;
+  const { mutateAsync: checkStamp, isPending: checking } = useCheckFile();
+  const busy = opening || pasting || checking;
 
   /** One reading replaces the last one whole: a picture and a list about two images is a lie. */
   const took = (result: Reading) => {
-    onState({ reading: result, problem: null });
-    announce(
+    onState({ reading: result, check: null, problem: null });
+    const found =
       result.codes.length === 0
         ? (result.note ?? 'Nothing was found in this image.')
-        : `The image was read — ${codes(result.codes.length)} found.`,
-    );
+        : `The image was read — ${codes(result.codes.length)} found.`;
+    announce(result.stamp === null ? found : `${found} ${stampSentence(result.stamp).sentence}`);
+  };
+
+  /** A checked file replaces whatever was on screen, for the same reason. */
+  const checked = (result: StampCheck) => {
+    onState({ reading: null, check: result, problem: null });
+    announce(stampSentence(result).sentence);
   };
 
   /**
-   * A refused image clears what was on screen.
+   * A refusal clears what was on screen.
    *
    * The alternative is a sentence about the file that was just refused sitting above the picture
    * of a different one, which is the kind of half-truth this screen exists to remove.
    */
-  const failed = (error: unknown) => {
-    onState({ reading: null, problem: describeError(error) });
+  const failed = (title: string, error: unknown) => {
+    onState({ reading: null, check: null, problem: { title, sentence: describeError(error) } });
   };
 
   const chooseImage = async () => {
@@ -123,7 +152,7 @@ export function ReadPage({
       if (typeof path !== 'string') return;
       took(await readFile(path));
     } catch (error) {
-      failed(error);
+      failed(IMAGE_REFUSED, error);
     }
   };
 
@@ -131,12 +160,30 @@ export function ReadPage({
     try {
       took(await readPasted());
     } catch (error) {
-      failed(error);
+      failed(IMAGE_REFUSED, error);
     }
   };
 
+  const chooseExported = async () => {
+    try {
+      const path = await open({
+        multiple: false,
+        filters: [{ name: 'Exported files', extensions: ['png', 'svg', 'pdf'] }],
+      });
+      if (typeof path !== 'string') return;
+      checked(await checkStamp(path));
+    } catch (error) {
+      failed(FILE_REFUSED, error);
+    }
+  };
+
+  // Exactly one thing is on screen, so at most one stamp is: the checked file's, or the stamp of
+  // the PNG that was opened.
+  const stamp = check ?? reading?.stamp ?? null;
+  const showing = reading !== null || check !== null;
+
   /**
-   * The two doors, rendered once.
+   * The three doors, rendered once.
    *
    * They sit in the empty state while there is nothing to look at and in the card's header once
    * there is, rather than in both places at once: two buttons with the same name on one surface
@@ -149,6 +196,9 @@ export function ReadPage({
       </Button>
       <Button disabled={busy} onClick={() => void pasteImage()}>
         Paste from clipboard
+      </Button>
+      <Button disabled={busy} onClick={() => void chooseExported()}>
+        Check an exported file…
       </Button>
     </div>
   );
@@ -166,29 +216,41 @@ export function ReadPage({
       <Card
         title="Image"
         description="Nothing opened here is stored, and nothing found in it is ever followed."
-        actions={reading === null ? undefined : doors}
+        actions={showing ? doors : undefined}
       >
         <div className="flex flex-col gap-3">
           {problem !== null && (
-            <InfoBar severity="danger" title="The image could not be read">
-              {problem}
+            <InfoBar severity="danger" title={problem.title}>
+              {problem.sentence}
             </InfoBar>
           )}
 
           {/* Not a live region: the buttons are disabled while this is on screen, and the
               outcome is announced when it arrives (DESIGN_SYSTEM §7). */}
-          {busy && <p className="text-caption text-fg-secondary">Reading the image…</p>}
+          {busy && (
+            <p className="text-caption text-fg-secondary">
+              {checking ? 'Checking the file…' : 'Reading the image…'}
+            </p>
+          )}
 
-          {reading === null && problem === null && (
+          {!showing && problem === null && (
             <EmptyState
               icon={<ScanCamera24Regular />}
               title="Nothing read yet"
-              description="Open a photograph or a screenshot of a code, and what it holds appears here."
+              description="Open a photograph or a screenshot of a code, and what it holds appears here — or check whether a file this product exported was changed."
               action={doors}
             />
           )}
 
-          {reading === null && problem !== null && doors}
+          {!showing && problem !== null && doors}
+
+          {/* A checked file is never drawn, so there is no picture here — and the card says so
+              rather than standing empty, which would look like a picture that failed to load. */}
+          {check !== null && (
+            <p className="text-caption text-fg-tertiary">
+              The file was checked for its stamp; nothing in it was drawn or decoded.
+            </p>
+          )}
 
           {reading !== null && (
             <>
@@ -204,6 +266,15 @@ export function ReadPage({
         </div>
       </Card>
 
+      {/* Above the codes: what the file says about itself comes before what is in it. */}
+      {stamp !== null && (
+        <StampCard
+          key={`${stamp.kind}-${stamp.decoder}-${stamp.verifiedAt}-${stamp.codeId}`}
+          check={stamp}
+          onOpen={onOpen}
+        />
+      )}
+
       {reading?.codes.map((code, index) => (
         // Keyed by the reading as well as the slot, so a card from the last image is never
         // reused for this one — a revealed password does not survive into another picture.
@@ -214,6 +285,77 @@ export function ReadPage({
           onMake={onMake}
         />
       ))}
+    </div>
+  );
+}
+
+/**
+ * What a file's stamp says (P2): exactly one sentence, in the tone it deserves, and — when this
+ * workspace verified it from a saved code still in the library — that code's name and a way to
+ * open it.
+ *
+ * The date and the name are the workspace's, never the file's: the host fills them only when its
+ * own row matches the stamp, so a stamp copied from elsewhere cannot bring a date with it.
+ */
+function StampCard({ check, onOpen }: { check: StampCheck; onOpen: OpenSaved }) {
+  const said = stampSentence(check);
+  const saved =
+    check.intact && check.matchesRecord && check.codeId !== null && check.codeName !== null
+      ? { id: check.codeId, name: check.codeName }
+      : null;
+
+  return (
+    <Card label="Stamp" title="Stamp">
+      <InfoBar severity={said.severity} title={said.sentence}>
+        {said.detail ??
+          (saved === null ? null : <SavedAs id={saved.id} name={saved.name} onOpen={onOpen} />)}
+      </InfoBar>
+    </Card>
+  );
+}
+
+/**
+ * `Saved as Menu.` and an Open button that opens it — through the Library's own path, so a code
+ * opened from here lands in Create exactly as one opened from the Library does.
+ *
+ * The code is fetched as the card appears, the way a Library row fetches it, and Open waits for
+ * it: opening a code needs the code.
+ */
+function SavedAs({ id, name, onOpen }: { id: string; name: string; onOpen: OpenSaved }) {
+  const code = useCode(id);
+  const [opening, setOpening] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const openIt = async () => {
+    const saved = code.data;
+    if (saved === undefined) return;
+    setProblem(null);
+    setOpening(true);
+    const answer = await onOpen(saved);
+    setOpening(false);
+    if (answer.ok) {
+      announce(`${saved.name} is open in Create; it is being checked again.`);
+    } else {
+      setProblem(answer.reason);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <span>{`Saved as ${name}.`}</span>
+        <Button
+          aria-label={`Open ${name}`}
+          disabled={code.data === undefined || opening}
+          onClick={() => void openIt()}
+        >
+          Open
+        </Button>
+      </div>
+      {code.isError && (
+        <p className="text-caption">{`This code could not be read. ${describeError(code.error)}`}</p>
+      )}
+      {problem !== null && <p className="text-caption">{problem}</p>}
     </div>
   );
 }

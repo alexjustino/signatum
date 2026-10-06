@@ -9,6 +9,10 @@
  * Nothing read is stored. A `Reading` exists for as long as the screen holding it does, which is
  * the whole promise of this screen: a photograph somebody dropped in is looked at, not kept.
  *
+ * A third door (P2) checks a file this product exported: its stamp, recomputed by the host, and
+ * whether this workspace holds the verification the stamp names. It answers a `StampCheck`, and
+ * a PNG opened through the first door carries the same answer on its `Reading`.
+ *
  * The bytes of a code arrive base64-encoded, because that is what survives JSON intact — a code
  * carries bytes, not text, and the lossy UTF-8 the host also sends is for the host's own logs,
  * never for deciding what a payload means. They are decoded here, once, so that everything above
@@ -41,6 +45,37 @@ export interface ReadCode {
   error: string | null;
 }
 
+/** The three kinds of file a stamp is checked on. */
+export type StampedKind = 'png' | 'svg' | 'pdf';
+
+/**
+ * What a file's stamp says, checked against this workspace (P2).
+ *
+ * `decoder` is the one thing taken from the file. Everything that describes the verification —
+ * when, as what, of which saved code — comes from this workspace's own row, and only when that
+ * row matches the stamp (`matchesRecord`); a file that matches nothing here carries nothing else.
+ */
+export interface StampCheck {
+  /** The file carries a stamp this build reads. */
+  stamped: boolean;
+  /** The file still matches its own stamp. False when there is no stamp. */
+  intact: boolean;
+  kind: StampedKind;
+  /** The decoder the stamp names; null when there is no stamp. */
+  decoder: string | null;
+  /** This workspace holds a verification under the stamp's reference. */
+  inWorkspace: boolean;
+  /** …and that verification is of this payload and this file. */
+  matchesRecord: boolean;
+  /** When this workspace verified it, as ISO 8601 — from the workspace, never from the file. */
+  verifiedAt: string | null;
+  format: string | null;
+  dpi: number | null;
+  /** The saved code it was made from, while that code is still in the library. */
+  codeId: string | null;
+  codeName: string | null;
+}
+
 /** What one image held. */
 export interface Reading {
   /** The source image's own pixels — the coordinate system the corners are in. */
@@ -52,6 +87,11 @@ export interface Reading {
   /** One sentence about the reading itself, or null when there is nothing to add. */
   note: string | null;
   decodeMs: number;
+  /**
+   * The stamp of a PNG opened from a file, when it carries one. Always null from the clipboard,
+   * which carries pixels and never a file's stamp.
+   */
+  stamp: StampCheck | null;
 }
 
 // snake_case on the wire, camelCase above this line — translated once.
@@ -67,6 +107,20 @@ interface RawReadCode {
   error?: string | null;
 }
 
+interface RawStampCheck {
+  stamped: boolean;
+  intact: boolean;
+  kind: StampedKind;
+  decoder?: string | null;
+  in_workspace: boolean;
+  matches_record: boolean;
+  verified_at?: string | null;
+  format?: string | null;
+  dpi?: number | null;
+  code_id?: string | null;
+  code_name?: string | null;
+}
+
 interface RawReading {
   width: number;
   height: number;
@@ -74,6 +128,7 @@ interface RawReading {
   codes: RawReadCode[];
   note?: string | null;
   decode_ms: number;
+  stamp?: RawStampCheck | null;
 }
 
 /**
@@ -108,6 +163,22 @@ function code(raw: RawReadCode): ReadCode {
   };
 }
 
+function stampCheck(raw: RawStampCheck): StampCheck {
+  return {
+    stamped: raw.stamped,
+    intact: raw.intact,
+    kind: raw.kind,
+    decoder: raw.decoder ?? null,
+    inWorkspace: raw.in_workspace,
+    matchesRecord: raw.matches_record,
+    verifiedAt: raw.verified_at ?? null,
+    format: raw.format ?? null,
+    dpi: raw.dpi ?? null,
+    codeId: raw.code_id ?? null,
+    codeName: raw.code_name ?? null,
+  };
+}
+
 function reading(raw: RawReading): Reading {
   return {
     width: raw.width,
@@ -116,6 +187,7 @@ function reading(raw: RawReading): Reading {
     codes: raw.codes.map(code),
     note: raw.note ?? null,
     decodeMs: raw.decode_ms,
+    stamp: raw.stamp ? stampCheck(raw.stamp) : null,
   };
 }
 
@@ -133,4 +205,14 @@ export async function readImage(path: string): Promise<Reading> {
  */
 export async function readClipboard(): Promise<Reading> {
   return reading(await invoke<RawReading>('read_clipboard', {}));
+}
+
+/**
+ * Check the stamp of the file at the chosen path — the third door (P2). The host reads a PNG,
+ * an SVG or a PDF under the same caps as a picture, never renders it and never decodes it, and
+ * answers with what the stamp says and whether this workspace holds the verification it names.
+ * A file it will not check is a refusal with a sentence, like any other.
+ */
+export async function checkFile(path: string): Promise<StampCheck> {
+  return stampCheck(await invoke<RawStampCheck>('check_file', { path }));
 }
