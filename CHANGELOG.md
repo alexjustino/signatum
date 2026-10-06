@@ -40,6 +40,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Cyrillic word under its own country's domain, stay quiet. It is worked out on the machine from the
   address alone — no list is downloaded and nothing is looked up — so it is not a phishing filter,
   and a shortener it does not know says nothing (ADR-034).
+- **A stamp in every file, saying what was verified and never when.** Every PNG, SVG and PDF the
+  product writes — a single export, every file of a batch, and the proof sheet — carries one stamp:
+  a random reference, the decoder that read it back, and a digest of the file. It carries no date,
+  no name, no path and nothing about what the code holds — not even a hash of it, which for a
+  Wi-Fi code with a known network name would be something to test password guesses against. In a PNG
+  it is one text chunk the decoder never saw, so removing it gives back, byte for byte, the picture
+  that was decoded; in an SVG it is a comment after the opening tag, and in a PDF an entry in the
+  document information beside the producer. The workspace keeps the reference and the digest on
+  the verification that proved the file (schema 7). Copying to the clipboard carries no stamp: the
+  system copies pixels, not files (ADR-033).
+- **Read checks an exported file.** **Check an exported file…** opens a PNG, SVG or PDF and says
+  whether this workspace verified it and whether it has changed since — _verified by this
+  workspace, unchanged_, with the date and the saved code taken from the workspace and never from
+  the file, and only for a file that is unchanged; _changed after it was verified_ when one pixel or
+  byte is different, with no date; a stamp from
+  another workspace, said as exactly that; or no stamp at all. An SVG or a PDF is searched for the
+  stamp and never drawn or parsed. A PNG opened as a picture on Read shows the same check above its
+  codes. The stamp is not a signature: anybody can write one, and only a matching record in your own
+  workspace says your workspace verified the file.
+- **Stamping can be turned off.** **Stamp exported files** under Settings → Defaults, on by
+  default. Turned off, every file is written exactly as before.
 
 ### Fixed
 

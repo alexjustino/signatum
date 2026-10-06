@@ -1,8 +1,8 @@
 # Data model
 
 > **Status: `001_init` landed with F0, `002_logos` with F4, `003_export_formats` with F7,
-> `004_library` with F8, `005_batches` with F9 and `006_settings` with F11 — schema version 6. The
-> SQL wins over this text.** Every table below is reproduced from the migrations themselves, and
+> `004_library` with F8, `005_batches` with F9, `006_settings` with F11 and `007_stamps` with P2 —
+> schema version 7. The SQL wins over this text.** Every table below is reproduced from the migrations themselves, and
 > the migrations are the authority; a column this text gets wrong is corrected by the SQL, not the
 > other way round.
 
@@ -31,7 +31,7 @@ the way it is; the SQL explains what it is.
 > (F10) opens an image, says what is in it, and keeps nothing — no row, no artefact, no history,
 > not even the path the file came from ([ADR-030](architecture/ADR.md#adr-030)).
 >
-> A **setting** is one of five choices this product keeps for the person using it, by name. Not a
+> A **setting** is one of six choices this product keeps for the person using it, by name. Not a
 > place for anything a screen would like to remember: the keys are a closed list the host owns
 > ([ADR-031](architecture/ADR.md#adr-031)).
 
@@ -46,11 +46,12 @@ the way it is; the SQL explains what it is.
 | `brand_kits`    | a logo, a look and a size, named                                  | F8, shipped  |
 | `batches`       | one run over one list of rows                                     | F9, shipped  |
 | `batch_rows`    | the report: one append-only row per row that run tried            | F9, shipped  |
-| `settings`      | five named choices, by key: the theme and the defaults            | F11, shipped |
+| `settings`      | six named choices, by key: the theme, the defaults, the stamp     | F11, shipped |
 
 **Read adds nothing to this list.** F10 reads codes out of images somebody else made and writes no
 row for any of them: no table, no column, no migration, and nothing in the workspace file that says
-an image was ever opened. What a person wants kept leaves Read through the Create screen, and is
+an image was ever opened. Checking an exported file's stamp (P2) is the same: it reads the rows
+that are there and writes none. What a person wants kept leaves Read through the Create screen, and is
 saved there as a code like any other.
 
 `codes` is the library's table, and the library is F8 — where it arrives, in `004_library.sql`,
@@ -165,7 +166,8 @@ forever without keeping what somebody typed.
 A proof sheet (1.1, ADR-032) writes one row per size the host rendered: `kind` `export`,
 `format` `pdf`, its own `artefact_sha256` and pixels, and `path` only on the rows whose picture is
 on the page — a size the decoder refused has a row with no path, and a size the domain refused
-before anything was rendered has no row at all.
+before anything was rendered has no row at all. From P2 one of those rows also holds the sheet's
+stamp (below): the chosen size's when it was drawn, else the smallest drawn size's.
 
 ```sql
 CHECK (verified = 0 OR decoded_sha256 IS payload_sha256)
@@ -220,6 +222,49 @@ again** rather than matched against an older row ([ADR-028](architecture/ADR.md#
 stored scene-to-verification join would be a second answer to a question the product deliberately
 answers only one way. If listing a saved code's proof history ever needs it, it arrives in a
 migration of its own.
+
+**Arriving with P2, in `007_stamps.sql`** — two nullable columns, the halves of a stamp that the
+file cannot vouch for on its own ([ADR-033](architecture/ADR.md#adr-033)):
+
+| Column         | Type | Meaning                                                                                                                                                                 |
+| -------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stamp_ref`    | TEXT | the reference written into the file: a UUID **v4**, lowercase, and never this row's own `id`                                                                            |
+| `stamp_digest` | TEXT | the `digest` written into the file, 64 lowercase hex; for a PNG it equals `artefact_sha256`, for an SVG or a PDF it is the whole file hashed with 64 zeros in its place |
+
+The statements, copied from `src-tauri/migrations/007_stamps.sql` without its header comment:
+
+```sql
+ALTER TABLE verifications ADD COLUMN stamp_ref TEXT
+    CHECK (stamp_ref IS NULL OR stamp_ref GLOB
+        '[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-4[0-9a-f][0-9a-f][0-9a-f]-[89ab][0-9a-f][0-9a-f][0-9a-f]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]');
+
+ALTER TABLE verifications ADD COLUMN stamp_digest TEXT
+    CHECK (stamp_digest IS NULL OR (
+        length(stamp_digest) = 64 AND stamp_digest NOT GLOB '*[^0-9a-f]*'
+    ))
+    CHECK ((stamp_digest IS NULL) = (stamp_ref IS NULL))
+    CHECK (stamp_digest IS NULL OR (verified = 1 AND path IS NOT NULL));
+
+CREATE UNIQUE INDEX idx_verifications_stamp_ref ON verifications (stamp_ref)
+    WHERE stamp_ref IS NOT NULL;
+```
+
+The `GLOB` spells a lowercase v4: hyphens where a UUID has them, the version digit `4`, the variant
+digit one of `8 9 a b`. **The two are set together or not at all, and only on a
+verified row that names a file**: a preview, a refusal, a copy to the clipboard, a row written
+before this migration and a file written with stamping turned off (`stamp_exports`) all carry
+`NULL` in both, which is the truth — none of them is a stamped file, and a stamp on a refusal would
+be a stamp on nothing. The unique index is partial: any number of rows have no stamp, and no two
+rows share one.
+
+**Why a reference of its own, and not the row's `id`.** The `id` is a UUID v7, and the leading 48
+bits of a v7 are the millisecond it was made; written into a file, it would put the time of the
+export there, which no export of this product does. The v4 is 122 random bits and no time. Read
+finds the row by this reference, and says _verified by this workspace_ only when the row's
+`stamp_digest` is the digest in the stamp **and** the file still matches that digest — so
+everything it shows about when, in which format and of which saved code comes from this row, never
+from the file, and never about a file that was changed. The stamp carries nothing about the
+payload, so `payload_sha256` stays in the workspace and is not part of the match.
 
 ## `002_logos`, as shipped
 
@@ -459,8 +504,10 @@ identifier, a value is a short string — so a workspace edited by something oth
 still cannot make the host read a megabyte to find out what the theme is.
 
 **The list itself is in the host, and it is closed** ([ADR-031](architecture/ADR.md#adr-031)):
-`theme`, `default_width_mm`, `default_dpi`, `default_quiet_zone`, `keep_wifi_passwords`, and
-nothing else. A key that is not on it is refused, and so is a value outside what that key may hold,
+`theme`, `default_width_mm`, `default_dpi`, `default_quiet_zone`, `keep_wifi_passwords`, and —
+from P2 — `stamp_exports`, `true` or `false`, which the host itself reads before it writes a file
+and which counts as on until somebody turns it off ([ADR-033](architecture/ADR.md#adr-033)). Nothing
+else. A key that is not on it is refused, and so is a value outside what that key may hold,
 with the bound named in the sentence. A test holds the list against the interface, so a preference
 the screen writes and the host does not keep is a red test rather than a choice that silently never
 comes back. **The theme lives here from F11**, out of the browser's storage where F0 left it, with
@@ -472,7 +519,7 @@ table is the authority: it is written first and it corrects the mirror, never th
 there is nothing for it to point at and nothing to cascade from. And the closed list is what lets
 [`../SECURITY.md`](../SECURITY.md) say plainly that this table holds no secret: a Wi-Fi password is
 never a setting, and the one key that mentions passwords — `keep_wifi_passwords` — holds the word
-`true` or the word `false`. A table that refuses every key but five cannot be used as a store for
+`true` or the word `false`. A table that refuses every key but six cannot be used as a store for
 anything else.
 
 **Absence is the answer, not an error.** A key that was never written means the default, which is
@@ -485,7 +532,9 @@ by hand.
 
 **Identifiers** are UUID v7, which sort by creation time — `batch_rows` included, where the plan
 asked for an autoincrement integer: the report's order is the line number it already carries, so
-the key does not have to carry it a second time. **Timestamps** are UTC, ISO 8601 with milliseconds
+the key does not have to carry it a second time. The one UUID that is not a v7 is not a key:
+`verifications.stamp_ref` is a v4, because it is written into a file and a v7 would carry the time
+there. **Timestamps** are UTC, ISO 8601 with milliseconds
 and a trailing `Z`;
 local wall-clock time is never stored. **Hashes** are lowercase hexadecimal SHA-256, of the bytes
 as stored or as written, never of an intermediate. **JSON columns** hold shapes the domain
@@ -566,7 +615,11 @@ and the two triggers that make the report append-only — a migration that only 
 workspace from before the batch existed simply gains them. F10 adds none: Read stores nothing.
 `006_settings` is F11's, and takes it to 6: `settings`, one table and no column on any other, so a
 workspace from before the settings screen gains an empty table and every key in it reads as its
-default. Version 6 is then the number Diagnostics shows and the number the running build states.
+default. `007_stamps` is P2's, and takes it to 7: `stamp_ref` and `stamp_digest` on
+`verifications`, both nullable and added with `ALTER TABLE` for the reason `format` was — a row
+written before the stamp existed proved a file that carries none — plus the partial unique index on
+the reference. Version 7 is then the number Diagnostics shows and the number the running build
+states.
 
 There is no down-migration. A mistake is corrected by a new migration, never by rewriting an
 applied one: an applied migration is history, and that history has already run on somebody's

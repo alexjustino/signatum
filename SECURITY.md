@@ -98,7 +98,7 @@ seriously.
   file name built from a CSV cell is reduced to one file name before anything is written:
   normalised, stripped of control characters, every `\ / : * ? " < > |` replaced, leading and
   trailing dots and spaces removed, `.` and `..` and an empty cell turned into `code`, a name
-  Windows reserves (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`, `CONIN$`, `CONOUT$`,
+  Windows reserves (`CON`, `PRN`, `AUX`, `NUL`, `COM0`–`COM9`, `LPT0`–`LPT9` and their superscript-digit forms, `CONIN$`, `CONOUT$`,
   with or without an extension) prefixed, and the whole thing cut to eighty characters and given
   the row's number in front. The host then makes the containment claim on its own side: the chosen
   folder is resolved once, and a leaf that is not a single path segment is a **failed row, never a
@@ -126,21 +126,27 @@ seriously.
   saved codes" on Settings, on unless it is turned off — and the Save form can still change it for
   one code.
 - **The settings table keeps no secret, and cannot be made to.** What a person chooses — the
-  theme, the default width, resolution and quiet zone, and whether Wi-Fi passwords are kept — is a
+  theme, the default width, resolution and quiet zone, whether Wi-Fi passwords are kept, and since
+  1.1 whether exported files are stamped — is a
   `settings` table of key and value (ADR-031). The keys are a closed list in the host, refused on
   write **and** on read, and every value is checked against its key's range before it is written;
   a row that does not fit — a hand-edited file — is reported as unset and never thrown. A password
-  is never a setting: `keep_wifi_passwords` holds the word `true` or `false`. There is nothing in
-  that table worth reading and nothing it can be used to store.
-- **Minimum capabilities, and three doors that read a file.** Tauri 2 capabilities are declared
+  is never a setting: `keep_wifi_passwords` and `stamp_exports` each hold the word `true` or
+  `false`. There is nothing in that table worth reading and nothing it can be used to store.
+- **Minimum capabilities, and four doors that read a file.** Tauri 2 capabilities are declared
   explicitly, one by one. Files are read and written **only** through paths the person chose in a
   system dialog; nothing in the product enumerates a directory or follows a path it was not handed.
-  Shell execution is not granted. Exactly three host commands read a file, each under its own caps:
+  Shell execution is not granted. Exactly four host commands read a file, each under its own caps:
   `import_logo`, which refuses above 20 MiB and hands back a normalised image or a sentence;
   `read_text_file`, since the batch (F9), which reads the chosen CSV at no more than 2 MiB, as
   UTF-8 or a refusal, from a local path only, refusing a name Windows reserves for a device before
-  it is opened, and is used by that one screen; and — since Read (F10) — `read_image`, below. A
-  batch's folder is the fourth thing a dialog hands over, and it is the only place a batch writes.
+  it is opened, and is used by that one screen; `read_image`, since Read (F10); and `check_file`,
+  since the stamp (1.1) — both below. All four refuse a file that is itself a symbolic link, so a
+  path the dialog handed over cannot lead the read somewhere it did not name, and all four refuse a
+  name Windows reserves for a device before anything is opened: `CON`, `PRN`, `AUX`, `NUL`,
+  `CONIN$`, `CONOUT$`, `COM0`–`COM9` and `LPT0`–`LPT9`, and the spellings with a superscript digit
+  (`COM¹`, `LPT²` and the like) that Windows resolves to the same devices. A batch's folder is one
+  more thing a dialog hands over, and it is the only place a batch writes.
 - **Read opens a file to look inside it, keeps none of it, and acts on none of it (F10, ADR-030).**
   `read_image` is the third door, and it carries the raster rules the logo import already makes its
   claims on: refused above 20 MiB, the format decided by the **bytes** and never by the name,
@@ -165,6 +171,43 @@ seriously.
   pressed the button. It is the first place this product **reads** the clipboard rather than
   writing to it, it happens only when a person presses for it, and an empty or non-image
   clipboard is a sentence rather than a search for something else to read.
+- **Checking a stamp opens a file to find one marker, and nothing else (1.1, ADR-033).**
+  `check_file` is the fourth door, and it is narrower than the third on purpose. It takes a
+  `.png`, `.svg` or `.pdf` only — the extension decides, because nothing is decoded — from an
+  absolute path on a local drive; a network path is refused in every spelling, and so are a
+  symbolic link and a name Windows reserves for a device, with trailing dots and spaces trimmed
+  first, before anything is opened. The file is refused above 20 MiB by its directory entry and
+  again while it is read, so a file that grows in between is stopped at the cap. A `.png` must
+  begin with the PNG signature, and is walked chunk by chunk, never past its own bytes; its stamp
+  counts only as the last chunk before `IEND` with a correct CRC, and a stamp chunk anywhere else,
+  or with a CRC that does not match, is a stamp that could not be read. **An SVG or a PDF is never
+  rendered, parsed or decoded**: it is searched as bytes for the stamp's marker, which must occur
+  exactly once, because a door that drew somebody's SVG to read a comment in it would be a renderer
+  reachable from any file on the disk. The stamp is at most 512 bytes and is accepted only in the
+  exact form this build writes, with a decoder that reads `name x.y.z` and nothing else. The path is
+  never echoed, and nothing is stored: the stamp is checked against the rows that are there, and no
+  row is written about the check.
+- **A stamp says what was verified; it is not a signature (1.1, ADR-033).** Every PNG, SVG and PDF
+  an export writes — a batch's files and the proof sheet included — carries one stamp unless
+  **Stamp exported files** is turned off in Settings: a random reference (a UUID v4, never the
+  verification id, whose leading digits are a time), the decoder's name and version, and a digest
+  of the file. **No date, no name, no path, and nothing about the payload** — not the payload, and
+  not its digest either: a file can outlive the code in it, cropped out of the picture or left
+  behind in a layout that kept the metadata, and the hash of a payload with little to guess — a
+  Wi-Fi network whose name is known — would be something to test guesses against offline. The
+  clipboard carries no stamp. What a stamp is not: **a signature, or authentication of any kind.**
+  Its format is public and anybody can write one, with a correct digest, onto a file of their own.
+  _Unchanged_ proves only that a file matches its own stamp; only a row in **this** workspace with
+  the same reference and the same stamp digest, for a file that is unchanged, says this workspace
+  verified it — and when, in which format and of which saved code is read from that row, never from
+  the file, and shown only then. A stamp copied onto edited pixels is reported as changed, with no
+  date. A stamp that matches no row here is reported as a stamp from another workspace and given no
+  more weight than that. A
+  file with two stamps, or with a stamp in a form this build does not write — another version
+  included — is refused with a sentence rather than read; opened as a picture on Read, its codes are
+  read as ever and the stamp is not reported. A stamp is also easy to lose: a PNG
+  optimiser or an editor that re-saves the file may drop it, and a file that carries none proves
+  nothing either way.
 - **What leaves is an image, and it lands only where a dialog said.** Copying a code puts the
   **verified image** on the clipboard and never the payload text: a payload on the clipboard is a
   paste into the wrong window — into the message somebody was writing, or into a terminal — and
@@ -198,6 +241,12 @@ neutralised with a sentence, in under a second, never as a crash and never as a 
 - a zero-byte file
 - a PNG named `.svg`
 - a fully transparent image
+- a file with two stamps
+- a stamp in any form but the one this build writes — reordered, spaced, an unknown key, another
+  version, a v7 reference, a decoder that does not read `name x.y.z`, longer than 512 bytes
+- a PNG stamp chunk that is not the last before `IEND`, or whose CRC does not match
+- a PNG whose chunk length claims more bytes than the file has
+- a file that is a symbolic link, on every door that reads one
 
 ### Out of the threat model, stated plainly
 
@@ -219,7 +268,10 @@ CSV, or as an image to look for a code in — because the open dialog hands it a
 reads the path it is given: it is read once, under the cap for that door, and what comes back is a
 normalised image, at most 2 MiB of UTF-8 text, what a decoder found in the pixels, or a sentence.
 Nothing read through the third door is written down, so a file read that way leaves no trace in the
-workspace. A network path is refused on every door. The dialog plugin may only open
+workspace. The fourth door can be asked about any `.png`, `.svg` or `.pdf` on a local drive, under
+its 20 MiB cap; what comes back is whether the file carries a stamp, whether it matches it, and
+what this workspace's own row says — never the file's content — and nothing about the check is
+written down either. A network path is refused on every door. The dialog plugin may only open
 and save; the interface itself never reads a file, and nothing in the product walks a directory.
 
 ## Distribution integrity

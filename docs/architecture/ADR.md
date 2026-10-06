@@ -38,6 +38,7 @@ part that matters most later — the cost we accepted.
 | [030](#adr-030) | Read is the gate's own decoder on somebody else's pixels, and nothing is stored  | Accepted                      |
 | [031](#adr-031) | Settings are a closed list of keys the host owns, and the theme lives there      | Accepted                      |
 | [032](#adr-032) | A proof sheet is the export at several sizes, each proved, with a printer check  | Accepted                      |
+| [033](#adr-033) | A stamp says what was verified, and never when                                   | Accepted                      |
 | [034](#adr-034) | The address inside a code is said out loud, and never refused                    | Accepted                      |
 
 ---
@@ -983,6 +984,13 @@ months later.
   terminal, into a document that is about to be sent. The clipboard is an export like any other
   and goes through the same verification before anything is put on it.
 
+**From 1.1, every file also carries a stamp ([ADR-033](#adr-033)).** A PNG gains one `tEXt` chunk
+before `IEND` that the decoder never saw: remove it and what is left is, byte for byte, the PNG
+that was decoded, so the first sentence above becomes a claim anybody can check rather than a
+weaker one. An SVG gains one comment after the root's opening tag and a PDF one entry in its
+information dictionary, and neither is drawn. The clipboard carries none. With stamping turned off
+in Settings, each file is exactly what this record describes.
+
 **Why.** Four ways out is four chances to verify one artefact and write another, which is the one
 bug [ADR-010](#adr-010) was written to make impossible and the one that reaches paper without
 anybody noticing. Stating per format what the verified bytes are turns that from a property
@@ -1419,7 +1427,8 @@ much later.
   the Save form's checkbox starts from rather than asking the same question about every network
   ([ADR-018](#adr-018)). A default is a starting point and never a rule: it is what a new code
   begins with, it is visible in the control it fills, and changing it on one code changes that
-  code, not the setting.
+  code, not the setting. From 1.1 the list has a sixth key, `stamp_exports`, the one setting the
+  host reads for itself ([ADR-033](#adr-033)).
 - **What is deliberately not kept.** **The window's position and size**, because they are the
   operating system's to remember and a product that restores its own geometry is a product
   fighting Windows about which monitor somebody is on. **A list of recent files**, because nothing
@@ -1517,7 +1526,8 @@ one A4 page. Nothing is drawn on it that was not proved, and one thing on it pro
   first eight characters would put the time of the print on the paper to within about a minute — a
   date in all but name. The reference under each code is taken from the id's random end instead.
   The stamp planned for 1.1 (P2) will put what was verified into every exported file, and it too
-  is planned without a date; it is not part of this record.
+  is planned without a date; it is not part of this record. It landed as [ADR-033](#adr-033): the
+  sheet's information dictionary now carries `/Signatum` beside `/Producer`, and still no date.
 - **The text is WinAnsi, and a summary the font cannot draw is replaced by a sentence.** The sheet
   sets its text in Helvetica and Helvetica-Bold, the fonts every PDF reader carries, with no font
   embedded, so the text it can draw is the Windows-1252 set. The product's own sentences are
@@ -1558,6 +1568,142 @@ That is the price of verifying each size rather than one.
 the replacement sentence on its sheet. Embedding a font would lift that, at the cost of a font file
 in the binary and in every sheet; that is a decision for the day the replacement turns out to be
 common, and it is not made here.
+
+## ADR-033 — A stamp says what was verified, and never when {#adr-033}
+
+**Status: Accepted.**
+
+**Context.** The scan gate proves a file at the moment it is written ([ADR-010](#adr-010)), and the
+workspace keeps the row that says so. Then the file leaves — into an e-mail, onto a print shop's
+server, into somebody's layout — and months later a person holding `menu-final-2.png` asks the
+question that row cannot answer from where it sits: is this the file that was proved, and has it
+been changed since? Until 1.1 nothing in the file pointed back at its row, so there was no way to
+say. The second slice of 1.1 puts a stamp in every file this product writes. Three shortcuts came
+with it, and each is refused below. Writing the verification id into the file is the obvious one,
+and the id is a UUID v7 whose leading 48 bits are the moment it was made. Writing the date is the
+next one, because the workspace knows it. Signing the stamp is the third, and a key inside a
+desktop binary is a key everybody who has the binary holds.
+
+**Decision.** Every PNG, SVG and PDF an export writes — a single export, every file of a batch, and
+the proof sheet — carries exactly one stamp, unless the person has turned stamping off. The stamp
+is one line of ASCII JSON, four keys in this order, no whitespace, and nothing else
+(`src-tauri/src/export/stamp.rs`):
+
+```text
+{"signatum":1,"ref":"<uuid v4>","decoder":"rqrr 0.10.1","digest":"<sha256>"}
+```
+
+- **`ref` is a reference of its own, a UUID v4, and never the verification id.** Row identifiers
+  are v7 ([`DATA_MODEL.md`](../DATA_MODEL.md)), and the first twelve hex digits of a v7 are the
+  millisecond it was made: a stamp carrying one would put the time of the export inside the file,
+  which no export of this product does — the reason the proof sheet prints the random end of the id
+  and not its start ([ADR-032](#adr-032)). So each stamped file gets a fresh v4, 122 random bits
+  and no time, made for that file and recorded on the row that proved it.
+- **`decoder` is the name and version that read the artefact back**, and it must read
+  `name x.y.z` — `rqrr 0.10.1` — so a stamp cannot carry a sentence, a path or anything that needs
+  escaping where it is written: not in a PDF string, where a parenthesis would end it, and not in an
+  XML comment, where `--` is not allowed.
+- **The stamp carries nothing about the payload — not the payload, and not its digest.** The
+  slice's first design put the payload's SHA-256 in the stamp, on the argument that anybody holding
+  the code can scan it anyway. It was taken out before it shipped, for two reasons. The reference
+  and the digest already bind the file to its row, so a payload digest adds nothing Read needs. And
+  a file outlives its code: crop the code out of a stamped picture, or paste the drawing into a
+  layout that keeps the metadata, and what is left is a hash of the payload with nothing visible
+  beside it. A payload with little entropy — a Wi-Fi code for a network whose name is known, where
+  only the password is unknown — can be guessed offline against that hash, as fast as a machine can
+  hash, with nobody to notice. A stamp that names no payload cannot be used that way. The file's
+  name, its folder and the person who made it are not in the stamp either.
+- **`digest` is defined per format, so a reader can recompute it from the file alone.**
+  - **PNG** — the stamp is one `tEXt` chunk, keyword `signatum`, whose text is the JSON alone, with
+    no prefix, and it counts only as **the last chunk before `IEND`, with a correct CRC**; a
+    `signatum` chunk anywhere else, or one whose CRC does not match, is a stamp that could not be
+    read. `digest` is the SHA-256 of the file **with that chunk removed**.
+  - **SVG** — the stamp is the comment `<!-- signatum:{json} -->`, right after the root element's
+    opening tag. `digest` is the SHA-256 of the whole file with the 64 hex characters of the
+    `digest` value replaced by 64 zeros.
+  - **PDF** — the stamp is the entry `/Signatum (signatum:{json})` in the document-information
+    dictionary, beside `/Producer (Signatum)`. `digest` follows the SVG's rule.
+- **The PNG's digest is the decoded artefact, which makes [ADR-026](#adr-026) stronger.** The chunk
+  goes in around bytes the decoder already read and touches none of them, so the file minus its
+  stamp is, byte for byte, the PNG that was decoded, and the stamp's `digest` is the row's
+  `artefact_sha256`. "The written file is the verified pixmap" becomes "remove the stamp and you
+  hold exactly what was decoded" — a claim anybody can check with a chunk walk and a hash, and the
+  one the tests now make, after removing the chunk, in every place they used to compare the whole
+  file.
+- **SVG and PDF use a placeholder, because their stamp sits inside the text it hashes.** The file
+  is written with 64 zeros where the digest goes, hashed, and the digest is written over the zeros.
+  Nothing moves: 64 characters replace 64 characters, so every cross-reference offset in the PDF
+  stays true without the file being rebuilt. A reader puts the zeros back and hashes again. Unlike
+  the PNG's, this digest covers the stamp's own other fields as well as the drawing.
+- **Reading a stamp is bounded, and parses nothing but the stamp.** A PNG is walked chunk by chunk
+  and never past its own bytes; an SVG or a PDF is searched for its marker as bytes, never parsed,
+  drawn or decoded. The marker must occur **exactly once** — a file with two stamps is refused,
+  because neither can be trusted — and the JSON is at most 512 bytes, parsed into a closed struct
+  and accepted only if writing it back out gives the very same bytes. So whitespace, reordered
+  keys, an unknown key — a `payload` included — an upper-case digest, a v7 reference, a decoder
+  that does not read `name x.y.z` and `"signatum":2` all read as _"This file's Signatum stamp could
+  not be read."_ That last one is deliberate: a future format needs a reader that knows it, and
+  this build does not guess at a stamp it was not written to read.
+- **The workspace keeps the two halves the file cannot vouch for.** Migration 007 adds `stamp_ref`
+  and `stamp_digest` to `verifications`, schema version 7. They are set together or not at all, and
+  only on a verified row that has a path — a stamp on a refusal would be a stamp on nothing — with
+  a unique index on the reference. For a batch, each file has its own reference on its own row. For
+  the proof sheet, which holds several verifications on one page, the stamp's `digest` covers the
+  whole sheet and its reference is recorded on one row: the chosen size's when it was drawn, else
+  the smallest drawn size's.
+- **Read checks a file, and the date it shows is the workspace's.** **Check an exported file…**
+  opens a `.png`, `.svg` or `.pdf` through `check_file`, the fourth door that reads a file
+  ([`SECURITY.md`](../../SECURITY.md)). It recomputes the digest and looks the reference up. The
+  stamp _matches the record_ when this workspace holds a row with that reference whose
+  `stamp_digest` is the stamp's digest. When, in which format, at which resolution and of which
+  saved code the file was verified are read from that row, and shown **only when the file is also
+  unchanged**: a stamp copied onto edited pixels is reported as changed, with no date, because the
+  row's date is about a file this one no longer is. A file that matches no row here is told nothing
+  but what its own stamp says. A PNG opened through _Open an image…_ reports the same check when it
+  carries a stamp this build can read. Like the rest of Read ([ADR-030](#adr-030)), checking a file
+  stores nothing.
+- **Turning it off is a setting, and it is on by default.** `stamp_exports` joins the closed list
+  ([ADR-031](#adr-031)) as **Stamp exported files** under Settings → Defaults. Off, every file is
+  written exactly as before the stamp existed, and the row's two columns are `NULL`, which is the
+  truth: that file was not stamped.
+- **The clipboard carries no stamp.** The system copies pixels, not files, and a stamp on the
+  clipboard would be one the next paste throws away.
+
+**What the stamp proves, and what it does not.** _Unchanged_ proves one thing: the file matches its
+own stamp. Only a row in **this** workspace holding the same reference and the same stamp digest,
+for a file that is unchanged, says this workspace verified it. The stamp is not a signature and not
+authentication. Its format is in this record and the code is open, so anybody can write one — onto
+a file of their own, with a correct digest — and such a file reads as stamped and unchanged. That
+is why a stamp that matches its file and no row here is reported as exactly that, _a stamp from
+another workspace_, with the decoder it names and nothing said about when or where, and never with
+the mark this product gives its own verified work. A reference this workspace issued, carrying a
+digest that is not the one recorded, is a different file under a borrowed stamp, and it is said so.
+
+**Why not a signature.** A signature needs a private key, and a private key in an offline desktop
+product is either in the binary, where anybody can take it out, or per workspace, where it proves
+only what the matching row already proves. Either way it would turn "this workspace has a record of
+this file" into "this file is authentic", a claim the product could not back. The row is the
+evidence; the stamp is how a file finds its row.
+
+**Cost accepted: a stamp is easy to lose, and losing it proves nothing.** A PNG optimiser that
+strips ancillary chunks, an SVG optimiser that strips comments, an editor that re-saves the file —
+any of them may drop the stamp, and Read then says the file carries none, which is true and is no
+evidence of anything. One that keeps the stamp while changing the bytes leaves a stamp that no
+longer matches, and Read says the file was changed after it was verified. Stamps written before
+this slice do not exist, so every file exported by 1.0.0 carries none.
+
+**Second cost: in a PNG the stamp's own fields are outside its digest.** The PNG's digest is the
+decoded artefact so that the stronger [ADR-026](#adr-026) claim holds, and the price is that its
+`ref` and `decoder` can be rewritten without making the file read as changed. That is the forger's
+case above, met the same way: what binds a file to a verification is the row, and a rewritten
+reference either names no row here or names one whose digest is not this file's.
+
+**Third cost: one shape, stated in two places.** The shape of a reference and of a digest is checked
+in the host, before a stamp is written and when one is read, and again by the `CHECK` constraints of
+migration 007. The file is written before its row, so a change to one side without the other would
+be a stamped file on disk whose row the database then refuses, and an export that reports an error
+about a file it did write. A host test and a migration test each pin their own side, as the raster
+bounds are pinned in [ADR-026](#adr-026).
 
 ## ADR-034 — The address inside a code is said out loud, and never refused {#adr-034}
 
