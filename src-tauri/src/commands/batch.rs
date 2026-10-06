@@ -723,6 +723,10 @@ fn read_text_file_at(path: &str) -> Result<TextFile> {
             "That is a name Windows reserves for a device, not a file.".to_string(),
         ));
     }
+    // A link's name was what the dialog showed; what it points at is a file nobody chose.
+    if crate::os::paths::is_link(path) {
+        return Err(Error::InvalidInput(crate::os::paths::A_LINK.to_string()));
+    }
 
     // The size comes from the directory entry, so a file far too large to be a
     // list of codes is refused without being read at all.
@@ -1373,6 +1377,22 @@ mod tests {
         let read = read_text_file_at(&path.to_string_lossy()).expect("read");
 
         assert_eq!(read.text, "url,name\nhttps://example.com,Menu\n");
+    }
+
+    #[test]
+    fn a_list_behind_a_link_is_refused() {
+        let scratch = Scratch::new();
+        let target = scratch.0.join("inner").join("contacts.csv");
+        std::fs::write(&target, "url\nhttps://example.com\n").expect("write");
+        let link = scratch.0.join("inner").join("link.csv");
+        if !crate::os::paths::make_link(&target, &link) {
+            return;
+        }
+
+        let refused = read_text_file_at(&link.to_string_lossy()).expect_err("a link was followed");
+
+        assert_eq!(refused.to_string(), crate::os::paths::A_LINK);
+        read_text_file_at(&target.to_string_lossy()).expect("the file itself is read");
     }
 
     #[test]

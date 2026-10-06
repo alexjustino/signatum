@@ -42,11 +42,42 @@ pub use crate::db::MAX_NAME_CHARS;
 /// Names Windows will not give a file, whatever the extension. The console
 /// devices are in the list with the rest: `CONIN$` and `CONOUT$` are not
 /// spelled like the others, and a list that leaves out the two that look
-/// different is a list somebody wrote from memory.
-pub(crate) const RESERVED: [&str; 24] = [
-    "con", "prn", "aux", "nul", "conin$", "conout$", "com1", "com2", "com3", "com4", "com5",
-    "com6", "com7", "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8",
+/// different is a list somebody wrote from memory. So are `COM0` and `LPT0`,
+/// and the ports spelled with a superscript digit — `COM¹`, `LPT³` — which
+/// Windows also resolves to a device. Compared on the lower-cased stem.
+pub(crate) const RESERVED: [&str; 32] = [
+    "con",
+    "prn",
+    "aux",
+    "nul",
+    "conin$",
+    "conout$",
+    "com0",
+    "com1",
+    "com2",
+    "com3",
+    "com4",
+    "com5",
+    "com6",
+    "com7",
+    "com8",
+    "com9",
+    "com\u{b9}",
+    "com\u{b2}",
+    "com\u{b3}",
+    "lpt0",
+    "lpt1",
+    "lpt2",
+    "lpt3",
+    "lpt4",
+    "lpt5",
+    "lpt6",
+    "lpt7",
+    "lpt8",
     "lpt9",
+    "lpt\u{b9}",
+    "lpt\u{b2}",
+    "lpt\u{b3}",
 ];
 
 /// What the interface is told about a logo.
@@ -268,7 +299,33 @@ fn check_source(path: &str) -> Result<&Path> {
             "a logo is read from a local drive, not from a network path".to_string(),
         ));
     }
+    // `COM3.png` is a device on a Windows that has the port, and opening it can wait forever:
+    // refused by name before anything is opened, as every other door does.
+    if names_a_device(source) {
+        return Err(Error::InvalidInput(
+            "That is a name Windows reserves for a device, not a file.".to_string(),
+        ));
+    }
+    // A link's name was what the dialog showed; what it points at is a file nobody chose.
+    if crate::os::paths::is_link(path) {
+        return Err(Error::InvalidInput(crate::os::paths::A_LINK.to_string()));
+    }
     Ok(source)
+}
+
+/// True when the file's name is one Windows resolves to a device, whatever its extension and
+/// with the trailing spaces and dots Windows ignores (`COM3 .png`, `COM3..png`).
+pub(crate) fn names_a_device(source: &Path) -> bool {
+    let stem = source
+        .file_stem()
+        .and_then(|found| found.to_str())
+        .unwrap_or("");
+    let base = stem
+        .split('.')
+        .next()
+        .unwrap_or(stem)
+        .trim_end_matches([' ', '.']);
+    RESERVED.contains(&base.to_ascii_lowercase().as_str())
 }
 
 /// Turn a file's name into the label this product will store.
@@ -372,6 +429,25 @@ mod tests {
             std::fs::write(&path, bytes).expect("seed");
             path.to_string_lossy().into_owned()
         }
+    }
+
+    /// A logo is read from the file a person chose, not from wherever a link
+    /// to it points.
+    #[test]
+    fn a_logo_behind_a_link_is_refused() {
+        let conn = workspace();
+        let scratch = Scratch::new();
+        let target = scratch.holding("brand.svg", br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 4"><rect width="4" height="4"/></svg>"#);
+        let link = scratch.0.join("link.svg");
+        if !crate::os::paths::make_link(std::path::Path::new(&target), &link) {
+            return;
+        }
+
+        let refused =
+            import_logo_with(&conn, &link.to_string_lossy()).expect_err("a link was followed");
+
+        assert_eq!(refused.to_string(), crate::os::paths::A_LINK);
+        import_logo_with(&conn, &target).expect("the file itself is read");
     }
 
     impl Drop for Scratch {
@@ -685,5 +761,19 @@ mod tests {
             refused.to_string(),
             "That logo is no longer in this workspace."
         );
+    }
+
+    #[test]
+    fn a_logo_named_for_a_device_is_refused_before_it_is_read() {
+        for name in ["COM3.png", "com0.svg", "LPT².png", "COM3 .png", "nul.jpg"] {
+            let path = std::env::temp_dir().join(name);
+            let refused = check_source(&path.to_string_lossy()).expect_err(name);
+            assert!(
+                refused.to_string().contains("reserves for a device"),
+                "{name}: {refused}"
+            );
+        }
+        let fine = std::env::temp_dir().join("com10.png");
+        assert!(check_source(&fine.to_string_lossy()).is_ok());
     }
 }
