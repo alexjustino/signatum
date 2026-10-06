@@ -41,6 +41,7 @@ part that matters most later — the cost we accepted.
 | [033](#adr-033) | A stamp says what was verified, and never when                                   | Accepted                      |
 | [034](#adr-034) | The address inside a code is said out loud, and never refused                    | Accepted                      |
 | [035](#adr-035) | Print is a degradation of its own, and the margin says so                        | Accepted                      |
+| [036](#adr-036) | The Rust version declared is the one the tree needs, and a gate holds it         | Accepted                      |
 
 ---
 
@@ -553,6 +554,9 @@ newer compiler, so 0.45 and 0.10 are what F0 takes rather than the latest publis
 real cost, and it comes due the day one of these crates fixes something that matters upstream:
 the answer then is to raise the MSRV across the family deliberately, in its own record, not to
 raise it quietly here for one crate.
+
+**From 1.1, the floor is 1.88 ([ADR-036](#adr-036)).** The tree Tauri brought in had already passed
+1.80 without anybody raising it; the declaration now says what the tree needs, and a gate checks it.
 
 ## ADR-020 — The matrix is proven against the standard, and the corpus is a proof, not a gate {#adr-020}
 
@@ -1945,3 +1949,34 @@ larger, is what a code that small needs anyway, and the proof sheet is where it 
 still asked for after the verdict and off the window's thread, never between a verdict and a file,
 and the bound it is held to is unchanged: three seconds on the release build at the largest raster
 it measures.
+
+## ADR-036 — The Rust version declared is the one the tree needs, and a gate holds it {#adr-036}
+
+**Status: Accepted.**
+
+**Context.** ADR-019 kept `rust-version = "1.80"` so that one toolchain would build the whole
+family, and said that raising it would be done deliberately, in a record of its own. The dependency
+round of 1.1 found that it had already been raised, silently, by the tree. Tauri 2.11 brings in
+`darling` 0.24 and the `icu` 2.3 crates, and each of them declares Rust 1.88; the product released
+as 1.0.0 could not have been built by the compiler its manifest named. Nothing noticed, because CI
+installs the newest stable compiler and never the declared one, and Cargo checks a crate's
+`rust-version` only against the compiler in hand. The updates that started the round — `sha2` 0.11,
+`resvg` 0.48 and `rqrr` 0.11 — need 1.85, which is below the floor the tree already had.
+
+**Decision.** `rust-version` is **1.88**: the highest any crate in the Windows build declares, and
+so the first version the declaration is true at. `scripts/check-msrv.mjs` holds it there. It asks
+Cargo for the dependency graph that builds on Windows, takes the highest `rust-version` in it, and
+fails the gates when that is newer than the one declared, naming the crates. A dependency update
+that raises the floor therefore says so in the pull request that brings it, and raising the
+declaration is one line in that change, with the reason beside it.
+
+**Why not a second toolchain in CI.** Building once more with exactly the declared compiler is the
+stronger proof — it would also catch a language feature used before its time — and it costs a
+toolchain download and a full build on every run. The gate costs one `cargo metadata`. What went
+wrong here was a claim the tree contradicted, and that is the part the gate checks; the compiler a
+contributor actually uses is the newest stable one, as CI's is.
+
+**Cost accepted: the family drifts apart.** The siblings declare their own floors, and they are no
+longer one number. The reason ADR-019 gave — one toolchain builds everything — still holds, because
+that toolchain is the current stable compiler, newer than any floor; what is given up is a single
+figure to quote, which was not true here anyway.
