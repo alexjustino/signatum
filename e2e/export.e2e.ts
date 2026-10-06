@@ -240,10 +240,28 @@ describe('size and export', () => {
     expect((copied as Report).verified).toBe(true);
     await driver.waitForText('Shrunk to 25 %');
     await driver.waitForText('JPEG quality 25');
-    // The margin card sits under the export row; bring it into the capture.
-    await driver.execute(
-      'document.querySelector("main").scrollTo({ top: document.querySelector("main").scrollHeight });',
+    // P4: print degrades a code differently from a screen, and the margin says so in its own group.
+    await driver.waitForElement('ul[aria-label="In print"]');
+    const printLines = await Promise.all(
+      (await driver.findAll('ul[aria-label="In print"] li')).map((li) => li.text()),
     );
+    expect(printLines).toHaveLength(4);
+    expect(printLines[0]).toMatch(/^Ink spread, coated paper — (reads|fails)$/);
+    expect(printLines[1]).toMatch(/^Ink spread, uncoated paper — (reads|fails)$/);
+    expect(printLines[2]).toMatch(/^Tilted 30° — (reads|fails)$/);
+    expect(printLines[3]).toMatch(/^Dim light — (reads|fails)$/);
+    expect(await driver.findAll('ul[aria-label="On screen and in chat"] li')).toHaveLength(9);
+    // The margin card sits at the foot of the sticky pane, which scrolls on its own (F11).
+    await driver.execute(
+      `const pane = document.querySelector('[aria-label="The code and how it leaves"]');
+       pane.scrollTo({ top: pane.scrollHeight });`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 250));
     await session.screenshot('export-margin');
+    // And in the dark theme: the failing lines are caution, which has to read on both grounds.
+    await driver.execute(`document.documentElement.setAttribute('data-theme', 'dark');`);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await session.screenshot('export-margin-dark');
+    await driver.execute(`document.documentElement.removeAttribute('data-theme');`);
   });
 });
