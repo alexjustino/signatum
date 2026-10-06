@@ -723,6 +723,10 @@ fn read_text_file_at(path: &str) -> Result<TextFile> {
             "That is a name Windows reserves for a device, not a file.".to_string(),
         ));
     }
+    // A link's name was what the dialog showed; what it points at is a file nobody chose.
+    if crate::os::paths::is_link(path) {
+        return Err(Error::InvalidInput(crate::os::paths::A_LINK.to_string()));
+    }
 
     // The size comes from the directory entry, so a file far too large to be a
     // list of codes is refused without being read at all.
@@ -969,6 +973,45 @@ mod tests {
             )
             .expect("read back");
         assert_eq!(exports, 50, "each line went through the export's own gate");
+    }
+
+    /// A batch goes through the export's own path, stamp included: every file
+    /// carries one that reads back intact, each under its own reference, and
+    /// each line's evidence keeps it.
+    #[test]
+    fn every_file_of_a_batch_is_stamped() {
+        let db = workspace();
+        let scratch = Scratch::new();
+        let rows: Vec<PlannedRow> = (0..3)
+            .map(|index| good(index + 2, &format!("{index:03}-code")))
+            .collect();
+
+        run(&db, &scratch.inner(), &rows).expect("the run itself succeeds");
+
+        let mut references = BTreeSet::new();
+        for name in scratch.inside() {
+            let bytes = std::fs::read(scratch.0.join("inner").join(&name)).expect("written");
+            let found = crate::export::stamp::read_stamp(&bytes, crate::export::stamp::Kind::Png)
+                .expect("read")
+                .unwrap_or_else(|| panic!("{name} carries no stamp"));
+            assert!(found.intact, "{name}");
+            references.insert(found.stamp.reference);
+        }
+        assert_eq!(references.len(), 3, "one reference per file");
+
+        let conn = db.lock().expect("lock");
+        let mut statement = conn
+            .prepare("SELECT stamp_ref FROM verifications WHERE stamp_ref IS NOT NULL")
+            .expect("prepare");
+        let recorded: BTreeSet<String> = statement
+            .query_map([], |r| r.get(0))
+            .expect("query")
+            .collect::<std::result::Result<_, _>>()
+            .expect("rows");
+        assert_eq!(
+            recorded, references,
+            "each line's evidence keeps its file's stamp"
+        );
     }
 
     /// The one that AEGIS gates: a name that is a path, a name that is a
@@ -1334,6 +1377,22 @@ mod tests {
         let read = read_text_file_at(&path.to_string_lossy()).expect("read");
 
         assert_eq!(read.text, "url,name\nhttps://example.com,Menu\n");
+    }
+
+    #[test]
+    fn a_list_behind_a_link_is_refused() {
+        let scratch = Scratch::new();
+        let target = scratch.0.join("inner").join("contacts.csv");
+        std::fs::write(&target, "url\nhttps://example.com\n").expect("write");
+        let link = scratch.0.join("inner").join("link.csv");
+        if !crate::os::paths::make_link(&target, &link) {
+            return;
+        }
+
+        let refused = read_text_file_at(&link.to_string_lossy()).expect_err("a link was followed");
+
+        assert_eq!(refused.to_string(), crate::os::paths::A_LINK);
+        read_text_file_at(&target.to_string_lossy()).expect("the file itself is read");
     }
 
     #[test]

@@ -35,6 +35,24 @@ interface Report {
 
 type InvokeResult<T> = T | { __error: string };
 
+/** The PNG with its `signatum` tEXt chunk removed, or unchanged when it carries none. */
+function withoutStamp(png: Buffer): Buffer {
+  let at = 8;
+  while (at + 8 <= png.length) {
+    const length = png.readUInt32BE(at);
+    const type = png.toString('latin1', at + 4, at + 8);
+    if (
+      type === 'tEXt' &&
+      png.toString('latin1', at + 8, at + 17) === 'signatum' + String.fromCharCode(0)
+    ) {
+      return Buffer.concat([png.subarray(0, at), png.subarray(at + 12 + length)]);
+    }
+    if (type === 'IEND') break;
+    at += 12 + length;
+  }
+  return png;
+}
+
 describe('create', () => {
   let session: Session;
   let dir: string;
@@ -99,7 +117,9 @@ describe('create', () => {
 
     const bytes = await readFile(file);
     expect((await stat(file)).size).toBe(ok.bytes_written);
-    expect(createHash('sha256').update(bytes).digest('hex')).toBe(ok.artefact_sha256);
+    // The file carries a stamp (P2): one tEXt chunk before IEND. Without it, the file is byte for
+    // byte the PNG the decoder read.
+    expect(createHash('sha256').update(withoutStamp(bytes)).digest('hex')).toBe(ok.artefact_sha256);
     expect(decodePng(bytes)).toBe(LINK);
   });
 

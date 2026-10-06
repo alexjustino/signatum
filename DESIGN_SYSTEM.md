@@ -436,6 +436,21 @@ before** — a primitive built ahead of the screen that needs it is a guess with
   every code would be the mark that is always on (§2). It announces itself once, as the status
   region `InfoBar` already is, and adds no live region of its own. The sentences are the domain's,
   shown as given, for the reason a verdict's sentence is.
+- **The Stamp card says one sentence, and only this workspace's own record earns the success
+  tone** (P2) — not a primitive: a `Card` named `Stamp` (`aria-label` and heading alike) on Read,
+  for a file opened with _Check an exported file…_ and above the code cards of a stamped PNG,
+  holding exactly one of five sentences (ADR-033). _"Verified by this workspace on 14 Sep 2026, by
+  rqrr 0.10.1 — unchanged since."_ is the only one in the success tone, with _"Saved as Menu."_ and
+  an **Open** button when the record names a saved code; the date is the workspace's row, never the
+  file's, and it is shown only for a file that is unchanged. _"This workspace verified a different file under this stamp."_ and _"Carries a Signatum
+  stamp, but the file was changed after it was verified."_ are cautions. _"This file carries no
+  Signatum stamp."_ is information, followed by _"Files exported by Signatum 1.1 or later carry one,
+  unless stamping was turned off."_ And _"Carries a Signatum stamp from another workspace: read back
+  by rqrr 0.10.1, and unchanged since. When and where it was verified is known only to the workspace
+  that made it."_ is information too — **never a green tick for a stamp from elsewhere**, because
+  anybody can write a stamp and a file that matches its own proves only that. The tone is carried by
+  the icon and the words as well as the colour (§2), and the switch that turns stamping off is one
+  more `Checkbox` on the Defaults card, **Stamp exported files**, saved on change like the others.
 
 ### Asking "are you sure"
 

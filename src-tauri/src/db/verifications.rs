@@ -47,6 +47,12 @@ pub struct VerificationRow<'a> {
     /// `None` for a code that has never been saved — which is most of them,
     /// because a code is proved long before anybody decides to keep it.
     pub code_id: Option<&'a str>,
+    /// The stamp's reference, a UUID v4, when the file written was stamped
+    /// (P2). Never the row's own identifier: that is a v7, and carries a time.
+    pub stamp_ref: Option<&'a str>,
+    /// The digest the stamp in the file carries; set with `stamp_ref` or not
+    /// at all.
+    pub stamp_digest: Option<&'a str>,
 }
 
 /// Write one verification and return its identifier.
@@ -69,8 +75,9 @@ pub fn record_as(conn: &Connection, id: &str, row: &VerificationRow) -> Result<S
     conn.execute(
         "INSERT INTO verifications
            (id, created_at, kind, decoder, verified, payload_sha256, decoded_sha256,
-            artefact_sha256, width, height, duration_ms, path, reason, dpi, format, code_id)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+            artefact_sha256, width, height, duration_ms, path, reason, dpi, format, code_id,
+            stamp_ref, stamp_digest)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
         rusqlite::params![
             id,
             now(),
@@ -88,9 +95,59 @@ pub fn record_as(conn: &Connection, id: &str, row: &VerificationRow) -> Result<S
             row.dpi,
             row.format,
             row.code_id,
+            row.stamp_ref,
+            row.stamp_digest,
         ],
     )?;
     Ok(id.to_string())
+}
+
+/// What the workspace holds about a stamped file, found by the stamp's
+/// reference.
+///
+/// Everything a person is told about *when* and *as what* a file was verified
+/// comes from here, and never from the file: a stamp carries no date, and one
+/// that did could say anything.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StampedRecord {
+    /// When the verification was recorded, as every timestamp column stores it.
+    pub created_at: String,
+    /// The digest the row says was written into the file.
+    pub stamp_digest: String,
+    /// What the export was: `png`, `svg` or `pdf`.
+    pub format: Option<String>,
+    /// The resolution it was made for.
+    pub dpi: Option<u32>,
+    /// The saved code it was of, while that code is still in the library.
+    pub code_id: Option<String>,
+    /// That saved code's name.
+    pub code_name: Option<String>,
+}
+
+/// The row a stamp's reference names, if this workspace holds one.
+///
+/// # Errors
+///
+/// [`crate::error::Error::Database`] when the table could not be read.
+pub fn find_by_stamp(conn: &Connection, stamp_ref: &str) -> Result<Option<StampedRecord>> {
+    let mut statement = conn.prepare(
+        "SELECT v.created_at, v.stamp_digest, v.format, v.dpi, v.code_id, c.name
+           FROM verifications AS v
+           LEFT JOIN codes AS c ON c.id = v.code_id
+          WHERE v.stamp_ref = ?1",
+    )?;
+    let mut rows = statement.query([stamp_ref])?;
+    let Some(row) = rows.next()? else {
+        return Ok(None);
+    };
+    Ok(Some(StampedRecord {
+        created_at: row.get(0)?,
+        stamp_digest: row.get(1)?,
+        format: row.get(2)?,
+        dpi: row.get(3)?,
+        code_id: row.get(4)?,
+        code_name: row.get(5)?,
+    }))
 }
 
 #[cfg(test)]
@@ -125,6 +182,8 @@ mod tests {
                 dpi: Some(300),
                 format: Some("png"),
                 code_id: None,
+                stamp_ref: None,
+                stamp_digest: None,
             },
         )
         .expect("record");
@@ -171,6 +230,8 @@ mod tests {
                 dpi: None,
                 format: None,
                 code_id: None,
+                stamp_ref: None,
+                stamp_digest: None,
             },
         )
         .expect("record");
@@ -204,6 +265,8 @@ mod tests {
                 dpi: None,
                 format: None,
                 code_id: None,
+                stamp_ref: None,
+                stamp_digest: None,
             },
         );
         assert!(

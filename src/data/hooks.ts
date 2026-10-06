@@ -28,7 +28,7 @@ import {
 } from './library';
 import { deleteLogo, importLogo, listLogos, logoDataUrl } from './logos';
 import { exportProofSheet } from './proof';
-import { readClipboard, readImage } from './read';
+import { checkFile, readClipboard, readImage } from './read';
 import { fetchSettings, writeSetting, type SettingKey } from './settings';
 import { fetchAccentRamp, fetchSystemInfo } from './system';
 
@@ -289,7 +289,7 @@ export function useWriteBatchReport() {
 }
 
 /**
- * The two doors into Read (F10), both mutations and neither cached.
+ * The doors into Read (F10, P2), all mutations and none cached.
  *
  * A reading is an answer about one image a person put in front of the product at one moment, and
  * nothing else ever wants to read it back — the same reason the scan-gate commands are mutations.
@@ -305,4 +305,12 @@ export function useReadImage() {
 /** Read whatever image is on the clipboard — the door a screenshot arrives through. */
 export function useReadClipboard() {
   return useMutation({ mutationFn: readClipboard });
+}
+
+/**
+ * Check the stamp of an exported file (P2) — a mutation for the reason the other two doors are:
+ * an answer about one file at one moment, which nothing else wants to read back.
+ */
+export function useCheckFile() {
+  return useMutation({ mutationFn: checkFile });
 }

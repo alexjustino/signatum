@@ -81,7 +81,7 @@ export function App({ settings }: { settings: Settings }) {
   // What the Read screen is looking at, for the same reason: a person goes to Settings to switch
   // the theme and comes back, and the photograph they were reading must still be on screen. It is
   // in memory for as long as the window lives, and nowhere else — nothing read is ever stored.
-  const [read, setRead] = useState<ReadState>({ reading: null, problem: null });
+  const [read, setRead] = useState<ReadState>({ reading: null, check: null, problem: null });
   // The saved code on screen, when there is one (F8): the row in the library the editor is
   // showing, either because it was opened from there or because it was just written there. It
   // lives here rather than in Create because everything that detaches it lives here.
@@ -270,9 +270,10 @@ export function App({ settings }: { settings: Settings }) {
           )}
           {/* Read hands Create a payload and nothing else: the look, the size and the logo on
               the editor are the person's, and a code somebody else made does not get to change
-              them. */}
+              them. The one exception is a file this workspace stamped from a saved code (P2):
+              its Open is the Library's Open, the same path, so it lands the same way. */}
           {destination === 'read' && (
-            <ReadPage state={read} onState={setRead} onMake={makeFromRead} />
+            <ReadPage state={read} onState={setRead} onMake={makeFromRead} onOpen={openSavedCode} />
           )}
           {destination === 'diagnostics' && <DiagnosticsPage />}
           {destination === 'settings' && <SettingsPage theme={theme} onChoose={chooseTheme} />}

@@ -13,7 +13,9 @@
 //! with a ruler instead of with a box of misprinted labels.
 //!
 //! What the page does not carry, as no export does: a date, an author, a title,
-//! a path. The document information holds the producer and nothing else.
+//! a path. The document information holds the producer and, from P2, the stamp
+//! (`export::stamp`) — which says what was verified and never when — and nothing
+//! else.
 //!
 //! The text is set in the two Helvetica faces every PDF reader has, with
 //! `/WinAnsiEncoding`, so nothing is embedded and nothing has to be shaped. A
@@ -24,10 +26,11 @@
 //!
 //! Pure: bytes in, bytes out. Nothing here opens a file.
 
-use pdf_writer::{Content, Finish, Name, Pdf, Rect, Ref, Str, TextStr};
+use pdf_writer::{Content, Finish, Name, Pdf, Rect, Ref, Str};
 
 use crate::error::{Error, Result};
-use crate::export::pdf::{points, Picture};
+use crate::export::pdf::{information, points, Picture};
+use crate::export::stamp::{self, Mark, Sealed};
 
 /// The page, A4 portrait, in millimetres.
 pub const PAGE_WIDTH_MM: f64 = 210.0;
@@ -164,6 +167,9 @@ pub struct Sheet<'a> {
     /// Every size on the sheet, in any order: the sheet draws them smallest
     /// first.
     pub sizes: &'a [Size<'a>],
+    /// The stamp the file carries, when stamping is on. Its digest covers the
+    /// whole sheet.
+    pub stamp: Option<Mark<'a>>,
 }
 
 /// One size on the sheet.
@@ -694,8 +700,9 @@ fn arrangements(
 /// [`Error::Render`] when a verified artefact cannot be read back or
 /// compressed — this host's own bytes. [`Error::InvalidInput`] with
 /// [`DOES_NOT_FIT`] when the sizes do not fit on one page, which no plan the
-/// domain makes can cause.
-pub fn sheet(sheet: &Sheet) -> Result<Vec<u8>> {
+/// domain makes can cause. [`Error::Render`] when the stamp could not be
+/// written.
+pub fn sheet(sheet: &Sheet) -> Result<Sealed> {
     let page_width = points(PAGE_WIDTH_MM);
     let page_height = points(PAGE_HEIGHT_MM);
     let margin = points(MARGIN_MM);
@@ -944,11 +951,11 @@ pub fn sheet(sheet: &Sheet) -> Result<Vec<u8>> {
     // Uncompressed on purpose: the measurements in it are there to be read.
     pdf.stream(drawing, &content.finish());
 
-    // As every export: the producer and nothing else. No date, no author, no
-    // title, no path.
-    pdf.document_info(about).producer(TextStr("Signatum"));
+    // As every export: the producer and the stamp, and nothing else. No date,
+    // no author, no title, no path.
+    information(&mut pdf, about, sheet.stamp.as_ref())?;
 
-    Ok(pdf.finish())
+    stamp::seal_pdf(pdf.finish(), sheet.stamp.is_some())
 }
 
 /// Set `text` one line under another from `top` down, and return where the
@@ -1271,8 +1278,10 @@ mod tests {
             summary,
             note,
             sizes,
+            stamp: None,
         })
         .expect("write the sheet")
+        .bytes
     }
 
     fn text_of(pdf: &[u8]) -> Vec<u8> {
@@ -1646,6 +1655,7 @@ mod tests {
             summary: "",
             note: None,
             sizes: &sizes,
+            stamp: None,
         })
         .expect_err("five big boxes on one page");
 

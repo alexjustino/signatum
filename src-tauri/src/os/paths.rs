@@ -30,6 +30,38 @@ pub fn is_local(path: &str) -> bool {
     }
 }
 
+/// What a reading door says about a path whose last component is a link.
+pub const A_LINK: &str = "That file is a link to somewhere else; open the file itself.";
+
+/// True when the last component of `path` is a symbolic link (on Windows, any name-surrogate
+/// reparse point — a symlink or a junction).
+///
+/// Every door that reads a file a person chose refuses one: the dialog showed the link's name
+/// and its folder, and what would be read is somewhere else that nobody chose. Asked of the
+/// link itself (`symlink_metadata`), never of what it points at; a path whose metadata cannot
+/// be read is not a link, and the read that follows says what is wrong with it.
+pub fn is_link(path: &str) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|facts| facts.file_type().is_symlink())
+}
+
+/// Make `link` a symbolic link to the file `target`, for the tests of the doors that refuse
+/// one. `false` when the system will not let this process make one — Windows asks for a
+/// privilege, or for developer mode — so the test can say it was skipped.
+#[cfg(test)]
+pub(crate) fn make_link(target: &std::path::Path, link: &std::path::Path) -> bool {
+    #[cfg(windows)]
+    let made = std::os::windows::fs::symlink_file(target, link);
+    #[cfg(not(windows))]
+    let made = std::os::unix::fs::symlink(target, link);
+    match made {
+        Ok(()) => true,
+        Err(error) => {
+            eprintln!("skipped: this system would not make a symbolic link ({error})");
+            false
+        }
+    }
+}
+
 #[cfg(windows)]
 fn windows_local(path: &str) -> bool {
     use std::path::{Component, Path, Prefix};
@@ -69,7 +101,26 @@ fn is_network_drive(letter: u8) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::is_local;
+    use super::{is_link, is_local, make_link};
+
+    #[test]
+    fn a_link_is_a_link_and_a_file_is_not() {
+        let folder = std::env::temp_dir().join(format!("signatum-{}", crate::db::new_id()));
+        std::fs::create_dir_all(&folder).expect("scratch directory");
+        let file = folder.join("code.png");
+        std::fs::write(&file, b"bytes").expect("seed");
+        let link = folder.join("link.png");
+
+        assert!(!is_link(&file.to_string_lossy()), "a file is not a link");
+        assert!(
+            !is_link(&folder.join("gone.png").to_string_lossy()),
+            "nothing there is not a link"
+        );
+        if make_link(&file, &link) {
+            assert!(is_link(&link.to_string_lossy()));
+        }
+        let _ = std::fs::remove_dir_all(&folder);
+    }
 
     #[cfg(windows)]
     #[test]

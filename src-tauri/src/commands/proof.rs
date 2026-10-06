@@ -15,9 +15,15 @@
 //! the identifiers are made before the page is; the rows themselves still wait
 //! for the file.
 //!
+//! From P2 the sheet carries a stamp, as every exported file does: its digest
+//! covers the whole sheet, and its reference belongs to one row — the chosen
+//! size's when that size was drawn, else the smallest drawn size's — because a
+//! reference names one verification and a sheet holds several.
+//!
 //! # Changelog of this boundary
 //!
 //! - P1: `export_proof_sheet`.
+//! - P2: the sheet is stamped unless `stamp_exports` is off.
 
 use std::path::Path;
 use std::sync::Mutex;
@@ -32,6 +38,7 @@ use crate::commands::codes::{
 use crate::db::Db;
 use crate::error::{Error, Result};
 use crate::export::proof::{self as proof_page, Drawn, Sheet};
+use crate::export::stamp::{Mark, Stamp};
 use crate::imaging::verify::{decoder, verify, Verification};
 
 /// The most sizes one sheet carries: the four standard ones and a chosen one.
@@ -196,9 +203,12 @@ fn export_proof_sheet_with(db: &Mutex<Connection>, asked: &ProofAsked) -> Result
     check_destination(asked.path, "pdf")?;
     check_plan(asked)?;
 
-    let logo = {
+    let (logo, stamping) = {
         let conn = db.lock().expect("the database lock was poisoned");
-        load_logo(&conn, asked.logo)?
+        (
+            load_logo(&conn, asked.logo)?,
+            super::settings::stamp_exports(&conn)?,
+        )
     };
     let placed = logo.as_ref().map(|(logo, area)| (logo, *area));
     let decoder = decoder();
@@ -229,7 +239,7 @@ fn export_proof_sheet_with(db: &Mutex<Connection>, asked: &ProofAsked) -> Result
     });
     if !any_read {
         // Every attempt is a fact, and none of them is a file.
-        record(db, asked, &attempts, None)?;
+        record(db, asked, &attempts, None, None)?;
         log::warn!("a proof sheet was refused: no size read back");
         return Err(Error::Refused(NOTHING_READ.to_string()));
     }
@@ -259,15 +269,32 @@ fn export_proof_sheet_with(db: &Mutex<Connection>, asked: &ProofAsked) -> Result
             },
         })
         .collect();
-    let bytes = proof_page::sheet(&Sheet {
+    // The stamp's reference is its own v4, never a row's identifier; the row it
+    // is recorded on is the one whose picture the stamp speaks for first.
+    let reference = crate::db::new_stamp_ref();
+    let stamped_row = if stamping {
+        stamped_attempt(asked.sizes, &attempts)
+    } else {
+        None
+    };
+    let mark = stamped_row.and_then(|index| match &attempts[index] {
+        Attempt::Rendered { verification, .. } => Some(Mark {
+            reference: &reference,
+            decoder: &verification.report.decoder,
+        }),
+        Attempt::Planned(_) => None,
+    });
+    let sealed = proof_page::sheet(&Sheet {
         decoder: &decoder,
         summary: asked.summary,
         note: asked.note,
         sizes: &drawn,
+        stamp: mark,
     })?;
+    let stamp = stamped_row.zip(sealed.stamp.as_ref());
 
-    let bytes_written = write_atomically(Path::new(asked.path), &bytes)?;
-    record(db, asked, &attempts, Some(asked.path))?;
+    let bytes_written = write_atomically(Path::new(asked.path), &sealed.bytes)?;
+    record(db, asked, &attempts, Some(asked.path), stamp)?;
 
     let sizes: Vec<SizeResult> = asked
         .sizes
@@ -305,7 +332,9 @@ fn export_proof_sheet_with(db: &Mutex<Connection>, asked: &ProofAsked) -> Result
 }
 
 /// Write one row per size that was rendered: `export`, `pdf`, the resolution,
-/// the saved code, and the path only on a row whose picture is in the file.
+/// the saved code, and the path only on a row whose picture is in the file —
+/// and the stamp on the one row it belongs to, given as the index of its
+/// attempt.
 ///
 /// In one transaction: the rows of one sheet are one fact, and a failure part
 /// of the way through leaves none of them rather than some — a sheet whose
@@ -315,12 +344,13 @@ fn record(
     asked: &ProofAsked,
     attempts: &[Attempt],
     written: Option<&str>,
+    stamp: Option<(usize, &Stamp)>,
 ) -> Result<()> {
     let conn = db.lock().expect("the database lock was poisoned");
     // `unchecked_transaction` because the connection is shared behind the lock
     // rather than borrowed mutably; nothing else can open one while it is held.
     let transaction = conn.unchecked_transaction()?;
-    for attempt in attempts {
+    for (index, attempt) in attempts.iter().enumerate() {
         let Attempt::Rendered { verification, id } = attempt else {
             continue;
         };
@@ -334,11 +364,36 @@ fn record(
             Some(asked.dpi),
             Some("pdf"),
             asked.code_id,
+            stamp
+                .filter(|(stamped, _)| *stamped == index)
+                .map(|(_, stamp)| stamp),
         )?;
     }
     // Dropped without a commit on any `?` above, which rolls every row back.
     transaction.commit()?;
     Ok(())
+}
+
+/// The attempt whose row the sheet's stamp is recorded on: the chosen size's
+/// when it was drawn, else the smallest drawn size's. `None` when nothing was
+/// drawn, which is a sheet that is not written.
+fn stamped_attempt(sizes: &[PlannedSize], attempts: &[Attempt]) -> Option<usize> {
+    let drawn = |index: &usize| {
+        matches!(
+            &attempts[*index],
+            Attempt::Rendered { verification, .. } if verification.report.verified
+        )
+    };
+    let indices = 0..sizes.len().min(attempts.len());
+    indices
+        .clone()
+        .filter(drawn)
+        .find(|index| sizes[*index].chosen)
+        .or_else(|| {
+            indices
+                .filter(drawn)
+                .min_by(|a, b| sizes[*a].mm.total_cmp(&sizes[*b].mm))
+        })
 }
 
 /// Everything about the plan the host refuses before it renders anything.
@@ -397,8 +452,9 @@ mod tests {
     use crate::export::pdf::points;
     use crate::export::proof::inspect::{content, holds, images, placements, read, shown};
     use crate::export::proof::{encode, UNPRINTABLE_SUMMARY};
+    use crate::export::stamp::{read_stamp, Kind};
     use crate::imaging::fixtures::{blank_svg, hello_world_svg, HELLO_WORLD};
-    use crate::imaging::verify::REASON_NO_CODE;
+    use crate::imaging::verify::{sha256_hex, REASON_NO_CODE};
 
     const DPI: u32 = 300;
 
@@ -741,6 +797,7 @@ mod tests {
             },
             &attempts,
             Some(&request.path),
+            None,
         )
         .expect_err("two rows under one identifier");
 
@@ -961,5 +1018,111 @@ mod tests {
 
         assert_eq!((size.mm, size.pixel_size, size.chosen), (25.0, 295, true));
         assert!(size.refused.is_none());
+    }
+
+    /// Every row's identifier, stamp reference and stamp digest.
+    #[allow(clippy::type_complexity)]
+    fn stamps(db: &Mutex<Connection>) -> Vec<(String, Option<String>, Option<String>)> {
+        let conn = db.lock().expect("lock");
+        let mut statement = conn
+            .prepare("SELECT id, stamp_ref, stamp_digest FROM verifications ORDER BY id")
+            .expect("prepare");
+        let found = statement
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .expect("query")
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .expect("read back");
+        found
+    }
+
+    /// The sheet is stamped like every export: its digest covers the whole
+    /// sheet, and its reference is on the chosen size's row and no other.
+    #[test]
+    fn a_sheet_is_stamped_and_the_chosen_size_holds_the_stamp() {
+        let db = workspace();
+        let scratch = Scratch::new();
+        let request = Request::new(scratch.file("menu-proof.pdf"));
+
+        let report = request.send(&db).expect("written");
+
+        let pdf = std::fs::read(&request.path).expect("the file exists");
+        let found = read_stamp(&pdf, Kind::Pdf)
+            .expect("read")
+            .expect("the sheet carries a stamp");
+        assert!(found.intact);
+        assert!(
+            !found
+                .stamp
+                .json()
+                .expect("json")
+                .contains(&sha256_hex(HELLO_WORLD.as_bytes())),
+            "the payload's digest is not in the stamp"
+        );
+        assert_eq!(found.stamp.decoder, decoder());
+
+        let chosen = report
+            .sizes
+            .iter()
+            .find(|size| size.chosen)
+            .and_then(|size| size.verification_id.clone())
+            .expect("the chosen size was drawn");
+        let recorded = stamps(&db);
+        let stamped: Vec<_> = recorded
+            .iter()
+            .filter(|(_, reference, _)| reference.is_some())
+            .collect();
+        assert_eq!(stamped.len(), 1, "one stamp, one row");
+        let (id, reference, digest) = stamped[0];
+        assert_eq!(*id, chosen);
+        assert_eq!(reference.as_deref(), Some(found.stamp.reference.as_str()));
+        assert_eq!(digest.as_deref(), Some(found.stamp.digest.as_str()));
+        assert_ne!(found.stamp.reference, *id);
+    }
+
+    /// When the chosen size was not drawn, the stamp is the smallest drawn
+    /// size's.
+    #[test]
+    fn a_sheet_whose_chosen_size_was_not_drawn_stamps_the_smallest_drawn_one() {
+        let db = workspace();
+        let scratch = Scratch::new();
+        let mut request = Request::new(scratch.file("menu-proof.pdf"));
+        // 25 mm is chosen; refuse it and 15 mm in the plan, leaving 20 and 30.
+        request.sizes[0].refused = Some("Too few pixels.".to_string());
+        request.sizes[2].refused = Some("Too few pixels.".to_string());
+
+        let report = request.send(&db).expect("written");
+
+        let smallest_drawn = report
+            .sizes
+            .iter()
+            .find(|size| size.mm == 20.0)
+            .and_then(|size| size.verification_id.clone())
+            .expect("20 mm was drawn");
+        let stamped: Vec<String> = stamps(&db)
+            .into_iter()
+            .filter(|(_, reference, _)| reference.is_some())
+            .map(|(id, _, _)| id)
+            .collect();
+        assert_eq!(stamped, vec![smallest_drawn]);
+    }
+
+    #[test]
+    fn a_sheet_written_with_stamping_off_carries_no_stamp() {
+        let db = workspace();
+        {
+            let conn = db.lock().expect("lock");
+            crate::db::settings::set(&conn, crate::commands::settings::STAMP_EXPORTS, "false")
+                .expect("turn it off");
+        }
+        let scratch = Scratch::new();
+        let request = Request::new(scratch.file("menu-proof.pdf"));
+
+        request.send(&db).expect("written");
+
+        let pdf = std::fs::read(&request.path).expect("the file exists");
+        assert_eq!(read_stamp(&pdf, Kind::Pdf).expect("read"), None);
+        assert!(stamps(&db)
+            .iter()
+            .all(|(_, reference, digest)| reference.is_none() && digest.is_none()));
     }
 }

@@ -24,6 +24,13 @@
 //!   verifying exactly as the PNG does and each recording what it was
 //!   (`format`, `dpi` — migration 003). `scan_margin` reports how much the
 //!   artefact survives, and never blocks anything.
+//! - P2: every file an export writes carries a stamp — a reference, the
+//!   decoder and a digest of what was verified; no payload digest and no
+//!   date (`export::stamp`) — unless the setting `stamp_exports` is off. The row
+//!   keeps the stamp's reference and digest (migration 007). A PNG's stamp is a
+//!   chunk the decoder never saw, so the file minus that chunk is still,
+//!   byte for byte, the artefact that was decoded. The clipboard is never
+//!   stamped: the system copies pixels, not files.
 
 use std::path::Path;
 
@@ -36,6 +43,7 @@ use crate::db::logos;
 use crate::db::verifications::{self, VerificationRow};
 use crate::db::Db;
 use crate::error::{Error, Result};
+use crate::export::stamp::{self as stamping, Mark, Stamp};
 use crate::export::{pdf, svg as svg_file};
 use crate::imaging::compose::LogoBox;
 use crate::imaging::logo::NormalisedLogo;
@@ -498,26 +506,60 @@ pub(crate) fn export_once(
         });
     }
 
-    let bytes = match written {
-        Written::Png => verification.png,
-        Written::Svg => svg_file::to_write(asked.svg, placed)?.into_bytes(),
-        Written::Pdf { width_mm } => pdf::one_page(&verification.png, width_mm)?,
+    // The stamp's reference is made here, for this file, and is never the
+    // row's identifier: that is a v7, and its first digits are the time.
+    let reference = crate::db::new_stamp_ref();
+    let mark = super::settings::stamp_exports(conn)?.then_some(Mark {
+        reference: &reference,
+        decoder: &report.decoder,
+    });
+    let (bytes, stamp) = match written {
+        Written::Png => match &mark {
+            // The chunk goes in around the decoded bytes, which are not touched:
+            // the file minus the chunk is the artefact, and that is the digest.
+            Some(mark) => {
+                let (bytes, stamp) = stamping::stamp_png(&verification.png, mark)?;
+                (bytes, Some(stamp))
+            }
+            None => (verification.png, None),
+        },
+        Written::Svg => {
+            let text = svg_file::to_write(asked.svg, placed)?;
+            match &mark {
+                Some(mark) => {
+                    let (text, stamp) = stamping::stamp_svg(&text, mark)?;
+                    (text.into_bytes(), Some(stamp))
+                }
+                None => (text.into_bytes(), None),
+            }
+        }
+        Written::Pdf { width_mm } => {
+            let sealed = pdf::one_page(&verification.png, width_mm, mark.as_ref())?;
+            (sealed.bytes, sealed.stamp)
+        }
     };
 
     let bytes_written = write_atomically(Path::new(path), &bytes)?;
-    let verification_id = record(
+    let verification_id = record_as(
         conn,
+        &crate::db::new_id(),
         "export",
         &report,
         Some(path),
         asked.dpi,
         format,
         asked.code_id,
+        stamp.as_ref(),
     )?;
     log::info!(
-        "exported {bytes_written} bytes as {} verified by {}",
+        "exported {bytes_written} bytes as {} verified by {}, {}",
         written.token(),
-        report.decoder
+        report.decoder,
+        if stamp.is_some() {
+            "stamped"
+        } else {
+            "unstamped"
+        }
     );
 
     Ok(Export {
@@ -748,12 +790,14 @@ fn record(
         dpi,
         format,
         code_id,
+        None,
     )
 }
 
 /// [`record`], under an identifier the caller already holds — the proof sheet
 /// prints each size's identifier on the page before the page is written, and
-/// writes the rows after it, as every export does.
+/// writes the rows after it, as every export does — and with the stamp the
+/// written file carries, when it carries one.
 #[allow(clippy::too_many_arguments)]
 // One value per column the evidence has; a struct for it would be a second
 // `VerificationRow`.
@@ -766,6 +810,7 @@ pub(crate) fn record_as(
     dpi: Option<u32>,
     format: Option<&str>,
     code_id: Option<&str>,
+    stamp: Option<&Stamp>,
 ) -> Result<String> {
     let linked = match code_id {
         Some(id) if !library::exists(conn, id)? => {
@@ -793,6 +838,8 @@ pub(crate) fn record_as(
             dpi,
             format,
             code_id: linked,
+            stamp_ref: stamp.map(|stamp| stamp.reference.as_str()),
+            stamp_digest: stamp.map(|stamp| stamp.digest.as_str()),
         },
     )?;
     Ok(id)
@@ -802,8 +849,29 @@ pub(crate) fn record_as(
 mod tests {
     use super::*;
     use crate::db::migrations;
+    use crate::export::stamp::{png_without_stamp, read_stamp, Kind};
     use crate::imaging::fixtures::{blank_svg, hello_world_svg, HELLO_WORLD};
     use crate::imaging::verify::sha256_hex;
+
+    /// What a stamped PNG was before its stamp: the artefact the decoder read.
+    fn unstamped(png: &[u8]) -> Vec<u8> {
+        png_without_stamp(png).expect("a PNG")
+    }
+
+    /// Every row's identifier, stamp reference and stamp digest, in the order
+    /// written.
+    #[allow(clippy::type_complexity)]
+    fn stamps(conn: &Connection) -> Vec<(String, Option<String>, Option<String>)> {
+        let mut statement = conn
+            .prepare("SELECT id, stamp_ref, stamp_digest FROM verifications ORDER BY id")
+            .expect("prepare");
+        let found = statement
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .expect("query")
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .expect("rows");
+        found
+    }
 
     fn workspace() -> Connection {
         let conn = Connection::open_in_memory().expect("in-memory database");
@@ -1060,9 +1128,16 @@ mod tests {
         let written = std::fs::read(&path).expect("the file exists");
         assert_eq!(export.bytes_written, written.len() as u64);
         assert_eq!(
-            sha256_hex(&written),
+            sha256_hex(&unstamped(&written)),
             export.report.artefact_sha256,
-            "the file on disk is the artefact that was verified"
+            "the file on disk, minus its stamp, is the artefact that was verified"
+        );
+        assert_eq!(
+            unstamped(&written),
+            crate::imaging::verify::artefact(hello_world_svg().as_bytes(), 512, None, Some(DPI))
+                .expect("render again")
+                .png,
+            "byte for byte"
         );
         assert!(export.report.verified);
         assert_eq!(export.path, path);
@@ -1095,7 +1170,7 @@ mod tests {
             "300 dpi is 11 811 pixels per metre"
         );
         assert_eq!(
-            sha256_hex(&written),
+            sha256_hex(&unstamped(&written)),
             export.report.artefact_sha256,
             "the bytes that carry the resolution are the bytes that were decoded"
         );
@@ -1115,7 +1190,16 @@ mod tests {
             export(&conn, &scene, HELLO_WORLD, 295, &path, None, Written::Svg).expect("export");
 
         let written = std::fs::read_to_string(&path).expect("the file exists");
-        assert_eq!(written, scene, "the domain's scene is written as it stands");
+        let stamp = read_stamp(written.as_bytes(), Kind::Svg)
+            .expect("read")
+            .expect("a stamp")
+            .stamp;
+        let comment = format!("<!-- signatum:{} -->", stamp.json().expect("json"));
+        assert_eq!(
+            written.replacen(&comment, "", 1),
+            scene,
+            "the domain's scene is written as it stands, and the stamp is all that was added"
+        );
         assert!(
             written.contains("width=\"25mm\""),
             "the printed size is in the file"
@@ -1246,7 +1330,10 @@ mod tests {
             .expect("export");
 
         let written = std::fs::read(&path).expect("the file exists");
-        assert_eq!(sha256_hex(&written), export.report.artefact_sha256);
+        assert_eq!(
+            sha256_hex(&unstamped(&written)),
+            export.report.artefact_sha256
+        );
     }
 
     #[test]
@@ -1413,7 +1500,10 @@ mod tests {
         .expect("export");
 
         let written = std::fs::read(&path).expect("the file exists");
-        assert_eq!(sha256_hex(&written), export.report.artefact_sha256);
+        assert_eq!(
+            sha256_hex(&unstamped(&written)),
+            export.report.artefact_sha256
+        );
     }
 
     #[test]
@@ -1680,5 +1770,174 @@ mod tests {
                 "`{key}` is missing from the report"
             );
         }
+    }
+
+    /// P2's proof of done, on this side: a PNG, an SVG and a PDF each carry a
+    /// stamp that reads back intact, whose reference and digest are the row's,
+    /// whose payload is the report's — and whose reference is a v4 and never
+    /// the row's own identifier.
+    #[test]
+    fn every_kind_of_export_is_stamped_and_the_row_keeps_the_stamp() {
+        let conn = workspace();
+        let scratch = Scratch::new();
+        let scene = sized(&hello_world_svg(), "25");
+
+        for (name, written, kind) in [
+            ("code.png", Written::Png, Kind::Png),
+            ("code.svg", Written::Svg, Kind::Svg),
+            ("code.pdf", Written::Pdf { width_mm: 25.0 }, Kind::Pdf),
+        ] {
+            let path = scratch.file(name);
+            let export =
+                export(&conn, &scene, HELLO_WORLD, 295, &path, None, written).expect("export");
+
+            let bytes = std::fs::read(&path).expect("the file exists");
+            let found = read_stamp(&bytes, kind)
+                .expect("read")
+                .unwrap_or_else(|| panic!("{name} carries no stamp"));
+            assert!(found.intact, "{name} does not match its own stamp");
+            assert!(
+                !found
+                    .stamp
+                    .json()
+                    .expect("json")
+                    .contains(&export.report.payload_sha256),
+                "{name}: the payload's digest is not in the stamp"
+            );
+            assert_eq!(found.stamp.decoder, export.report.decoder);
+            assert_eq!(
+                found.stamp.reference.as_bytes()[14],
+                b'4',
+                "{name}: not a v4"
+            );
+
+            let (id, stamp_ref, stamp_digest) = stamps(&conn).pop().expect("a row");
+            assert_eq!(stamp_ref.as_deref(), Some(found.stamp.reference.as_str()));
+            assert_eq!(stamp_digest.as_deref(), Some(found.stamp.digest.as_str()));
+            assert_ne!(found.stamp.reference, id, "the stamp is not the row's v7");
+        }
+    }
+
+    /// The PNG's digest is the artefact's: the row's `artefact_sha256` and its
+    /// `stamp_digest` are the same number, because the file minus the chunk is
+    /// the bytes that were decoded.
+    #[test]
+    fn a_png_stamp_digest_is_the_artefact_that_was_decoded() {
+        let conn = workspace();
+        let scratch = Scratch::new();
+        let path = scratch.file("code.png");
+
+        let export = export_png_with(&conn, &hello_world_svg(), HELLO_WORLD, 295, &path, None)
+            .expect("export");
+
+        let (_, _, digest) = stamps(&conn).pop().expect("a row");
+        assert_eq!(
+            digest.as_deref(),
+            Some(export.report.artefact_sha256.as_str())
+        );
+    }
+
+    /// The setting off: every kind of file is written without a stamp, and the
+    /// rows say so with NULL.
+    #[test]
+    fn with_stamping_off_no_file_is_stamped_and_no_row_has_a_stamp() {
+        let conn = workspace();
+        crate::db::settings::set(&conn, crate::commands::settings::STAMP_EXPORTS, "false")
+            .expect("turn it off");
+        let scratch = Scratch::new();
+        let scene = sized(&hello_world_svg(), "25");
+
+        for (name, written, kind) in [
+            ("code.png", Written::Png, Kind::Png),
+            ("code.svg", Written::Svg, Kind::Svg),
+            ("code.pdf", Written::Pdf { width_mm: 25.0 }, Kind::Pdf),
+        ] {
+            let path = scratch.file(name);
+            let export =
+                export(&conn, &scene, HELLO_WORLD, 295, &path, None, written).expect("export");
+            let bytes = std::fs::read(&path).expect("the file exists");
+            assert_eq!(read_stamp(&bytes, kind).expect("read"), None, "{name}");
+            match kind {
+                Kind::Png => assert_eq!(sha256_hex(&bytes), export.report.artefact_sha256),
+                Kind::Svg => assert_eq!(String::from_utf8(bytes).expect("text"), scene),
+                Kind::Pdf => assert!(!String::from_utf8_lossy(&bytes).contains("/Signatum")),
+            }
+        }
+        let recorded = stamps(&conn);
+        assert_eq!(recorded.len(), 3);
+        assert!(recorded
+            .iter()
+            .all(|(_, reference, digest)| reference.is_none() && digest.is_none()));
+    }
+
+    /// A preview, a refusal and a copy write no file, so none of them carries a
+    /// stamp.
+    #[test]
+    fn nothing_that_wrote_no_file_has_a_stamp() {
+        fn places(_: &clipboard::Image) -> Result<()> {
+            Ok(())
+        }
+
+        let conn = workspace();
+        let scratch = Scratch::new();
+        verify_code_with(&conn, &hello_world_svg(), HELLO_WORLD, 128, None, None).expect("verify");
+        let _ = export_png_with(
+            &conn,
+            &blank_svg(),
+            HELLO_WORLD,
+            128,
+            &scratch.file("x.png"),
+            None,
+        );
+        copy_png_with(
+            &conn,
+            &Asked {
+                svg: &hello_world_svg(),
+                payload: HELLO_WORLD,
+                pixel_size: 128,
+                logo: None,
+                dpi: Some(DPI),
+                code_id: None,
+            },
+            places,
+        )
+        .expect("copy");
+
+        let recorded = stamps(&conn);
+        assert_eq!(recorded.len(), 3);
+        assert!(recorded
+            .iter()
+            .all(|(_, reference, digest)| reference.is_none() && digest.is_none()));
+    }
+
+    /// The stamp says what was verified and nothing about where or when: not
+    /// the folder, not the file's name, not a date.
+    #[test]
+    fn a_stamp_carries_no_path_no_name_and_no_date() {
+        let conn = workspace();
+        let scratch = Scratch::new();
+        let path = scratch.file("private-folder-menu.png");
+
+        export_png_with(&conn, &hello_world_svg(), HELLO_WORLD, 295, &path, None).expect("export");
+
+        let bytes = std::fs::read(&path).expect("the file exists");
+        let json = read_stamp(&bytes, Kind::Png)
+            .expect("read")
+            .expect("stamp")
+            .stamp
+            .json()
+            .expect("json");
+        let folder = scratch.0.to_string_lossy().into_owned();
+        assert!(!json.contains("private-folder"), "{json}");
+        assert!(!json.contains(&folder), "{json}");
+        assert!(!json.contains("signatum-"), "{json}");
+        assert!(
+            !json.contains(&chrono::Utc::now().format("%Y-%m").to_string()),
+            "{json}"
+        );
+        assert!(
+            !json.contains('T') && !json.contains('Z'),
+            "no timestamp: {json}"
+        );
     }
 }
