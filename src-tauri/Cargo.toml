@@ -69,7 +69,7 @@ hex = "0.4"
 # The normalised logo reaches the screen as a `data:` URL, because the interface
 # cannot read a file and the host will not hand it a path. Already in the tree
 # for the corpus test; declared here so a release build links it too.
-base64 = "0.22"
+base64 = "0.23"
 
 # The PNG encoder the exports use, rather than tiny-skia's, for one reason: it
 # can write the `pHYs` chunk, which is where a printed code's physical size
