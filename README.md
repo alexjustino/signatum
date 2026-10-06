@@ -131,8 +131,9 @@ straight onto the clipboard — the picture, never the payload text, because a p
 clipboard is a paste into the wrong window. Every one of them is verified before it is written, and
 where "the bytes written are the bytes decoded" could not be literally true — a vector file has no
 pixels for a decoder to read — it is written down rather than glossed over. Alongside the verdict,
-the code is also shrunk, blurred and recompressed nine ways and read again, so the screen can say
-how much abuse it has left in it: a report, and never a gate.
+the code is also shrunk, blurred and recompressed nine ways and read again — thirteen since P4,
+which adds what print does — so the screen can say how much abuse it has left in it: a report, and
+never a gate.
 
 F8 has given the product a memory. A code that has passed the gate can be saved under a name and
 reopened later from a library of its own — after closing the window, after an update — with the
@@ -224,9 +225,14 @@ since; the stamp is not a signature, and it can be turned off in Settings. P3 ad
 guard: before a link is printed and when a code is read,
 the address inside it is said in a sentence when it mixes alphabets, imitates a Latin word in
 another alphabet, goes through a link shortener or is an IP address rather than a name — a warning
-worked out on the machine, never a refusal. P5 lets the whole library be checked again in one
-press: every saved code rebuilt, compared with the drawing it was saved as, and read back again,
-with a line on each row.
+worked out on the machine, never a refusal. P4 adds what print does to the nine ways a screen
+degrades a code: the scan margin now also reads it back after ink has spread on coated and on
+uncoated paper — by a share of a module, not a count of pixels — held 30° off square and in dim
+light: thirteen lines under two headings. A code that reads clean and fails under ink spread says so
+by name; it is still a report and never a gate, the figures are conventional rather than measured
+on a press, and the proof sheet is still the real test. P5 lets the whole library be checked again
+in one press: every saved code rebuilt, compared with the drawing it was saved as, and read back
+again, with a line on each row.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 

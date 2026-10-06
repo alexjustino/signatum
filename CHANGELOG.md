@@ -33,6 +33,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does is printed in one line under the heading when the sheet's font can draw every character of
   it, and replaced by a sentence saying so when it cannot — never printed with question marks where
   the letters were.
+- **The scan margin asks what print does, too.** After a code passes, the margin already shrank,
+  blurred and recompressed it nine ways — what a screen or a chat app does to a picture — and read
+  each one back. Four more lines now ask what paper and a phone do: ink spreading on coated and on
+  uncoated paper, which grows every dark module by 8 % and 18 % of a module on each edge and
+  closes the light gaps between them; the code seen 30° off square, in perspective; and dim light —
+  a third of the contrast, a camera's noise and a slight blur, the same every time it is asked. The
+  card shows them under their own heading, **In print**, below **On screen and in chat**, so a code
+  that reads clean and fails under ink spread says so on the line named for it. It is still a
+  report and never a gate: nothing is disabled and the verdict does not change. The figures are
+  conventional approximations, not a measurement of any press or camera, and on a very small code
+  a pixel of spread is the least that can be applied, so both paper lines can fail while the code
+  reads — a reason to print it larger, and to print the proof sheet (ADR-035).
 - **The address inside a code, said out loud before anybody follows it.** When the link in a code
   is not what it looks like, the product says so in a sentence: a name that mixes alphabets, such as
   `аpple.com` with a Cyrillic `а`, and which word it reads as; a name written wholly in another
