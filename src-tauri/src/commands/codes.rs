@@ -31,6 +31,11 @@
 //!   chunk the decoder never saw, so the file minus that chunk is still,
 //!   byte for byte, the artefact that was decoded. The clipboard is never
 //!   stamped: the system copies pixels, not files.
+//! - P4: `scan_margin` takes `modules` — the code's side in modules, quiet zone
+//!   included, 21 to 193 — and reports thirteen variants instead of nine: the
+//!   four new ones are print (ink spread on coated and on uncoated paper, a 30°
+//!   tilt, dim light), and ink spread is a share of a module, which is what the
+//!   count is for (ADR-035). Still a report and never a gate (ADR-027).
 
 use std::path::Path;
 
@@ -352,16 +357,23 @@ pub fn copy_png(
     )
 }
 
-/// How much abuse the artefact survives: nine variants, nine verdicts.
+/// How much abuse the artefact survives: thirteen variants, thirteen verdicts —
+/// nine on screen and in chat, four in print (ADR-035).
 ///
 /// A report and never a gate (ADR-027) — it writes no row and refuses no export.
 /// The artefact it measures is composed exactly as the one the gate answers for,
 /// so the margin is a fact about the code somebody is about to print.
 ///
+/// `modules` is the code's side in modules, quiet zone included — the matrix
+/// size plus twice the quiet zone. The domain knows it and the raster does not,
+/// and it is what makes ink spread a share of a module rather than a number of
+/// pixels.
+///
 /// # Errors
 ///
-/// [`Error::InvalidInput`] for a size, a drawing, a payload or a logo the host
-/// will not accept, and [`Error::Render`] when the artefact could not be made.
+/// [`Error::InvalidInput`] for a size, a drawing, a payload, a logo or a module
+/// count the host will not accept, and [`Error::Render`] when the artefact could
+/// not be made.
 #[tauri::command(async, rename_all = "snake_case")]
 pub fn scan_margin(
     db: State<'_, Db>,
@@ -369,6 +381,7 @@ pub fn scan_margin(
     payload: String,
     pixel_size: u32,
     logo: Option<LogoRef>,
+    modules: u32,
 ) -> Result<ScanMargin> {
     // The margin is a measurement and writes no row, so there is nothing for a
     // `code_id` to be recorded on: it is deliberately not an argument here.
@@ -379,13 +392,14 @@ pub fn scan_margin(
             svg: &svg,
             payload: &payload,
             // The margin measures how a code degrades, not the export: a render past this side
-            // costs seconds of blur and nine decodes for no better answer, so it is measured at
-            // the export's size or this one, whichever is smaller — and off the main thread.
+            // costs seconds of blur and thirteen decodes for no better answer, so it is measured
+            // at the export's size or this one, whichever is smaller — and off the main thread.
             pixel_size: pixel_size.min(MARGIN_MAX_PIXELS),
             logo: logo.as_ref(),
             dpi: None,
             code_id: None,
         },
+        modules,
     )
 }
 
@@ -627,8 +641,12 @@ fn copy_png_with(
 }
 
 /// What [`scan_margin`] does once the database is in hand.
-fn scan_margin_with(conn: &Connection, asked: &Asked) -> Result<ScanMargin> {
+///
+/// The module count is refused before anything is rendered, with the rest of
+/// what the host will not accept.
+fn scan_margin_with(conn: &Connection, asked: &Asked, modules: u32) -> Result<ScanMargin> {
     check_inputs(asked)?;
+    margin::check_modules(modules)?;
     let logo = load_logo(conn, asked.logo)?;
 
     let artefact = crate::imaging::verify::artefact(
@@ -638,7 +656,7 @@ fn scan_margin_with(conn: &Connection, asked: &Asked) -> Result<ScanMargin> {
         asked.dpi,
     )?;
 
-    margin::scan_margin(&artefact.png, asked.payload.as_bytes())
+    margin::scan_margin(&artefact.png, asked.payload.as_bytes(), modules)
 }
 
 /// Fetch the logo a request named, and the box it asked for.
@@ -1694,9 +1712,12 @@ mod tests {
         assert_eq!(rows(&conn), vec![("export".to_string(), 0, None)]);
     }
 
-    /// The margin is a report: nine lines, and not one row in the workspace.
+    /// The modules of the fixture's side, quiet zone included: 21 + 2 × 4.
+    const FIXTURE_MODULES: u32 = 29;
+
+    /// The margin is a report: thirteen lines, and not one row in the workspace.
     #[test]
-    fn the_scan_margin_reports_nine_variants_and_records_nothing() {
+    fn the_scan_margin_reports_thirteen_variants_and_records_nothing() {
         let conn = workspace();
 
         let margin = scan_margin_with(
@@ -1709,10 +1730,11 @@ mod tests {
                 dpi: None,
                 code_id: None,
             },
+            FIXTURE_MODULES,
         )
         .expect("margin");
 
-        assert_eq!(margin.variants.len(), 9);
+        assert_eq!(margin.variants.len(), 13);
         assert!(margin.variants.iter().all(|variant| variant.verified));
         assert!(
             rows(&conn).is_empty(),
@@ -1737,6 +1759,7 @@ mod tests {
                 dpi: None,
                 code_id: None,
             },
+            FIXTURE_MODULES,
         )
         .expect("margin");
 
@@ -1744,6 +1767,50 @@ mod tests {
             margin.variants.iter().all(|variant| !variant.verified),
             "a logo over the budget cannot read at any size"
         );
+    }
+
+    /// A module count no code has is refused before anything is rendered —
+    /// and, the margin being a measurement, still without a row.
+    #[test]
+    fn the_scan_margin_refuses_a_module_count_no_code_has() {
+        let conn = workspace();
+
+        for modules in [0, 20, 194, u32::MAX] {
+            let refused = scan_margin_with(
+                &conn,
+                &Asked {
+                    svg: &hello_world_svg(),
+                    payload: HELLO_WORLD,
+                    pixel_size: 512,
+                    logo: None,
+                    dpi: None,
+                    code_id: None,
+                },
+                modules,
+            )
+            .expect_err("a module count outside 21..=193 must be refused");
+
+            assert_eq!(kind_of(&refused), "invalid_input", "{modules} modules");
+        }
+        for modules in [21, 193] {
+            assert!(
+                scan_margin_with(
+                    &conn,
+                    &Asked {
+                        svg: &hello_world_svg(),
+                        payload: HELLO_WORLD,
+                        pixel_size: 128,
+                        logo: None,
+                        dpi: None,
+                        code_id: None,
+                    },
+                    modules,
+                )
+                .is_ok(),
+                "{modules} modules is a code's side"
+            );
+        }
+        assert!(rows(&conn).is_empty());
     }
 
     #[test]

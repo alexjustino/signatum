@@ -13,8 +13,9 @@
 //! file somebody was sent and `compose` draws the result onto the code —
 //! between the render and the encode, so the pixels that are decoded are the
 //! pixels that carry the logo. `margin` asks the decoder the other question,
-//! nine times over: how much shrinking, blurring and recompression the verified
-//! artefact survives. That one is a report and never a gate (ADR-027). `read`
+//! thirteen times over: how much shrinking, blurring and recompression the
+//! verified artefact survives, and how much ink spread, tilt and dim light in
+//! print. That one is a report and never a gate (ADR-027). `read`
 //! turns the same decoder on pixels this product did not draw: every code in a
 //! picture, what each one carries and how it was built — with a cap on what is
 //! searched and one second pass for a photograph taken in uneven light.
