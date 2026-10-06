@@ -86,7 +86,17 @@ export interface CopyRequest extends VerifyRequest {
   dpi: number;
 }
 
-/** How the code holds up when it is shrunk, blurred and recompressed. */
+/**
+ * The margin is asked about the same picture the gate verified, plus one fact the raster does not
+ * carry: how many modules wide the code is, quiet zone included (`matrix.size + 2 × quietZone`).
+ * It is what makes ink spread a share of a module rather than a number of pixels that means
+ * something different at every size (ADR-035). The host takes 21 to 193.
+ */
+export interface ScanMarginRequest extends VerifyRequest {
+  modules: number;
+}
+
+/** How the code holds up on a screen, in a chat app and in print. */
 export interface ScanMargin {
   variants: ScanVariant[];
 }
@@ -253,15 +263,17 @@ export async function copyPng({
 
 /**
  * How far the code can be degraded and still read: shrunk, blurred,
- * recompressed. A report about a code that already passed, never a gate on it
- * (ADR-027) — a variant that fails says so in a line and blocks nothing.
+ * recompressed, and — since P4 — spread by ink, tilted and dimmed, the way
+ * print degrades it. A report about a code that already passed, never a gate
+ * on it (ADR-027) — a variant that fails says so in a line and blocks nothing.
  */
 export async function scanMargin({
   svg,
   payload,
   pixelSize,
   logo = null,
-}: VerifyRequest): Promise<ScanMargin> {
+  modules,
+}: ScanMarginRequest): Promise<ScanMargin> {
   // The saved code's id is deliberately not forwarded: the margin is a report about the picture
   // on screen, never a reading recorded against a row in the library (ADR-027).
   const raw = await invoke<RawScanMargin>('scan_margin', {
@@ -269,6 +281,7 @@ export async function scanMargin({
     payload,
     pixel_size: pixelSize,
     logo: placementArg(logo),
+    modules,
   });
   return { variants: raw.variants };
 }
