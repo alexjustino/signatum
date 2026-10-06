@@ -536,6 +536,11 @@ and not one of them needed to draw a background rectangle and a path. `usvg` and
 not declared as dependencies at all — `resvg` re-exports the exact versions it was built against,
 and a second copy of `tiny-skia` at another version would be two incompatible `Pixmap` types.
 
+**From 1.1, `usvg` is declared, for one feature.** From 0.48 the writer that re-serialises a logo's
+SVG from its parsed tree ([ADR-016](#adr-016)) is a feature of its own, and it goes off with
+resvg's defaults. `usvg` is declared at resvg's own version only to turn it back on; Cargo still
+builds one copy, and the code still reaches it as `resvg::usvg`.
+
 **`jsQR` is the third decoder**, in the end-to-end suite only, never in the product. It runs in
 the Node process that drives the binary, reads the PNG from disk after the product wrote it, and
 shares its lineage with neither the encoder (Nayuki) nor the host's decoder (`rqrr`, a port of
