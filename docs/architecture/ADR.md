@@ -1153,6 +1153,15 @@ behaviour the screen promises — one click sets the look — and it means there
 a person who wonders why their older codes did not follow the kit. Recorded here so that the
 question has an answer.
 
+**From 1.1, the whole library can be asked the same question at once (P5).** "Check all again" on
+the Library runs, for every saved code in turn, exactly what Open runs — the fields rebuilt into a
+scene, the scene's digest compared with the one it was saved under, and the decoder asked again —
+and says on each row whether it rebuilds identically and reads, rebuilds differently but still
+reads, or no longer reads. It is the cost this record accepted, measured on demand rather than
+discovered on paper: after an update to the product, one press says which saved codes it changed.
+A Wi-Fi code saved without its password cannot be rebuilt into what was printed, and is reported
+as not checked rather than counted as a failure.
+
 ---
 
 ## ADR-029 — A batch is the Create pipeline in a loop, and the host writes only inside the chosen folder {#adr-029}

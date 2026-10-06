@@ -1,5 +1,6 @@
 import type { StampCheck } from '@/data/read';
 import type { Severity } from '@/ui/InfoBar';
+import { formatDay } from '@/domain/day';
 
 /**
  * What the Stamp card says about a file (P2): exactly one of five sentences, and its tone.
@@ -21,33 +22,9 @@ export interface StampSentence {
   detail: string | null;
 }
 
-const MONTHS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
-
-/**
- * `14 Sep 2026` — the day this workspace verified the file, in the reader's own time zone.
- *
- * Written out rather than asked of `Intl`, because the locale data under `en-GB` now spells the
- * ninth month `Sept`, and a date that changes with the runtime's library is a sentence a test
- * cannot hold. Null when the workspace's text is not a date: a day this screen made up would be
- * worse than none.
- */
+/** `14 Sep 2026` — the day this workspace verified the file (see `formatDay`). */
 export function stampDay(iso: string): string | null {
-  const at = new Date(iso);
-  if (Number.isNaN(at.getTime())) return null;
-  return `${at.getDate()} ${MONTHS[at.getMonth()]} ${at.getFullYear()}`;
+  return formatDay(iso);
 }
 
 export function stampSentence(check: StampCheck): StampSentence {

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The library, checked again in one press.** "Check all again" on the Library rebuilds every
+  saved code the way Open does, compares it with the drawing it was saved as, and asks the decoder
+  again — one at a time, with a progress bar — then says on each row whether it rebuilds
+  identically and reads, rebuilds differently but still reads ("check it before you print"), or no
+  longer reads, and sums it up once. After an update, that is how you learn which saved codes it
+  changed. A Wi-Fi code saved without its password is reported as not checked.
 - **A proof sheet: the code at the sizes people print, on one page, each one read back first.**
   **Proof sheet…** on the Create screen writes one A4 PDF with the code at 15, 20, 25 and 30 mm,
   and at the chosen size when it is none of those. Each size is rendered at the pixels an export of

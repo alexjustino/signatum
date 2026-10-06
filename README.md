@@ -224,7 +224,9 @@ since; the stamp is not a signature, and it can be turned off in Settings. P3 ad
 guard: before a link is printed and when a code is read,
 the address inside it is said in a sentence when it mixes alphabets, imitates a Latin word in
 another alphabet, goes through a link shortener or is an IP address rather than a name — a warning
-worked out on the machine, never a refusal.
+worked out on the machine, never a refusal. P5 lets the whole library be checked again in one
+press: every saved code rebuilt, compared with the drawing it was saved as, and read back again,
+with a line on each row.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 
