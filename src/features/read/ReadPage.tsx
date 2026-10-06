@@ -3,9 +3,17 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useMemo, useState } from 'react';
 
 import { describeError } from '@/data/errors';
-import { useCheckFile, useCode, useReadClipboard, useReadImage } from '@/data/hooks';
+import {
+  useCheckFile,
+  useCode,
+  useReadClipboard,
+  useReadImage,
+  useSavedCodesInFull,
+  type SavedCodesInFull,
+} from '@/data/hooks';
 import type { SavedCode } from '@/data/library';
 import type { ReadCode, Reading, StampCheck } from '@/data/read';
+import { describeMatch, matchSaved } from '@/domain/match';
 import { describeBytes, wouldScanAt, type ReadKind, type ScanVerdict } from '@/domain/read';
 import { LENGTH_UNIT_LABELS, LENGTH_UNITS, toMillimetres, type LengthUnit } from '@/domain/size';
 import { AddressSentences } from '@/features/create/AddressSentences';
@@ -25,9 +33,10 @@ import { Select } from '@/ui/Select';
  * how the symbol was built, and whether a code of that many modules survives being printed at a
  * width. A third door (P2) checks a file this product exported: it is never drawn and never
  * decoded, only its stamp is read, and the answer is one sentence on a Stamp card — the same card
- * a stamped PNG opened through the first door shows above its codes. The decoding is the host's and the meaning is the domain's; this screen owns neither,
- * which is what makes a code that was read and a code that was made describe themselves in the
- * same sentences.
+ * a stamped PNG opened through the first door shows above its codes. A code that carries exactly
+ * what a saved code carries says which one, with Open (P6). The decoding is the host's and the
+ * meaning is the domain's; this screen owns neither, which is what makes a code that was read and
+ * a code that was made describe themselves in the same sentences.
  *
  * Nothing read is stored, and nothing found in an image is ever acted on: a link in a photograph
  * is shown as text, never followed. The content is data here, the way a payload is data on
@@ -116,6 +125,11 @@ export function ReadPage({
   const { mutateAsync: readPasted, isPending: pasting } = useReadClipboard();
   const { mutateAsync: checkStamp, isPending: checking } = useCheckFile();
   const busy = opening || pasting || checking;
+
+  // The library in full, asked for once there is a decoded code to match and shared by every card
+  // (P6). `list_codes` carries no payload, so each saved code is fetched once into the window's
+  // cache — the same entry a Library row reads — and not again for the next card or the next image.
+  const library = useSavedCodesInFull(reading?.codes.some((code) => code.error === null) ?? false);
 
   /** One reading replaces the last one whole: a picture and a list about two images is a lie. */
   const took = (result: Reading) => {
@@ -282,7 +296,9 @@ export function ReadPage({
           key={`${reading.decodeMs}-${reading.width}-${reading.height}-${index}`}
           index={index + 1}
           code={code}
+          library={library}
           onMake={onMake}
+          onOpen={onOpen}
         />
       ))}
     </div>
@@ -323,11 +339,39 @@ function StampCard({ check, onOpen }: { check: StampCheck; onOpen: OpenSaved }) 
  */
 function SavedAs({ id, name, onOpen }: { id: string; name: string; onOpen: OpenSaved }) {
   const code = useCode(id);
+  return (
+    <div className="flex flex-col gap-2">
+      <OpenRow lead={`Saved as ${name}.`} name={name} saved={code.data} onOpen={onOpen} />
+      {code.isError && (
+        <p className="text-caption">{`This code could not be read. ${describeError(code.error)}`}</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A saved code's name, when the line needs it, and the Open button that opens it — the one
+ * button the Stamp card and a matched code card share, so both open a code the way the Library
+ * does: through `onOpen`, announced the same way, refused in the same sentence.
+ *
+ * `saved` is undefined while the code is still on its way; Open waits for it, because opening a
+ * code needs the code.
+ */
+function OpenRow({
+  lead,
+  name,
+  saved,
+  onOpen,
+}: {
+  lead?: string;
+  name: string;
+  saved: SavedCode | undefined;
+  onOpen: OpenSaved;
+}) {
   const [opening, setOpening] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
   const openIt = async () => {
-    const saved = code.data;
     if (saved === undefined) return;
     setProblem(null);
     setOpening(true);
@@ -343,21 +387,59 @@ function SavedAs({ id, name, onOpen }: { id: string; name: string; onOpen: OpenS
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-3">
-        <span>{`Saved as ${name}.`}</span>
+        {lead !== undefined && <span>{lead}</span>}
         <Button
           aria-label={`Open ${name}`}
-          disabled={code.data === undefined || opening}
+          disabled={saved === undefined || opening}
           onClick={() => void openIt()}
         >
           Open
         </Button>
       </div>
-      {code.isError && (
-        <p className="text-caption">{`This code could not be read. ${describeError(code.error)}`}</p>
-      )}
       {problem !== null && <p className="text-caption">{problem}</p>}
     </div>
   );
+}
+
+/**
+ * What a read code is in this library (P6): the saved codes that carry exactly its bytes, by
+ * name, each with its own Open. Information, not success — a match says which saved code this
+ * print is, and nothing about whether it would scan at a size; the card's own answer says that.
+ *
+ * Only the names are shown. What matched is the whole payload, a Wi-Fi password included, and
+ * the password stays where the Reveal button keeps it.
+ */
+function SavedMatch({ matches, onOpen }: { matches: SavedCode[]; onOpen: OpenSaved }) {
+  const [only] = matches;
+  return (
+    <InfoBar severity="info" title={describeMatch(matches.map((saved) => saved.name))}>
+      {matches.length === 1 && only !== undefined ? (
+        <OpenRow name={only.name} saved={only} onOpen={onOpen} />
+      ) : (
+        <ul aria-label="Saved codes it matches" className="flex flex-col gap-2">
+          {matches.map((saved) => (
+            <li key={saved.id}>
+              <OpenRow lead={saved.name} name={saved.name} saved={saved} onOpen={onOpen} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </InfoBar>
+  );
+}
+
+/**
+ * What the card says when the library could not be compared in full — silence would read as
+ * "this is not one of yours" (DESIGN_SYSTEM §10).
+ */
+function notCompared(library: SavedCodesInFull): string | null {
+  if (library.listFailed) {
+    return 'The library could not be read, so this code was not compared with your saved codes.';
+  }
+  if (library.unread === 0) return null;
+  return library.unread === 1
+    ? '1 saved code could not be read, so this code was not compared with it.'
+    : `${library.unread} saved codes could not be read, so this code was not compared with them.`;
 }
 
 /**
@@ -454,11 +536,16 @@ function maskSecret(content: string): string {
 function CodeCard({
   index,
   code,
+  library,
   onMake,
+  onOpen,
 }: {
   index: number;
   code: ReadCode;
+  /** The saved codes in full, fetched once for the whole screen — never once per card. */
+  library: SavedCodesInFull;
   onMake: (made: MadeFromRead) => void;
+  onOpen: OpenSaved;
 }) {
   const [revealed, setRevealed] = useState(false);
   const [width, setWidth] = useState('25');
@@ -467,6 +554,11 @@ function CodeCard({
   // The bytes are described once per code: the sentences are the domain's, and they are the same
   // ones the Create screen says about a code being made.
   const description = useMemo(() => describeBytes(code.bytes), [code.bytes]);
+
+  // Matched by the bytes, never by the lossy text beside them: the domain compares byte for byte.
+  // Above the early return, because a hook that is sometimes called is the crash the lint rule
+  // exists for; a pattern that did not decode carries no bytes and matches nothing.
+  const matches = useMemo(() => matchSaved(code.bytes, library.codes), [code.bytes, library.codes]);
 
   const name = `Code ${index}`;
 
@@ -490,6 +582,9 @@ function CodeCard({
   const shown =
     description.sensitive && !revealed ? maskSecret(description.content) : description.content;
 
+  // Said only when it could matter: a code that already matched has its answer.
+  const unmatched = matches.length === 0 ? notCompared(library) : null;
+
   // Only the two kinds whose whole payload is a single field go back to Create as themselves. A
   // contact or a Wi-Fi is a form with parts, and filling one from bytes is its own slice.
   const makeKind: MadeFromRead['kind'] | null =
@@ -508,6 +603,11 @@ function CodeCard({
             <AddressSentences sentences={description.warnings} />
           </InfoBar>
         )}
+
+        {/* Which saved code this print is (P6), under the caution rather than above it: what is
+            worth reading before following the address comes first, on every card. */}
+        {matches.length > 0 && <SavedMatch matches={matches} onOpen={onOpen} />}
+        {unmatched !== null && <p className="text-caption text-fg-secondary">{unmatched}</p>}
 
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-body">
           <dt className="text-fg-secondary">Kind</dt>
