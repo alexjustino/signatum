@@ -44,6 +44,7 @@ import { EmptyState } from '@/ui/EmptyState';
 import { InfoBar } from '@/ui/InfoBar';
 import { Input } from '@/ui/Input';
 import { ProgressBar } from '@/ui/ProgressBar';
+import { formatDay } from '@/domain/day';
 
 /**
  * The library: the codes that were kept (SPEC §2.7).
@@ -159,10 +160,9 @@ const CHECK_MARK: Record<RecheckOutcome, { icon: ReactNode; tone: string }> = {
   unanswered: { icon: <Warning16Regular />, tone: 'text-caution' },
 };
 
-/** The day a code was kept, in the reader's own format; the stored text when it is not a date. */
+/** The day a code was kept, as every screen writes a day; the stored text when it is not a date. */
 function day(stamp: string): string {
-  const at = new Date(stamp);
-  return Number.isNaN(at.getTime()) ? stamp : at.toLocaleDateString();
+  return formatDay(stamp) ?? stamp;
 }
 
 export function LibraryPage({
