@@ -4,6 +4,11 @@
 //! as a file until an independent decoder has read the pixels back and the
 //! bytes it read are the bytes that were asked for. Not "looks right", not
 //! "the encoder says so" — read back, byte for byte.
+//!
+//! # Changelog
+//!
+//! - P9: `composed` — the artefact's pixels before the encode — split out of
+//!   `artefact`, so the damage test paints over exactly what the gate encodes.
 
 use std::time::Instant;
 
@@ -14,7 +19,7 @@ use crate::error::Result;
 use crate::imaging::compose::{draw_logo, LogoBox};
 use crate::imaging::decode::decode_png;
 use crate::imaging::logo::NormalisedLogo;
-use crate::imaging::render::{encode, render_pixmap, Rendered};
+use crate::imaging::render::{encode, render_pixmap, Raster, Rendered};
 
 /// The decoder's name, as the report and the record spell it.
 pub const DECODER_NAME: &str = "rqrr";
@@ -103,25 +108,40 @@ pub fn artefact(
     logo: Option<(&NormalisedLogo, LogoBox)>,
     dpi: Option<u32>,
 ) -> Result<Rendered> {
-    let raster = render_pixmap(svg, pixel_size)?;
-    let mut pixmap = raster.pixmap;
+    encode(&composed(svg, pixel_size, logo)?.pixmap, dpi)
+}
+
+/// Render `svg` and draw `logo` on it, and stop there: the artefact's pixels
+/// before they are encoded, with the scale that took the scene to them.
+///
+/// [`artefact`] is this plus the encode. It is split out for the damage test
+/// (P9), which paints over the very pixels the gate would have encoded — a
+/// second way of composing them would be a second artefact, and the damage
+/// would be measured on a picture nobody prints.
+///
+/// # Errors
+///
+/// As [`artefact`], less the encode.
+pub fn composed(
+    svg: &[u8],
+    pixel_size: u32,
+    logo: Option<(&NormalisedLogo, LogoBox)>,
+) -> Result<Raster> {
+    let mut raster = render_pixmap(svg, pixel_size)?;
 
     if let Some((logo, area)) = logo {
         // The box arrives in the scene's units; the scale that took the
         // `viewBox` to pixels is the one that takes the box there too.
-        draw_logo(
-            &mut pixmap,
-            logo,
-            (
-                area.x * raster.scale_x,
-                area.y * raster.scale_y,
-                area.width * raster.scale_x,
-                area.height * raster.scale_y,
-            ),
-        )?;
+        let box_px = (
+            area.x * raster.scale_x,
+            area.y * raster.scale_y,
+            area.width * raster.scale_x,
+            area.height * raster.scale_y,
+        );
+        draw_logo(&mut raster.pixmap, logo, box_px)?;
     }
 
-    encode(&pixmap, dpi)
+    Ok(raster)
 }
 
 /// Render `svg`, draw `logo` on it if there is one, decode the pixels, and

@@ -19,8 +19,13 @@
 //! turns the same decoder on pixels this product did not draw: every code in a
 //! picture, what each one carries and how it was built — with a cap on what is
 //! searched and one second pass for a photograph taken in uneven light.
+//! `damage` (P9) paints cells of ink or paper over the composed artefact, at
+//! the scene's own module grid, and asks the gate's decoder again — the
+//! decoder's say on damage in one place, past what the error-correction
+//! arithmetic guarantees (ADR-037). A report too, and it records nothing.
 
 pub mod compose;
+pub mod damage;
 pub mod decode;
 pub mod logo;
 pub mod margin;

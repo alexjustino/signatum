@@ -68,6 +68,11 @@
 //!   anything, and says whether the file is unchanged and whether this
 //!   workspace is the one that verified it. The setting `stamp_exports` turns
 //!   stamping off; the clipboard is never stamped.
+//! - P9: where it breaks. `damage_test` paints the cells somebody smudged or
+//!   drew over the artefact the scan margin measures, logo included, and asks
+//!   the gate's decoder whether it still reads — the decoder's say past what
+//!   the error-correction arithmetic in the domain guarantees (ADR-037). It
+//!   records nothing and blocks nothing.
 
 pub mod commands;
 pub mod db;
@@ -123,6 +128,7 @@ pub fn run() {
             commands::codes::export_pdf,
             commands::codes::copy_png,
             commands::codes::scan_margin,
+            commands::codes::damage_test,
             commands::proof::export_proof_sheet,
             commands::logos::import_logo,
             commands::logos::list_logos,
