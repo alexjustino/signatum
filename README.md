@@ -326,7 +326,8 @@ The installers on the Releases page are not code-signed, so SmartScreen warns on
 Verify the download came from the Releases page of this repository and that its SHA-256 matches
 the release notes.
 
-Building needs Node.js 22+, a stable Rust toolchain with the MSVC build tools, and PowerShell 7.
+Building needs Node.js 22+, a stable Rust toolchain (1.88 or newer) with the MSVC build tools,
+and PowerShell 7.
 
 ## Getting started
 

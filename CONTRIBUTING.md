@@ -107,7 +107,8 @@ runs, and all of them must pass:
 
 | Gate                       | What it protects                                                               |
 | -------------------------- | ------------------------------------------------------------------------------ |
-| `check:version`            | the version is one fact in three files                                         |
+| `check:version`            | the version is one fact across five files                                      |
+| `check:msrv`               | the declared Rust version covers every crate the Windows build compiles        |
 | `cargo fmt --check`        | Rust formatting                                                                |
 | `cargo clippy -D warnings` | Rust correctness and idiom                                                     |
 | `cargo test`               | the host: the independent decoder, the hostile corpus, the writers, migrations |
