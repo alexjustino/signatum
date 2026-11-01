@@ -541,6 +541,12 @@ SVG from its parsed tree ([ADR-016](#adr-016)) is a feature of its own, and it g
 resvg's defaults. `usvg` is declared at resvg's own version only to turn it back on; Cargo still
 builds one copy, and the code still reaches it as `resvg::usvg`.
 
+**From 1.1, the decoder is `rqrr` 0.11.0 and the renderer `resvg` 0.48.1.** Both moved in the
+dependency round of 1.1, each only after the corpus ([ADR-020](#adr-020)) had read 10 000 of 10 000
+codes back byte for byte with it. The table above is the day F0 landed; `Cargo.lock` is the version
+today. A verification records the decoder that made it, so rows written before the move go on
+saying 0.10.1.
+
 **`jsQR` is the third decoder**, in the end-to-end suite only, never in the product. It runs in
 the Node process that drives the binary, reads the PNG from disk after the product wrote it, and
 shares its lineage with neither the encoder (Nayuki) nor the host's decoder (`rqrr`, a port of

@@ -22,7 +22,7 @@ pub const DECODER_NAME: &str = "rqrr";
 /// The decoder's version. Declared here so the report can carry a number a
 /// person could look up, and held to `Cargo.lock` by a test — a version nobody
 /// can check is a decoration, not evidence.
-pub const DECODER_VERSION: &str = "0.10.1";
+pub const DECODER_VERSION: &str = "0.11.0";
 
 /// What is said when the decoder found nothing to read.
 pub const REASON_NO_CODE: &str = "The decoder found no code.";
