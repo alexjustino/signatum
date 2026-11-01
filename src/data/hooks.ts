@@ -16,7 +16,15 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { useCallback, useMemo } from 'react';
 
 import { cancelBatch, readTextFile, runBatch, writeBatchReport } from './batch';
-import { copyPng, exportPdf, exportPng, exportSvg, scanMargin, verifyCode } from './codes';
+import {
+  copyPng,
+  damageTest,
+  exportPdf,
+  exportPng,
+  exportSvg,
+  scanMargin,
+  verifyCode,
+} from './codes';
 import {
   deleteBrandKit,
   deleteCode,
@@ -128,6 +136,16 @@ export function useCopyPng() {
  */
 export function useScanMargin() {
   return useMutation({ mutationFn: scanMargin });
+}
+
+/**
+ * Whether the code still reads with somebody's smudge on it (P9).
+ *
+ * A mutation for the reason the margin is one: a question about a picture that exists only in
+ * this window, asked when a person pressed a button, and never read back by anything else.
+ */
+export function useDamageTest() {
+  return useMutation({ mutationFn: damageTest });
 }
 
 /**

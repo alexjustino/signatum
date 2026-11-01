@@ -47,7 +47,7 @@ import {
   type PayloadForm,
   type PayloadKind,
 } from '@/domain/payload';
-import type { Plan } from '@/domain/placement';
+import { plateOf, type Plan } from '@/domain/placement';
 import { proofFileName, proofSizes } from '@/domain/proof';
 import type { Style } from '@/domain/scene';
 import {
@@ -72,12 +72,14 @@ import { TabStrip } from '@/ui/TabStrip';
 
 import { AddressSentences } from './AddressSentences';
 import { BrandKitCard } from './BrandKitCard';
+import { BreakCard } from './BreakCard';
 import { PayloadFields } from './forms/PayloadFields';
 import { LogoCard, type ChosenLogo } from './LogoCard';
 import { LookCard, type EclFloor } from './LookCard';
-import { planFor, sceneFor } from './plan';
+import { PLATE_PADDING, planFor, sceneFor } from './plan';
 import { ScanMarginCard } from './ScanMarginCard';
 import { SizeCard } from './SizeCard';
+import { useBreakTest } from './useBreakTest';
 
 /**
  * Create: what a person wants the code to do becomes a code, and the code is
@@ -555,6 +557,31 @@ export function CreatePage({
   // The gate owns the export button. Nothing else is allowed to enable it.
   const gate = gateState(report, inFlight);
   const verified = gate === 'verified';
+
+  /**
+   * The logo's plate in scene modules — the box the placement engine gave the logo, with the same
+   * padding the plan was made with — or null for a code with nothing in the middle. It is what the
+   * error-correction arithmetic counts as already lost (ADR-037).
+   */
+  const plate = useMemo(() => (box === null ? null : plateOf(box, PLATE_PADDING)), [box]);
+  const matrix = plan !== null && plan.ok ? plan.matrix : null;
+
+  /**
+   * Where this code breaks, and the damage somebody tried on it (P9). Asked only of a code that
+   * passed, like the margin, and keyed to the artefact the gate verified: a different code leaves
+   * the damage and the decoder's answer behind. It reads the verdict and never writes it — nothing
+   * it holds reaches the gate or the export row.
+   */
+  const breakTest = useBreakTest({
+    matrix: verified ? matrix : null,
+    plate,
+    quietZone: style.quietZone,
+    codeKey: verified ? artefact : null,
+    request:
+      verified && svg !== null && payload !== null && modules !== null
+        ? { svg, payload, pixelSize: pixels, logo: placement, modules }
+        : null,
+  });
 
   /**
    * How far this code can be degraded and still read, asked for once it reads at
@@ -1145,6 +1172,30 @@ export function CreatePage({
               failure={marginNow?.failure ?? null}
             />
           )}
+
+          {/* After the margin and under the same rule: a report about a code that passed, which
+              disables nothing and changes no verdict (ADR-037). */}
+          {verified &&
+            breakTest.analysis !== null &&
+            matrix !== null &&
+            svg !== null &&
+            scene.side !== null && (
+              <BreakCard
+                test={breakTest}
+                svg={svg}
+                logo={
+                  logo !== null && logo.info.dataUrl !== null && box !== null
+                    ? { dataUrl: logo.info.dataUrl, box, side: scene.side }
+                    : undefined
+                }
+                side={scene.side}
+                ecl={matrix.ecl}
+                hasLogo={plate !== null}
+                widthMm={toMillimetres(printSize)}
+                size={matrix.size}
+                quietZone={style.quietZone}
+              />
+            )}
         </div>
       </div>
     </div>

@@ -285,3 +285,59 @@ export async function scanMargin({
   });
   return { variants: raw.variants };
 }
+
+/** One module the damage test paints over the print, in symbol coordinates (quiet zone excluded). */
+export interface DamageCell {
+  x: number;
+  y: number;
+  /** Ink (`true`) or bare paper (`false`). */
+  dark: boolean;
+}
+
+/**
+ * The damage test is asked about the picture the margin is asked about — the same SVG, raster,
+ * logo and module count — plus the quiet zone, so the host can find the symbol inside the scene,
+ * and the cells a person smudged or drew (ADR-037).
+ */
+export interface DamageTestRequest extends ScanMarginRequest {
+  quietZone: number;
+  cells: readonly DamageCell[];
+}
+
+/** What the gate's decoder made of the damaged picture. */
+export interface DamageReport {
+  /** True only when the decoded bytes are the payload bytes. */
+  reads: boolean;
+  /** The host's own sentence when it did not read; null when it did. */
+  reason: string | null;
+  /** The decoder that was asked, name and version. */
+  decoder: string;
+}
+
+/**
+ * Paint the cells over the print and ask the gate's decoder whether it still reads (P9). The
+ * other half of the screen's answer: the arithmetic says whether the code is still guaranteed to
+ * read, and only a decoder can say what happens past the guarantee. A report about a code that
+ * already passed, never a gate on it — it records nothing and blocks nothing (ADR-037).
+ */
+export async function damageTest({
+  svg,
+  payload,
+  pixelSize,
+  logo = null,
+  modules,
+  quietZone,
+  cells,
+}: DamageTestRequest): Promise<DamageReport> {
+  // No saved code's id, for the reason the margin forwards none: this is a question about the
+  // picture on screen with somebody's thumb on it, never a reading of a row in the library.
+  return invoke<DamageReport>('damage_test', {
+    svg,
+    payload,
+    pixel_size: pixelSize,
+    logo: placementArg(logo),
+    modules,
+    quiet_zone: quietZone,
+    cells: cells.map(({ x, y, dark }) => ({ x, y, dark })),
+  });
+}
