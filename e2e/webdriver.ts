@@ -201,6 +201,33 @@ export class Driver {
     await call('DELETE', this.sessionUrl('/actions'));
   }
 
+  /**
+   * Drag the mouse through points in viewport pixels: pressed at the first, moved through the
+   * rest, released at the last — real pointer events, the way a person draws, not a script
+   * standing in for them.
+   */
+  async drag(points: readonly { x: number; y: number }[]): Promise<void> {
+    const [first, ...rest] = points;
+    if (first === undefined) return;
+    const at = (p: { x: number; y: number }, duration: number) => ({
+      type: 'pointerMove',
+      duration,
+      origin: 'viewport',
+      x: Math.round(p.x),
+      y: Math.round(p.y),
+    });
+    const actions = [
+      at(first, 0),
+      { type: 'pointerDown', button: 0 },
+      ...rest.map((p) => at(p, 60)),
+      { type: 'pointerUp', button: 0 },
+    ];
+    await call('POST', this.sessionUrl('/actions'), {
+      actions: [{ type: 'pointer', id: 'mouse', parameters: { pointerType: 'mouse' }, actions }],
+    });
+    await call('DELETE', this.sessionUrl('/actions'));
+  }
+
   title(): Promise<string> {
     return call('GET', this.sessionUrl('/title'));
   }
