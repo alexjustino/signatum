@@ -321,15 +321,20 @@ export function weakestSpot(
 
 /**
  * The figures to set beside "30 %": what the code could lose spread evenly, before and after the
- * logo, and how small a share of the symbol its weakest spot is.
+ * logo, and how small a share of the symbol its weakest spot is. A spot already found can be
+ * passed in, so the search is not run twice.
  */
-export function headroom(matrix: Matrix, plate: LogoBox | null, quietZone: number): Headroom {
+export function headroom(
+  matrix: Matrix,
+  plate: LogoBox | null,
+  quietZone: number,
+  spot: WeakestSpot | null = weakestSpot(matrix, plate, quietZone),
+): Headroom {
   const layout = layoutOf(matrix.version, matrix.ecl);
   const blocks = budgets(layout, plateCodewords(layout, plate, quietZone), new Set());
   const total = Math.floor(rawDataModules(matrix.version) / 8);
   const textbook = (layout.capacity * layout.numBlocks) / total;
   const afterLogo = blocks.reduce((sum, b) => sum + Math.max(0, b.capacity - b.logo), 0) / total;
-  const spot = weakestSpot(matrix, plate, quietZone);
   const weakestShare = spot === null ? 1 : spot.cells.length / (layout.n * layout.n);
   return { textbook, afterLogo, weakestShare };
 }
