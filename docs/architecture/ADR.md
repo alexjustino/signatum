@@ -1997,7 +1997,7 @@ figure to quote, which was not true here anyway.
 
 **Status: Accepted.**
 
-**Context.** Every QR tool says that level H survives 30 % damage, and this product raises a code
+**Context.** It is commonly said that level H survives 30 % damage, and this product raises a code
 with a logo to level H when the logo needs it ([ADR-017](#adr-017)). The figure is true of damage
 spread perfectly evenly over the symbol, and of nothing else. ISO/IEC 18004 splits a symbol's
 codewords into error-correction blocks, and Reed–Solomon corrects each block on its own: a block can
