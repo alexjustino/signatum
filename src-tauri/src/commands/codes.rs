@@ -446,23 +446,25 @@ pub fn damage_test(
     quiet_zone: u32,
     cells: Vec<DamageCell>,
 ) -> Result<DamageReport> {
-    let conn = db.0.lock().expect("the database lock was poisoned");
-    damage_test_with(
-        &conn,
-        &Asked {
-            svg: &svg,
-            payload: &payload,
-            // The margin's size, for the margin's reason: past this side a render costs time and
-            // buys no better answer — and the two reports are about the same picture.
-            pixel_size: pixel_size.min(MARGIN_MAX_PIXELS),
-            logo: logo.as_ref(),
-            dpi: None,
-            code_id: None,
-        },
-        modules,
-        quiet_zone,
-        &cells,
-    )
+    let asked = Asked {
+        svg: &svg,
+        payload: &payload,
+        // The margin's size, for the margin's reason: past this side a render costs time and
+        // buys no better answer — and the two reports are about the same picture.
+        pixel_size: pixel_size.min(MARGIN_MAX_PIXELS),
+        logo: logo.as_ref(),
+        dpi: None,
+        code_id: None,
+    };
+    check_damage(&asked, modules, quiet_zone, &cells)?;
+    // The workspace is held only while the logo is fetched, never through the render and the
+    // decode: a command that runs on the window's thread and wants it — an export clicked while
+    // this runs — must not wait for a picture it has nothing to do with.
+    let logo = {
+        let conn = db.0.lock().expect("the database lock was poisoned");
+        load_logo(&conn, asked.logo)?
+    };
+    damage_rendered(&asked, logo, modules, quiet_zone, &cells)
 }
 
 /// What [`verify_code`] does once the database is in hand.
@@ -718,11 +720,13 @@ fn scan_margin_with(conn: &Connection, asked: &Asked, modules: u32) -> Result<Sc
     margin::scan_margin(&artefact.png, asked.payload.as_bytes(), modules)
 }
 
-/// What [`damage_test`] does once the database is in hand.
+/// What [`damage_test`] does, in one piece, with a connection in hand — the order the tests
+/// hold it to. The command runs the same three steps but holds the lock for the logo alone.
 ///
 /// Everything a request can get wrong is refused before anything is rendered,
 /// except the one thing only the render knows — whether `modules` is the
 /// drawing's own side — which is refused before anything is painted.
+#[cfg(test)]
 fn damage_test_with(
     conn: &Connection,
     asked: &Asked,
@@ -730,11 +734,26 @@ fn damage_test_with(
     quiet_zone: u32,
     cells: &[DamageCell],
 ) -> Result<DamageReport> {
+    check_damage(asked, modules, quiet_zone, cells)?;
+    let logo = load_logo(conn, asked.logo)?;
+    damage_rendered(asked, logo, modules, quiet_zone, cells)
+}
+
+/// Everything a damage test can be refused for before anything is fetched or drawn.
+fn check_damage(asked: &Asked, modules: u32, quiet_zone: u32, cells: &[DamageCell]) -> Result<()> {
     check_inputs(asked)?;
     margin::check_modules(modules)?;
-    damage::check_cells(modules, quiet_zone, cells)?;
-    let logo = load_logo(conn, asked.logo)?;
+    damage::check_cells(modules, quiet_zone, cells)
+}
 
+/// The render, the damage and the decode, with the logo already in hand and no lock held.
+fn damage_rendered(
+    asked: &Asked,
+    logo: Option<(NormalisedLogo, LogoBox)>,
+    modules: u32,
+    quiet_zone: u32,
+    cells: &[DamageCell],
+) -> Result<DamageReport> {
     let mut raster = crate::imaging::verify::composed(
         asked.svg.as_bytes(),
         asked.pixel_size,
