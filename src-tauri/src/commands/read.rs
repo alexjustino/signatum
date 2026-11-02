@@ -1091,7 +1091,10 @@ mod tests {
             assert!(check.in_workspace, "{name}");
             assert!(check.matches_record, "{name}");
             assert_eq!(check.kind, token);
-            assert_eq!(check.decoder.as_deref(), Some("rqrr 0.10.1"));
+            assert_eq!(
+                check.decoder.as_deref(),
+                Some(crate::imaging::verify::decoder().as_str())
+            );
             assert_eq!(check.format.as_deref(), Some(token));
             assert_eq!(check.dpi, Some(300));
             assert_eq!(check.code_id.as_deref(), Some(saved.as_str()));
