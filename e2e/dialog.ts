@@ -6,7 +6,8 @@ import { spawn } from 'node:child_process';
  * WebDriver drives the webview and nothing outside it, and Tauri keeps its IPC function out of the
  * page's reach, so a test cannot stand in for the dialog from inside the page. It does not need
  * to: the dialog is an ordinary Windows window. This finds the one owned by the product's process
- * (class `#32770`), finds its file-name box (the `Edit` whose control id is 1148) and its default
+ * (class `#32770`), finds its file-name box (the `Edit` whose control id is 1148 in an Open dialog
+ * and 1001 in a Save dialog) and its default
  * button (control id 1), writes the path into the box with `WM_SETTEXT` and presses the button
  * with `BM_CLICK` — the real dialog, answered through its own windows.
  *
@@ -38,7 +39,8 @@ function Condition($property, $value) {
 function Both($a, $b) { New-Object System.Windows.Automation.AndCondition($a, $b) }
 $ids = @(Get-Process -Name signatum -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
 if ($ids.Count -eq 0) { throw 'the product is not running' }
-$isNameBox = Both (Condition $A::ClassNameProperty 'Edit') (Condition $A::AutomationIdProperty '1148')
+$either = New-Object System.Windows.Automation.OrCondition((Condition $A::AutomationIdProperty '1148'), (Condition $A::AutomationIdProperty '1001'))
+$isNameBox = Both (Condition $A::ClassNameProperty 'Edit') $either
 $isButton = Both (Condition $A::ClassNameProperty 'Button') (Condition $A::AutomationIdProperty '1')
 $deadline = (Get-Date).AddMilliseconds(${timeoutMs})
 $nameBox = $null
