@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { startSession, type Session } from './session';
-import { Keys } from './webdriver';
 
 /**
  * P6's proof of done, against the real binary: a code found by Read is matched against the
@@ -59,10 +58,7 @@ describe('a print against the library', () => {
 
   async function typeInto(label: string, value: string): Promise<void> {
     const field = await session.driver.waitForElement(`input[aria-label="${label}"]`);
-    await field.clear();
-    await field.sendKeys(' ');
-    await field.sendKeys(Keys.BACKSPACE);
-    await field.sendKeys(value);
+    await field.fill(value);
   }
 
   const clickText = async (text: string) => {

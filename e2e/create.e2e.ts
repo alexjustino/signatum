@@ -141,8 +141,7 @@ describe('create', () => {
   it('says why when the link is not a link', async () => {
     const { driver } = session;
     const input = await driver.waitForElement('input[aria-label="Link"]');
-    await input.clear();
-    await input.sendKeys('javascript:alert(1)');
+    await input.fill('javascript:alert(1)');
     await driver.waitForText('has to start with https://');
     const button = await driver.findByXPath('//button[contains(normalize-space(.), "Export PNG")]');
     expect(await button.attribute('disabled')).not.toBeNull();
@@ -151,8 +150,7 @@ describe('create', () => {
   it('renders the preview identically in the dark theme', async () => {
     const { driver } = session;
     const input = await driver.waitForElement('input[aria-label="Link"]');
-    await input.clear();
-    await input.sendKeys(LINK);
+    await input.fill(LINK);
     await driver.waitForText('read it back byte for byte');
     const light = await sceneOnScreen();
 

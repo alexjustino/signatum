@@ -110,8 +110,19 @@ describe('accessibility', () => {
       it(`${screen} has no axe violations in the ${theme} theme`, async () => {
         await setTheme(session, theme);
         await go(session, screen);
-        // Let the theme's variables settle before the contrast pass reads them.
-        await new Promise((resolve) => setTimeout(resolve, 150));
+        if (screen === 'Create') {
+          // Coming back to Create asks the gate again, and the export row opens when it answers.
+          // Its buttons fade from the disabled colour over 100 ms, and axe, which skips a disabled
+          // button, would measure an enabled one at the first frame of that fade.
+          await session.driver.waitFor('the export row open', async () => {
+            const button = await session.driver.findByXPath(
+              '//button[contains(normalize-space(.), "Export PNG")]',
+            );
+            return (await button.attribute('disabled')) === null;
+          });
+        }
+        // Let the theme's variables and any fade settle before the contrast pass reads them.
+        await new Promise((resolve) => setTimeout(resolve, 250));
         const found = await violations(session);
         expect(found, report(screen, theme, found)).toEqual([]);
         await session.screenshot(`a11y-${screen.toLowerCase()}-${theme.toLowerCase()}`);
@@ -171,10 +182,7 @@ describe('accessibility', () => {
     await driver.waitForText('read it back byte for byte');
     await (await driver.findByXPath('//button[normalize-space(.)="Save…"]')).click();
     const name = await driver.waitForElement('input[aria-label="Name"]');
-    await name.clear();
-    await name.sendKeys(' ');
-    await name.sendKeys(Keys.BACKSPACE);
-    await name.sendKeys('Menu');
+    await name.fill('Menu');
     await (await driver.findByXPath('//button[normalize-space(.)="Save code"]')).click();
     await driver.waitForText('Saved as Menu');
 

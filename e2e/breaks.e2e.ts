@@ -179,10 +179,7 @@ describe('where it breaks', () => {
 
   async function setLink(text: string): Promise<void> {
     const input = await session.driver.waitForElement('input[aria-label="Link"]');
-    await input.clear();
-    await input.sendKeys(' ');
-    await input.sendKeys(Keys.BACKSPACE);
-    await input.sendKeys(text);
+    await input.fill(text);
   }
 
   it('says where a code with a logo breaks, in millimetres, and shows its weak spots', async () => {
