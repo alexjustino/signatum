@@ -129,7 +129,7 @@ export function BreakCard({
       </div>
 
       <div className="mt-3 flex flex-col gap-1">
-        <h3 className="text-caption font-semibold text-fg-secondary">Blocks</h3>
+        <h3 className="text-caption font-semibold text-fg-secondary">Error-correction blocks</h3>
         <ul aria-label="Error-correction blocks" className="flex flex-col gap-2">
           {blocks.map((block, index) => (
             <li key={index} className="flex flex-col gap-1">
@@ -179,8 +179,17 @@ export function BreakCard({
       {/* Both answers in one line, the arithmetic's and then the decoder's, so a person reads
           them side by side. The contract with the end-to-end suite is this live region. While a
           stroke is being drawn it is busy: the text follows every cell on screen, and assistive
-          technology hears it once, when the stroke ends, rather than once per module. */}
-      <p aria-live="polite" aria-busy={test.stroking} className="mt-3 text-body text-fg">
+          technology hears it once, when the stroke ends, rather than once per module. Atomic, so
+          the decoder's answer is heard beside the prediction it answers, not on its own.
+          It is the card's own region rather than `announce()` (DESIGN_SYSTEM §7) because it is not
+          a transient message: it is the visible, lasting state of the experiment, as the batch
+          plan's count is. */}
+      <p
+        aria-live="polite"
+        aria-atomic="true"
+        aria-busy={test.stroking}
+        className="mt-3 text-body text-fg"
+      >
         <span>{predicted}</span>
         {decoder !== null && <span>{` ${decoder}`}</span>}
       </p>

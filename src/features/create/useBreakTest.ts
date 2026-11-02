@@ -76,8 +76,9 @@ export interface BreakTest {
  * The state behind "Where it breaks" (P9, ADR-037): the code's weak places, the damage somebody
  * smudged or drew on it, the arithmetic's prediction and the decoder's answer.
  *
- * It lives in a hook that Create calls rather than in the card, because two places draw from it —
- * the card, and the overlay on the preview — and they must be showing the same damage.
+ * It lives in a hook that Create calls rather than in the card, because it outlives the card: the
+ * card is shown only while the code is verified, and the damage and the decoder's answer are kept
+ * under the artefact they are about, so a code that comes back finds them as they were.
  *
  * `matrix` is null until the gate has passed: there is nothing to break about a code that does
  * not read, and the weakest spot (a ten-millisecond search) is not run while somebody is typing.

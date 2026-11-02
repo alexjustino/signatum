@@ -161,14 +161,19 @@
   /* The weak-spot overlay (P9). It is drawn over the code, and the code is not themed (§2,
      "Colour and the code"): it sits on the colours somebody chose to print, which are the same in
      both themes, so these are too. A block is tinted at three strengths, strongest where most of
-     its budget is spent, and the weakest spot is ringed in the same red. Damage is shown as what
-     the host paints before the decoder reads it: black ink, white paper. */
+     its budget is spent, and the weakest spot is ringed in the same red — dashed over a white
+     halo, because the ring lands on the most-tinted block by construction, and red on a red tint
+     is about 2:1 where red on white is 5.7:1. Damage is shown as what the host paints before the
+     decoder reads it: black ink, white paper, each with an edge that holds 4.5:1 against both
+     (a themed stroke would be a different grey in each theme, on a print that is not). */
   --viz-spent-low: rgb(196 43 28 / 0.15);
   --viz-spent-mid: rgb(196 43 28 / 0.35);
   --viz-spent-high: rgb(196 43 28 / 0.6);
   --viz-spot: #c42b1c;
+  --viz-spot-halo: #ffffff;
   --damage-ink: #000000;
   --damage-paper: #ffffff;
+  --damage-edge: #767676;
 }
 
 /* ── Dark ──────────────────────────────────────────────────────────────── */
@@ -215,8 +220,10 @@
     --viz-spent-mid: rgb(196 43 28 / 0.35);
     --viz-spent-high: rgb(196 43 28 / 0.6);
     --viz-spot: #c42b1c;
+    --viz-spot-halo: #ffffff;
     --damage-ink: #000000;
     --damage-paper: #ffffff;
+    --damage-edge: #767676;
   }
 }
 
@@ -262,8 +269,10 @@
   --viz-spent-mid: rgb(196 43 28 / 0.35);
   --viz-spent-high: rgb(196 43 28 / 0.6);
   --viz-spot: #c42b1c;
+  --viz-spot-halo: #ffffff;
   --damage-ink: #000000;
   --damage-paper: #ffffff;
+  --damage-edge: #767676;
 }
 
 /* ── Density ────────────────────────────────────────────────────────────────

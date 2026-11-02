@@ -1,4 +1,4 @@
-import { useRef, type PointerEvent } from 'react';
+import { useEffect, useRef, type PointerEvent } from 'react';
 
 import type { BlockBudget, Damage, WeakestSpot } from '@/domain/resilience';
 
@@ -73,6 +73,15 @@ export function WeakSpotOverlay({
     painting.current = false;
   };
 
+  // A stroke cut short by the overlay going away still ends: otherwise the card's result line
+  // would stay busy, and a busy live region is one assistive technology stops reading.
+  useEffect(
+    () => () => {
+      if (painting.current) onStroke(false);
+    },
+    [onStroke],
+  );
+
   return (
     <svg
       aria-hidden="true"
@@ -106,7 +115,8 @@ export function WeakSpotOverlay({
         })}
 
       {/* Damage is drawn as the host paints it before the decoder reads it — black ink, white
-          paper — with a thin outline, so a paper cell still has an edge on a light module. */}
+          paper — with a thin outline, so a paper cell still has an edge on a light module. The
+          outline is unthemed like the print it sits on (DESIGN_SYSTEM §2). */}
       {cells.map((cell) => (
         <rect
           key={`${cell.x},${cell.y}`}
@@ -114,21 +124,32 @@ export function WeakSpotOverlay({
           y={cell.y + quietZone}
           width={1}
           height={1}
-          className={`${cell.dark ? 'fill-(--damage-ink)' : 'fill-(--damage-paper)'} stroke-stroke-strong`}
+          className={`${cell.dark ? 'fill-(--damage-ink)' : 'fill-(--damage-paper)'} stroke-(--damage-edge)`}
           strokeWidth={1}
           vectorEffect="non-scaling-stroke"
         />
       ))}
 
+      {/* The ring lands on the most-spent block by construction, where red on a red tint is
+          about 2:1; a white halo under the dashes keeps it readable on any module and any tint. */}
       {showWeakSpots && spot !== null && (
-        <circle
-          cx={spot.x + 0.5 + quietZone}
-          cy={spot.y + 0.5 + quietZone}
-          r={spot.radius + 0.5}
-          className="fill-none stroke-(--viz-spot)"
-          strokeWidth={0.3}
-          strokeDasharray="0.8 0.5"
-        />
+        <g className="fill-none">
+          <circle
+            cx={spot.x + 0.5 + quietZone}
+            cy={spot.y + 0.5 + quietZone}
+            r={spot.radius + 0.5}
+            className="stroke-(--viz-spot-halo)"
+            strokeWidth={0.5}
+          />
+          <circle
+            cx={spot.x + 0.5 + quietZone}
+            cy={spot.y + 0.5 + quietZone}
+            r={spot.radius + 0.5}
+            className="stroke-(--viz-spot)"
+            strokeWidth={0.3}
+            strokeDasharray="0.8 0.5"
+          />
+        </g>
       )}
     </svg>
   );
