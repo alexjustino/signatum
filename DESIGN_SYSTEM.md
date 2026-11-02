@@ -469,6 +469,53 @@ before** — a primitive built ahead of the screen that needs it is a guess with
   And **nothing on it ever disables anything** — a failing line, in either group, is information
   for choosing a size, a look or a paper, and the export beside it does not hear about it (§10
   keeps disabled buttons for the scan gate).
+- **The weak spots are a drawing over the card's own copy of the code, and the blocks are a
+  stacked bar each** (P9) — not primitives: the card `Where it breaks` on Create (ADR-037), after
+  the scan margin and under the same rule, follows the outline over somebody else's picture (F10)
+  and the verdict word above. It is a `Card` named `Where it breaks` (`aria-label` and heading
+  alike, as the Stamp card is), and it opens with **one sentence**: the figure everybody quotes,
+  what is really left after the logo, and the smudge that stops the code, in millimetres of the
+  print. **The code it draws on is its own copy**, never the preview of what will be exported: a
+  `CodePreview` named _"The code, to try to break"_, with `framed={false}` because it already sits
+  inside a card and a frame inside a frame is a border twice. The main preview never shows damage
+  that is not in the file. `CodePreview` gained exactly those two props for it — `framed`, and
+  `layer`, a drawing laid over the whole square above the logo; the slice adds no primitive.
+  **The overlay** is that layer: an `<svg>` in the scene's own module units, so it scales with the
+  code and cannot drift off it — each data module outside the plate tinted by how much of its block
+  is spent, in three steps of one red where the strongest means spent, and the weakest spot as a
+  dashed red ring over a white halo, because the ring lands on the most-spent block by
+  construction and red on a red tint would not read. The tint and the ring are off until **Show the
+  weak spots** — a `Checkbox` — is ticked, because the preview shows the print's own colours (§2)
+  and a tint over them is a statement about the code, not the code. Damage is drawn whether or not
+  they are shown, as the host paints it before the decoder reads it: black ink or white paper, each
+  with a thin grey edge, so a paper cell still has an edge on a light module. **Every colour on
+  the code is a token, and none of them is themed**: `--viz-*` and `--damage-*` in `tokens.css`
+  sit on the print, which is the same in both themes, so they are too — the same rule as the
+  preview's inside (§2), held by the token test, which also holds the edge and the ring at 3:1 or
+  better against what they sit on. The overlay is `aria-hidden` and carries no meaning of its own:
+  **the sentence carries it**, and a person who never sees the overlay loses nothing. **The
+  controls** are four peers in two even rows (§4) — **Smudge the weakest spot**, **Draw**, **Ask
+  the decoder**, **Clear** — and a `ChoiceGroup` named **Brush** (Ink, Paper), with a caption that
+  says what Draw does. **Draw** is a toggle: a `Button` with `aria-pressed`, its label fixed, in
+  the accent appearance while it is pressed, as a chosen option in a `ChoiceGroup` is. The overlay
+  is a pointer target only while it is on, and drawing is the one thing on the card that needs a
+  pointer — **Smudge the weakest spot** is the same experiment from the keyboard. **The blocks**
+  follow the margin's groups: a small heading, _"Error-correction blocks"_, over a `ul` whose
+  `aria-label` is that heading, one row per block: the label in words — _"Block 2 — 6 of 11
+  spent"_ — over a stacked bar of the block's capacity in three segments, logo, damage and spare,
+  decorative, so the bar is never the only reading of the fact (§2, _two readings of one fact
+  agree_). The bar is themed chrome, not print: `stroke-strong`, `danger` and `success`, with a
+  legend under the list that names each segment in words beside its swatch, and names the logo
+  only when there is one (§2, _a mark that is always on_). **The prediction and the decoder's
+  answer are one line**, the arithmetic's and then the decoder's, in a polite, atomic live region
+  inside the card, and not through `announce()` (§7), because it is not a transient message: it is
+  the visible, lasting state of the experiment, read where it is shown, as the batch plan's count
+  is. While a pointer stroke is in progress the
+  region is `aria-busy`: the text follows every module on screen, and assistive technology hears
+  it once, when the stroke ends, rather than once per module. And, as on the margin, **nothing on
+  the card disables anything outside it** or changes the verdict: its own buttons rest only when
+  they have nothing to do — no weakest spot to smudge, an answer already being asked for, nothing
+  to clear — and the export beside it does not hear about any of it. Nothing on it is saved.
 
 ### Asking "are you sure"
 
