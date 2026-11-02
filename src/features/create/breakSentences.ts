@@ -60,7 +60,8 @@ export interface HeadlineInput {
 
 /**
  * The card's one sentence: the figure everybody quotes, what is really left, and the smudge that
- * stops the code. Without a logo nothing has been spent, so the clause about what is left is
+ * can stop the code — "can", because the weakest spot is the worst case: a real blot changes fewer
+ * modules than every one it covers, and may be survived. Without a logo nothing has been spent, so the clause about what is left is
  * dropped and the claim is qualified instead — it holds only for damage spread perfectly evenly.
  */
 export function headline({
@@ -81,11 +82,11 @@ export function headline({
     const left = `With this logo, ${percent(afterLogo)} is left if damage is spread evenly`;
     return spot === null
       ? `${claim}. ${left}.`
-      : `${claim}. ${left} — and one smudge ${spot} across, in the right place, stops it.`;
+      : `${claim}. ${left} — and one smudge ${spot} across, in the right place, can stop it.`;
   }
   return spot === null
     ? `${claim} — spread perfectly evenly.`
-    : `${claim} — spread perfectly evenly. One smudge ${spot} across, in the right place, stops it.`;
+    : `${claim} — spread perfectly evenly. One smudge ${spot} across, in the right place, can stop it.`;
 }
 
 /** Codewords a block has lost, to the logo and to the damage together. */

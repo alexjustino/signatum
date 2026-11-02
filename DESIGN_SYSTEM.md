@@ -474,7 +474,7 @@ before** — a primitive built ahead of the screen that needs it is a guess with
   the scan margin and under the same rule, follows the outline over somebody else's picture (F10)
   and the verdict word above. It is a `Card` named `Where it breaks` (`aria-label` and heading
   alike, as the Stamp card is), and it opens with **one sentence**: the figure everybody quotes,
-  what is really left after the logo, and the smudge that stops the code, in millimetres of the
+  what is really left after the logo, and the smudge that can stop the code, in millimetres of the
   print. **The code it draws on is its own copy**, never the preview of what will be exported: a
   `CodePreview` named _"The code, to try to break"_, with `framed={false}` because it already sits
   inside a card and a frame inside a frame is a border twice. The main preview never shows damage

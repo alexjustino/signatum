@@ -23,7 +23,7 @@ const BRUSHES: readonly Brush[] = ['ink', 'paper'];
 const BRUSH_LABELS: Record<Brush, string> = { ink: 'Ink', paper: 'Paper' };
 
 /**
- * Where the code breaks (P9, ADR-037): the place a smudge stops it, and a way to try.
+ * Where the code breaks (P9, ADR-037): the place a smudge can stop it, and a way to try.
  *
  * "Level H survives 30 % damage" is true only of damage spread perfectly evenly. Reed–Solomon
  * corrects each block on its own and a logo has already spent part of every block it sits on, so

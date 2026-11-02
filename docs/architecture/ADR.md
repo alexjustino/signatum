@@ -2006,8 +2006,8 @@ one block loses more. Damage is not spread evenly. A smudge, a scratch, a staple
 coffee lands in one place, and the codewords in one place belong to a few blocks. A logo has spent
 part of the budget before anything is printed: the plate covers codewords, the placement engine
 charges them to the blocks they belong to ([ADR-013](#adr-013)), and each of those blocks starts
-with part of its correction gone. So a code has a weakest place, and a smudge there stops it long
-before 30 % of anything is gone. Nothing in 1.0.0 said where that place is, or how small the smudge
+with part of its correction gone. So a code has a weakest place, and a smudge there can stop it
+long before 30 % of anything is gone. Nothing in 1.0.0 said where that place is, or how small the smudge
 that finds it. The ninth slice of 1.1 says both, and this record fixes how they are worked out,
 what the screen does with them, and what the answers are worth.
 
@@ -2091,7 +2091,12 @@ nothing about ink, paper or a camera. The test of the paper remains the proof sh
 **A measured example.** A link to `https://example.com/menu` with a logo plans to version 3 at
 level H: two blocks of 35 codewords, each able to correct 11. The textbook figure is 31 %. After the
 logo, 14 % is left spread evenly. And one smudge about 4.9 mm across on a code printed 25 mm wide —
-4.4 % of the symbol — in the right place, stops it.
+4.4 % of the symbol — in the right place, can stop it.
+
+**Why "can".** The card says a smudge that size can stop the code, not that it does. The size is the
+worst case, with every module it covers turned to its opposite, and that case is what the tests
+prove stops a decoder. A real blot leaves the modules that were already its colour, so one the same
+size is sometimes survived; **Try to break it** is there to see which.
 
 **Cost accepted: the weakest spot is conservative.** Every codeword the disk touches is assumed
 lost, because a smudge may darken or lighten and the worst case is the one a guarantee can stand

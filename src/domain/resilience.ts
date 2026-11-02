@@ -5,7 +5,7 @@
  * perfectly evenly. Reed–Solomon corrects each error-correction block on its own: a code fails
  * the moment any one block loses more codewords than half its error-correction codewords, and a
  * logo has already spent part of every block it sits on. So a code has a weakest place, and a
- * smudge there stops it long before 30 % of anything is gone.
+ * smudge there can stop it long before 30 % of anything is gone.
  *
  * This module answers three questions from the matrix alone, with the standard's arithmetic and
  * no decoder:

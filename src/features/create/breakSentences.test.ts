@@ -44,7 +44,7 @@ describe('headline', () => {
     // radius √10 → (2√10 + 1) × 25/37 = 4.948… mm.
     expect(headline({ ...base, afterLogo: 0.143, hasLogo: true, spotRadius: Math.sqrt(10) })).toBe(
       'Level H is said to survive 30 % damage. With this logo, 14 % is left if damage is spread ' +
-        'evenly — and one smudge 4.9 mm across, in the right place, stops it.',
+        'evenly — and one smudge 4.9 mm across, in the right place, can stop it.',
     );
   });
 
@@ -53,7 +53,7 @@ describe('headline', () => {
       headline({ ...base, ecl: 'M', afterLogo: 0.15, hasLogo: false, spotRadius: Math.sqrt(10) }),
     ).toBe(
       'Level M is said to survive 15 % damage — spread perfectly evenly. One smudge 4.9 mm ' +
-        'across, in the right place, stops it.',
+        'across, in the right place, can stop it.',
     );
   });
 
@@ -66,7 +66,7 @@ describe('headline', () => {
     );
   });
 
-  it('says the measured case of the decision record: 14 % left, 4.9 mm stops it at 25 mm', () => {
+  it('says the measured case of the decision record: 14 % left, 4.9 mm can stop it at 25 mm', () => {
     const plan = planFor('https://example.com/menu', {
       logoSize: 'largest',
       quietZone: 4,
@@ -88,7 +88,7 @@ describe('headline', () => {
       }),
     ).toBe(
       'Level H is said to survive 30 % damage. With this logo, 14 % is left if damage is spread ' +
-        'evenly — and one smudge 4.9 mm across, in the right place, stops it.',
+        'evenly — and one smudge 4.9 mm across, in the right place, can stop it.',
     );
   });
 });

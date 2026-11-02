@@ -13,12 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   true only of damage spread perfectly evenly: each error-correction block is corrected on its own,
   and a logo has already spent part of the blocks it sits on. After a code passes, a card on the
   Create screen, **Where it breaks**, says how much is left once the logo is counted and how small
-  one smudge in the right place has to be to stop the code, measured at the printed size — for a
+  a smudge in the right place can be and still stop the code, measured at the printed size — for a
   link to a menu with a logo, 14 % left of the textbook 31 %, and a smudge about 4.9 mm across on a
-  25 mm code. **Show the weak spots** marks, on the card's own copy of the code, where each block is spent and where that
-  smudge would go, the blocks are listed with what each has left, and the code can be damaged by
-  hand, in ink or paper, or smudged at its weakest spot in one press, with the prediction following. The preview of what is
-  exported never shows damage that is not in the file.
+  25 mm code. **Show the weak spots** marks, on the card's own copy of the code, where each block is
+  spent and where that smudge would go; the blocks are listed with what each has left; and the code
+  can be damaged by hand, in ink or paper, or smudged at its weakest spot in one press, with the
+  prediction following. The preview of what is exported never shows damage that is not in the file.
   **Ask the decoder** paints the damage onto the code and asks the gate's own decoder, and its
   answer is shown beside the prediction, because the guarantee runs one way: what the logo covers
   is counted as lost, so a code past its guarantee may still read, and only a decoder can say. A
