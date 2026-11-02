@@ -234,7 +234,11 @@ on a press, and the proof sheet is still the real test. P5 lets the whole librar
 in one press: every saved code rebuilt, compared with the drawing it was saved as, and read back
 again, with a line on each row. P6 holds a print against the library: when Read finds a code that
 carries exactly what a saved code carries, byte for byte, it names that saved code and opens it in
-one press.
+one press. P9 says where a code breaks: level H is said to survive 30 % damage, but each
+error-correction block is corrected on its own and a logo has already spent part of the blocks it
+sits on, so **Where it breaks** on Create says, in millimetres at the printed size, how small one
+smudge in the right place has to be to stop the code, shows its weak spots and lets you try to break it —
+with the arithmetic's guarantee and the gate decoder's answer side by side, and nothing recorded.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 
@@ -346,13 +350,13 @@ npm run gates
 
 ## Roadmap
 
-| Release   | Theme               | Contents                                                                                                      |
-| --------- | ------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **1.0.0** | The mark            | **released 2026-09-14** — the list above, on the Releases page                                                |
-| **1.1.0** | The proof           | **in progress** — a proof sheet, a stamp in every file, a look-alike guard, print conditions, a library check |
-| 1.2.0     | The card            | business-card and badge layouts (print-ready PDF sheets) · frames with a call to action · calendar events     |
-| 1.3.0     | The payment         | PIX BR Code (EMV, CRC16) · EPC SEPA · payload templates per country                                           |
-| 2.0       | Only if it earns it | macOS and Linux                                                                                               |
+| Release   | Theme               | Contents                                                                                                                       |
+| --------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **1.0.0** | The mark            | **released 2026-09-14** — the list above, on the Releases page                                                                 |
+| **1.1.0** | The proof           | **in progress** — a proof sheet, a stamp in every file, a look-alike guard, print conditions, a library check, where it breaks |
+| 1.2.0     | The card            | business-card and badge layouts (print-ready PDF sheets) · frames with a call to action · calendar events                      |
+| 1.3.0     | The payment         | PIX BR Code (EMV, CRC16) · EPC SEPA · payload templates per country                                                            |
+| 2.0       | Only if it earns it | macOS and Linux                                                                                                                |
 
 1.1.0 "The proof" is open: it carries the promise from the file to the paper and to whoever
 receives the code — the slices and their proofs are in [`docs/SPEC.md`](docs/SPEC.md) §10. The rows

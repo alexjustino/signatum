@@ -42,6 +42,7 @@ part that matters most later — the cost we accepted.
 | [034](#adr-034) | The address inside a code is said out loud, and never refused                    | Accepted                      |
 | [035](#adr-035) | Print is a degradation of its own, and the margin says so                        | Accepted                      |
 | [036](#adr-036) | The Rust version declared is the one the tree needs, and a gate holds it         | Accepted                      |
+| [037](#adr-037) | A code has a weakest place, and the screen says where                            | Accepted                      |
 
 ---
 
@@ -1991,3 +1992,126 @@ contributor actually uses is the newest stable one, as CI's is.
 longer one number. The reason ADR-019 gave — one toolchain builds everything — still holds, because
 that toolchain is the current stable compiler, newer than any floor; what is given up is a single
 figure to quote, which was not true here anyway.
+
+## ADR-037 — A code has a weakest place, and the screen says where {#adr-037}
+
+**Status: Accepted.**
+
+**Context.** Every QR tool says that level H survives 30 % damage, and this product raises a code
+with a logo to level H when the logo needs it ([ADR-017](#adr-017)). The figure is true of damage
+spread perfectly evenly over the symbol, and of nothing else. ISO/IEC 18004 splits a symbol's
+codewords into error-correction blocks, and Reed–Solomon corrects each block on its own: a block can
+lose half its error-correction codewords and still be corrected, and the code fails the moment any
+one block loses more. Damage is not spread evenly. A smudge, a scratch, a staple or a drop of
+coffee lands in one place, and the codewords in one place belong to a few blocks. A logo has spent
+part of the budget before anything is printed: the plate covers codewords, the placement engine
+charges them to the blocks they belong to ([ADR-013](#adr-013)), and each of those blocks starts
+with part of its correction gone. So a code has a weakest place, and a smudge there can stop it
+long before 30 % of anything is gone. Nothing in 1.0.0 said where that place is, or how small the smudge
+that finds it. The ninth slice of 1.1 says both, and this record fixes how they are worked out,
+what the screen does with them, and what the answers are worth.
+
+**Decision.** Four answers come from the matrix alone, in the domain, with the standard's
+arithmetic and no decoder (`src/domain/resilience.ts`):
+
+- **What each block can still lose** (`blockBudgets`). Each block's capacity is half its
+  error-correction codewords; the codewords under the plate — the logo box grown by the engine's
+  padding — are charged to the blocks they belong to; what is left is the spare.
+- **Whether given damage is still guaranteed to read** (`predictDamage`). Damage is a set of
+  modules, each left as ink or as paper. A codeword is lost when at least one of its eight modules
+  changes — ink on a dark module, or paper on a light one, changes nothing — and a codeword the
+  plate already took is not counted twice. The answer is one of three: _guaranteed_, every block
+  within its capacity and nothing structural touched; _past its guarantee_, at least one block lost
+  more than it can correct; or _the decoder decides_, below.
+- **Where the code is weakest** (`weakestSpot`). The smallest round smudge, centred on a data
+  module outside the plate, that pushes one block past its capacity when every codeword it touches
+  is counted as lost. The search grows a disk around every module centre and stops at the first
+  radius where some block runs out; ties go to the spot nearest the top left, so the answer is the
+  same every time it is asked.
+- **The figures to set beside "30 %"** (`headroom`). The share of all codewords the code could lose
+  if damage were spread evenly — the textbook figure; the same after the logo; and the share of the
+  symbol's modules the weakest spot covers.
+
+On Create, a card titled **Where it breaks** follows the scan margin, shown only after the gate has
+passed the code:
+
+- **One sentence**, with the level's conventional figure (L 7 %, M 15 %, Q 25 %, H 30 %), what is
+  left after the logo spread evenly, and the weakest spot's width in millimetres at the printed size
+  the size card holds: the printed width divided by the modules across it, quiet zone included,
+  times the spot's width in modules. Without a logo, the clause about the logo is dropped.
+- **Show the weak spots**, off by default: an overlay on the card's own copy of the code that tints
+  each data module by how much of its block is spent, and draws the weakest spot as a dashed circle.
+  It is never drawn on the preview above: that is the picture of what will be exported, and it does
+  not show damage that is not in the file.
+- **The blocks**, one row each, with what the logo, the damage and the spare take of its capacity,
+  and a label that says it in words.
+- **Try to break it.** Damage can be drawn with a pointer, module by module, as ink or as paper, and
+  the prediction follows as it is drawn; or the weakest spot can be smudged in one press, which
+  inverts every module under it and gives the same experience to somebody without a pointer. **Ask
+  the decoder** sends the damaged code to the host, which renders it as the scan margin does, paints
+  the damage on top of the print — logo included — and asks the gate's own decoder whether the
+  payload comes back byte for byte. The prediction and the decoder's answer are shown side by side.
+
+**It informs, and it never blocks.** This is the scan margin's rule ([ADR-027](#adr-027)) applied to
+the matrix: nothing on the card disables an export or changes the verdict, and nothing is recorded.
+The decoder check writes no verification row and no file, and is not tied to a saved code.
+
+**The guarantee runs one way, so the decoder's answer stands beside it.** Codewords under the plate
+are counted as lost, because what is drawn there is a picture and not the code. That makes
+_guaranteed_ a promise and _past its guarantee_ not a sentence of death: some of what the plate
+covers may still be right, and a decoder may correct the rest. The arithmetic can say that a code
+will read; it cannot say that one will not. So the card asks the decoder as well and shows both,
+and when the prediction is past its guarantee and the decoder still reads, the sentence says why —
+some of what the logo covers survived better than the guarantee counts. A screen that showed only
+the arithmetic would call codes broken that read; one that showed only the decoder would say
+nothing about the next smudge.
+
+**Function patterns and the quiet zone are left to the decoder.** Whether a decoder still finds a
+symbol with a finder smudged, a timing line broken or ink in the quiet zone is not arithmetic: it
+depends on the decoder, and two decoders may answer differently. Damage there is counted and named
+— _a finder or the quiet zone was hit: only a decoder can say_ — and never predicted. The weakest
+spot does not count the function patterns it crosses either: it is about the blocks.
+
+**Proven against an independent decoder.** `src/domain/resilience.test.ts` holds the arithmetic to
+jsQR, a decoder that is neither the encoder nor the gate's. Six codes — two with a logo, and four
+without one at L, M, Q and H — each take 120 seeded trials of one to three round blots, ink or
+paper, up to a sixth of the symbol's side across. Every trial the domain calls guaranteed is
+rasterised with its damage and read back by jsQR, byte for byte; the sample has to land on both
+sides of the line, or it proves nothing. Every weakest spot, inverted, stops jsQR, and a disk one
+step smaller at the same centre keeps every block within its capacity. The seed is fixed, so a
+failure names a case that can be run again.
+
+**Why not ISO/IEC 15415 grading.** Verifiers grade a printed code, and one of their parameters is
+the error correction left unused — one figure for the whole symbol, never where. A grade is a
+measurement of a print: it needs a calibrated image of that print, under a specified light, at a
+specified resolution. This is arithmetic on the matrix before anything is printed, and it claims
+nothing about ink, paper or a camera. The test of the paper remains the proof sheet
+([ADR-032](#adr-032)), printed and read with a phone.
+
+**A measured example.** A link to `https://example.com/menu` with a logo plans to version 3 at
+level H: two blocks of 35 codewords, each able to correct 11. The textbook figure is 31 %. After the
+logo, 14 % is left spread evenly. And one smudge about 4.9 mm across on a code printed 25 mm wide —
+4.4 % of the symbol — in the right place, can stop it.
+
+**Why "can".** The card says a smudge that size can stop the code, not that it does. The size is the
+worst case, with every module it covers turned to its opposite, and that case is what the tests
+prove stops a decoder. A real blot leaves the modules that were already its colour, so one the same
+size is sometimes survived; **Try to break it** is there to see which.
+
+**Cost accepted: the weakest spot is conservative.** Every codeword the disk touches is assumed
+lost, because a smudge may darken or lighten and the worst case is the one a guarantee can stand
+on. A real smudge does one or the other: ink on a dark module and paper on a light one change
+nothing, so it often changes fewer modules than the disk covers, and a code can survive a smudge of
+exactly that size in exactly that place. The spot is the smallest damage that can break the code,
+not the smallest that will.
+
+**Second cost: the millimetres are the size card's.** The width in the sentence assumes the code is
+printed at the size the size card holds. Printed at another size, the spot scales with it and the
+sentence is wrong by the same factor; a page scaled by the print dialog is what the proof sheet's
+calibration bar is for.
+
+**Third cost: the decoder check is one decoder on one render.** It renders at the scan margin's
+resolution — the export's raster or 1,024 pixels, whichever is smaller (`MARGIN_MAX_PIXELS`) — and
+paints the damage as whole modules on a clean raster. A smudge on paper has soft edges, and a phone
+is not `rqrr`. The answer is the gate decoder's opinion of one damaged render, which is what it is
+asked for, and the phone matrix of each release (SPEC §6) is still what decides.

@@ -198,7 +198,9 @@ a PNG of the same code. Both landed with F7, in the SQL above.
 margin is a report about one render at one moment, shown after a verdict and never stored
 (ADR-027). The batch was the reason it might have been kept, and F9 did not keep it either: the
 report says whether each row was written and why not, which is what a person acts on. If a reason
-to keep it appears, it arrives in a migration of its own.
+to keep it appears, it arrives in a migration of its own. The damage check of P9 keeps nothing
+either: asking the decoder about a damaged code writes no verification row and no file
+([ADR-037](architecture/ADR.md#adr-037)).
 
 **Arriving with F8, in `004_library.sql`** — one nullable column, so that an attempt can say which
 saved code it was about:

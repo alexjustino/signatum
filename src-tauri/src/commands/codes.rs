@@ -4,8 +4,9 @@
 //! pixels, compare byte for byte — and records what happened. The difference is
 //! what follows: `verify_code` returns the verdict, the exports write a file or
 //! reach the clipboard, and only ever on the strength of a verification of the
-//! artefact that leaves (ADR-010). `scan_margin` asks a different question
-//! altogether and answers it without writing anything down.
+//! artefact that leaves (ADR-010). `scan_margin` and `damage_test` ask
+//! different questions altogether and answer them without writing anything
+//! down.
 //!
 //! # Changelog of this boundary
 //!
@@ -36,6 +37,11 @@
 //!   four new ones are print (ink spread on coated and on uncoated paper, a 30°
 //!   tilt, dim light), and ink spread is a share of a module, which is what the
 //!   count is for (ADR-035). Still a report and never a gate (ADR-027).
+//! - P9: `damage_test` paints cells of ink or paper — symbol coordinates, so
+//!   it takes the `quiet_zone` too — over the artefact the margin measures,
+//!   logo included, and asks the gate's decoder whether it still reads. It
+//!   answers past what the error-correction arithmetic guarantees, and like
+//!   the margin it records nothing and blocks nothing (ADR-037).
 
 use std::path::Path;
 
@@ -51,6 +57,7 @@ use crate::error::{Error, Result};
 use crate::export::stamp::{self as stamping, Mark, Stamp};
 use crate::export::{pdf, svg as svg_file};
 use crate::imaging::compose::LogoBox;
+use crate::imaging::damage::{self, DamageCell, DamageReport};
 use crate::imaging::logo::NormalisedLogo;
 use crate::imaging::margin::{self, ScanMargin};
 use crate::imaging::render::{MAX_PIXEL_SIZE, MAX_SVG_BYTES, MIN_PIXEL_SIZE};
@@ -406,6 +413,60 @@ pub fn scan_margin(
 /// The largest raster the scan margin is measured on; the test that bounds its time uses it.
 pub const MARGIN_MAX_PIXELS: u32 = 1024;
 
+/// Paint the cells somebody smudged or drew over the code and ask the gate's
+/// decoder whether it still reads (ADR-037).
+///
+/// The artefact is composed exactly as the scan margin composes its clean one —
+/// same inputs, same logo, at most [`MARGIN_MAX_PIXELS`] a side — and the cells
+/// land on top of it, logo included, at the scene's own module grid. `cells`
+/// are in symbol coordinates, which is how the domain counts them; `quiet_zone`
+/// is what finds the symbol inside the scene.
+///
+/// A report about a code that already passed, never a gate on it: it writes no
+/// row and no file, and takes no `code_id` for the reason the margin takes
+/// none — there is nothing to record a link on.
+///
+/// # Errors
+///
+/// [`Error::InvalidInput`] for anything the margin refuses, a quiet zone that
+/// leaves no symbol, a cell off the code, more cells than the code has modules,
+/// or a module count that is not the drawing's own side. [`Error::Render`] when
+/// the artefact could not be made.
+#[tauri::command(async, rename_all = "snake_case")]
+#[allow(clippy::too_many_arguments)]
+// Flat, snake-case arguments are the contract with the interface: the margin's
+// own, plus the two things only damage needs.
+pub fn damage_test(
+    db: State<'_, Db>,
+    svg: String,
+    payload: String,
+    pixel_size: u32,
+    logo: Option<LogoRef>,
+    modules: u32,
+    quiet_zone: u32,
+    cells: Vec<DamageCell>,
+) -> Result<DamageReport> {
+    let asked = Asked {
+        svg: &svg,
+        payload: &payload,
+        // The margin's size, for the margin's reason: past this side a render costs time and
+        // buys no better answer — and the two reports are about the same picture.
+        pixel_size: pixel_size.min(MARGIN_MAX_PIXELS),
+        logo: logo.as_ref(),
+        dpi: None,
+        code_id: None,
+    };
+    check_damage(&asked, modules, quiet_zone, &cells)?;
+    // The workspace is held only while the logo is fetched, never through the render and the
+    // decode: a command that runs on the window's thread and wants it — an export clicked while
+    // this runs — must not wait for a picture it has nothing to do with.
+    let logo = {
+        let conn = db.0.lock().expect("the database lock was poisoned");
+        load_logo(&conn, asked.logo)?
+    };
+    damage_rendered(&asked, logo, modules, quiet_zone, &cells)
+}
+
 /// What [`verify_code`] does once the database is in hand.
 fn verify_code_with(
     conn: &Connection,
@@ -657,6 +718,56 @@ fn scan_margin_with(conn: &Connection, asked: &Asked, modules: u32) -> Result<Sc
     )?;
 
     margin::scan_margin(&artefact.png, asked.payload.as_bytes(), modules)
+}
+
+/// What [`damage_test`] does, in one piece, with a connection in hand — the order the tests
+/// hold it to. The command runs the same three steps but holds the lock for the logo alone.
+///
+/// Everything a request can get wrong is refused before anything is rendered,
+/// except the one thing only the render knows — whether `modules` is the
+/// drawing's own side — which is refused before anything is painted.
+#[cfg(test)]
+fn damage_test_with(
+    conn: &Connection,
+    asked: &Asked,
+    modules: u32,
+    quiet_zone: u32,
+    cells: &[DamageCell],
+) -> Result<DamageReport> {
+    check_damage(asked, modules, quiet_zone, cells)?;
+    let logo = load_logo(conn, asked.logo)?;
+    damage_rendered(asked, logo, modules, quiet_zone, cells)
+}
+
+/// Everything a damage test can be refused for before anything is fetched or drawn.
+fn check_damage(asked: &Asked, modules: u32, quiet_zone: u32, cells: &[DamageCell]) -> Result<()> {
+    check_inputs(asked)?;
+    margin::check_modules(modules)?;
+    damage::check_cells(modules, quiet_zone, cells)
+}
+
+/// The render, the damage and the decode, with the logo already in hand and no lock held.
+fn damage_rendered(
+    asked: &Asked,
+    logo: Option<(NormalisedLogo, LogoBox)>,
+    modules: u32,
+    quiet_zone: u32,
+    cells: &[DamageCell],
+) -> Result<DamageReport> {
+    let mut raster = crate::imaging::verify::composed(
+        asked.svg.as_bytes(),
+        asked.pixel_size,
+        logo.as_ref().map(|(logo, area)| (logo, *area)),
+    )?;
+    damage::check_grid(&raster, modules)?;
+
+    damage::read_damaged(
+        &mut raster.pixmap,
+        asked.payload.as_bytes(),
+        modules,
+        quiet_zone,
+        cells,
+    )
 }
 
 /// Fetch the logo a request named, and the box it asked for.
@@ -1811,6 +1922,256 @@ mod tests {
             );
         }
         assert!(rows(&conn).is_empty());
+    }
+
+    /// The fixture's quiet zone, as the damage test is told it.
+    const FIXTURE_QUIET_ZONE: u32 = 4;
+
+    /// The damage test on the fixture at 512 pixels, built the way the command
+    /// builds it.
+    fn damage(
+        conn: &Connection,
+        logo: Option<&LogoRef>,
+        modules: u32,
+        quiet_zone: u32,
+        cells: &[DamageCell],
+    ) -> Result<DamageReport> {
+        damage_test_with(
+            conn,
+            &Asked {
+                svg: &hello_world_svg(),
+                payload: HELLO_WORLD,
+                pixel_size: 512,
+                logo,
+                dpi: None,
+                code_id: None,
+            },
+            modules,
+            quiet_zone,
+            cells,
+        )
+    }
+
+    /// Ink over every module of the 21-module symbol that is not a finder
+    /// pattern or its separator: the data, the format and the timing — nearly
+    /// all of what the decoder corrects from.
+    fn a_blot_over_the_data() -> Vec<DamageCell> {
+        let finder = |x: i32, y: i32| (x < 8 && y < 8) || (x >= 13 && y < 8) || (x < 8 && y >= 13);
+        (0..21)
+            .flat_map(|y| (0..21).map(move |x| (x, y)))
+            .filter(|&(x, y)| !finder(x, y))
+            .map(|(x, y)| DamageCell { x, y, dark: true })
+            .collect()
+    }
+
+    #[test]
+    fn a_code_with_no_damage_reads_through_the_damage_test() {
+        let conn = workspace();
+
+        let report = damage(&conn, None, FIXTURE_MODULES, FIXTURE_QUIET_ZONE, &[]).expect("damage");
+
+        assert!(report.reads, "reason: {:?}", report.reason);
+        assert_eq!(report.reason, None);
+        assert_eq!(report.decoder, decoder());
+    }
+
+    /// One smudged module is what error correction is for, and the decoder
+    /// corrects it.
+    #[test]
+    fn one_damaged_module_is_corrected() {
+        let conn = workspace();
+        // Symbol (11, 10) is a light module of the fixture, in the data.
+        let cell = DamageCell {
+            x: 11,
+            y: 10,
+            dark: true,
+        };
+
+        let report =
+            damage(&conn, None, FIXTURE_MODULES, FIXTURE_QUIET_ZONE, &[cell]).expect("damage");
+
+        assert!(report.reads, "reason: {:?}", report.reason);
+    }
+
+    #[test]
+    fn a_dark_blot_over_the_data_stops_the_code_reading() {
+        let conn = workspace();
+
+        let report = damage(
+            &conn,
+            None,
+            FIXTURE_MODULES,
+            FIXTURE_QUIET_ZONE,
+            &a_blot_over_the_data(),
+        )
+        .expect("damage");
+
+        assert!(!report.reads, "a code with its data inked over still read");
+        assert!(
+            matches!(
+                report.reason.as_deref(),
+                Some(crate::imaging::verify::REASON_NO_CODE)
+                    | Some(crate::imaging::verify::REASON_DIFFERENT)
+            ),
+            "the reason is the gate's own sentence: {:?}",
+            report.reason
+        );
+    }
+
+    /// The blot lands on the logo as it lands on everything else: the logo is
+    /// under the damage, never over it.
+    #[test]
+    fn damage_lands_on_top_of_the_logo() {
+        let conn = workspace();
+        let logo = a_stored_logo(&conn);
+        let placed = centred_logo(&logo, 0.2);
+
+        let clean = damage(
+            &conn,
+            Some(&placed),
+            FIXTURE_MODULES,
+            FIXTURE_QUIET_ZONE,
+            &[],
+        )
+        .expect("clean");
+        let blotted = damage(
+            &conn,
+            Some(&placed),
+            FIXTURE_MODULES,
+            FIXTURE_QUIET_ZONE,
+            &a_blot_over_the_data(),
+        )
+        .expect("blotted");
+
+        assert!(clean.reads, "reason: {:?}", clean.reason);
+        assert!(!blotted.reads);
+    }
+
+    /// A cell off the code, or a quiet zone that leaves no symbol, is refused
+    /// before anything is rendered — and without a row.
+    #[test]
+    fn a_damaged_module_off_the_code_is_refused() {
+        let conn = workspace();
+        let cell = |x, y| DamageCell { x, y, dark: true };
+
+        for (x, y) in [(-5, 0), (0, -5), (25, 0), (0, 25)] {
+            let refused = damage(
+                &conn,
+                None,
+                FIXTURE_MODULES,
+                FIXTURE_QUIET_ZONE,
+                &[cell(x, y)],
+            )
+            .expect_err("a cell off the code was painted");
+            assert_eq!(kind_of(&refused), "invalid_input", "({x}, {y})");
+        }
+        assert!(
+            damage(
+                &conn,
+                None,
+                FIXTURE_MODULES,
+                FIXTURE_QUIET_ZONE,
+                &[cell(-4, -4), cell(24, 24)],
+            )
+            .is_ok(),
+            "the quiet zone is part of the code, and damage there is damage"
+        );
+
+        let no_symbol = damage(&conn, None, FIXTURE_MODULES, 14, &[]).expect_err("no symbol");
+        assert_eq!(kind_of(&no_symbol), "invalid_input");
+        let no_code = damage(&conn, None, 20, FIXTURE_QUIET_ZONE, &[]).expect_err("no code");
+        assert_eq!(kind_of(&no_code), "invalid_input");
+        assert!(rows(&conn).is_empty());
+    }
+
+    #[test]
+    fn more_damaged_modules_than_the_code_has_are_refused() {
+        let conn = workspace();
+        let most = (FIXTURE_MODULES * FIXTURE_MODULES) as usize;
+        let cell = DamageCell {
+            x: 0,
+            y: 0,
+            dark: true,
+        };
+
+        assert!(
+            damage(
+                &conn,
+                None,
+                FIXTURE_MODULES,
+                FIXTURE_QUIET_ZONE,
+                &vec![cell; most]
+            )
+            .is_ok(),
+            "as many cells as the code has modules, duplicates and all"
+        );
+        let refused = damage(
+            &conn,
+            None,
+            FIXTURE_MODULES,
+            FIXTURE_QUIET_ZONE,
+            &vec![cell; most + 1],
+        )
+        .expect_err("more cells than modules were painted");
+        assert_eq!(kind_of(&refused), "invalid_input");
+    }
+
+    /// The cells are painted at `pixels / modules` a module, which is the
+    /// scene's grid only when the drawing is that many modules wide.
+    #[test]
+    fn a_module_count_that_is_not_the_drawings_own_is_refused() {
+        let conn = workspace();
+
+        let refused = damage(&conn, None, FIXTURE_MODULES + 2, FIXTURE_QUIET_ZONE, &[])
+            .expect_err("the damage would have been painted between modules");
+
+        assert_eq!(kind_of(&refused), "invalid_input");
+    }
+
+    /// A damage test is a question, not evidence: the workspace has the same
+    /// rows after it as before, whatever the decoder answered.
+    #[test]
+    fn a_damage_test_records_nothing() {
+        let conn = workspace();
+        verify_code_with(&conn, &hello_world_svg(), HELLO_WORLD, 128, None, None).expect("verify");
+        let before = rows(&conn);
+
+        damage(&conn, None, FIXTURE_MODULES, FIXTURE_QUIET_ZONE, &[]).expect("clean");
+        damage(
+            &conn,
+            None,
+            FIXTURE_MODULES,
+            FIXTURE_QUIET_ZONE,
+            &a_blot_over_the_data(),
+        )
+        .expect("blotted");
+
+        assert_eq!(rows(&conn), before);
+        assert_eq!(before.len(), 1);
+    }
+
+    #[test]
+    fn a_damage_report_reaches_the_interface_as_three_keys() {
+        let conn = workspace();
+
+        let report = damage(&conn, None, FIXTURE_MODULES, FIXTURE_QUIET_ZONE, &[]).expect("damage");
+        let json = serde_json::to_value(&report).expect("serialise");
+
+        assert_eq!(
+            json,
+            serde_json::json!({ "reads": true, "reason": null, "decoder": decoder() })
+        );
+        let cell: DamageCell =
+            serde_json::from_value(serde_json::json!({ "x": -1, "y": 3, "dark": false }))
+                .expect("a cell arrives as the interface sends it");
+        assert_eq!(
+            cell,
+            DamageCell {
+                x: -1,
+                y: 3,
+                dark: false
+            }
+        );
     }
 
     #[test]
