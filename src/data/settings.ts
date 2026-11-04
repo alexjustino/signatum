@@ -3,7 +3,7 @@
  *
  * The host keeps settings as a key/value table of strings — the siblings' pattern — with a
  * closed list of keys and its own validation behind `settings_set`. Above this line a setting
- * is a theme, a width in millimetres, a resolution, a quiet zone and a yes/no; below it, two
+ * is a theme, a width in millimetres, a resolution, a quiet zone and two yes/nos; below it, two
  * strings.
  *
  * Reading is deliberately forgiving and writing is not. A row this build does not recognise, or
@@ -38,6 +38,7 @@ export const SETTING_KEYS = [
   'default_dpi',
   'default_quiet_zone',
   'keep_wifi_passwords',
+  'stamp_exports',
 ] as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[number];
@@ -51,6 +52,8 @@ export interface Settings {
   defaultQuietZone: number;
   /** Whether a saved Wi-Fi code keeps its password (ADR-018). */
   keepWifiPasswords: boolean;
+  /** Whether every exported file carries a stamp of what was verified (P2). */
+  stampExports: boolean;
 }
 
 /**
@@ -70,7 +73,9 @@ export const MAX_WIDTH_MM = MAX_PRINT_MM;
 /**
  * What a workspace with no settings row is: exactly what the product starts from today.
  * Keeping a Wi-Fi password is on, because the code a person just verified carries it already
- * and a saved code that cannot be reopened is a surprise (ADR-018).
+ * and a saved code that cannot be reopened is a surprise (ADR-018). Stamping exported files is on,
+ * because a stamp carries no date, no name and no path, and is what lets Read say a file was not
+ * changed since it was verified (P2).
  */
 export const BUILT_IN_SETTINGS: Settings = {
   theme: readTheme(null),
@@ -78,6 +83,7 @@ export const BUILT_IN_SETTINGS: Settings = {
   defaultDpi: DEFAULT_PRINT_SIZE.dpi,
   defaultQuietZone: DEFAULT_STYLE.quietZone,
   keepWifiPasswords: true,
+  stampExports: true,
 };
 
 /** One row of the table, as the host hands it over. */
@@ -129,6 +135,7 @@ export function readSettings(rows: readonly RawSetting[]): Settings {
       stored.get('keep_wifi_passwords'),
       BUILT_IN_SETTINGS.keepWifiPasswords,
     ),
+    stampExports: readBoolean(stored.get('stamp_exports'), BUILT_IN_SETTINGS.stampExports),
   };
 }
 

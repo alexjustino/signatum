@@ -5,6 +5,7 @@
  * inside the folder that was chosen and nowhere else.
  */
 
+import { checkLink } from './lookalike';
 import { defaultName } from './library';
 import { buildPayload, type PayloadForm } from './payload';
 import type { ContactForm } from './payload/contact';
@@ -214,8 +215,11 @@ const RESERVED = new Set([
   'nul',
   'conin$',
   'conout$',
-  ...Array.from({ length: 9 }, (_, i) => `com${i + 1}`),
-  ...Array.from({ length: 9 }, (_, i) => `lpt${i + 1}`),
+  // COM0 and LPT0, and the superscript digits Windows also resolves as ports: the same list the
+  // host refuses, so the domain never hands it a name it would refuse.
+  ...Array.from({ length: 10 }, (_, i) => `com${i}`),
+  ...Array.from({ length: 10 }, (_, i) => `lpt${i}`),
+  ...['¹', '²', '³'].flatMap((d) => [`com${d}`, `lpt${d}`]),
 ]);
 
 export const MAX_FILE_STEM = 80;
@@ -273,6 +277,8 @@ export interface PlannedRow {
   scene: Scene;
   plan: Extract<Plan, { ok: true }>;
   pixelSize: number;
+  /** What the row's link is, when it is worth saying before it is printed (ADR-034). */
+  warnings: string[];
 }
 
 export interface BatchPlan {
@@ -341,6 +347,7 @@ export function planBatch(
       scene,
       plan,
       pixelSize,
+      warnings: form.kind === 'link' ? checkLink(built.payload).map((w) => w.sentence) : [],
     });
   });
   problems.sort((a, b) => a.line - b.line);

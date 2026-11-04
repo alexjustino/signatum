@@ -31,6 +31,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "006_settings",
         include_str!("../../migrations/006_settings.sql"),
     ),
+    (
+        "007_stamps",
+        include_str!("../../migrations/007_stamps.sql"),
+    ),
 ];
 
 /// Every migration, name and SQL, in the order they apply.
@@ -113,7 +117,7 @@ mod tests {
     /// to somebody whose file is a release behind.
     #[test]
     fn a_workspace_at_any_earlier_version_migrates_to_this_one() {
-        assert_eq!(target_version(), 6, "F11 adds the sixth migration");
+        assert_eq!(target_version(), 7, "P2 adds the seventh migration");
 
         for stop_at in 0..=target_version() {
             let conn = memory();
@@ -248,7 +252,7 @@ mod tests {
 
         apply(&conn).expect("migrate");
 
-        assert_eq!(current_version(&conn), 6);
+        assert_eq!(current_version(&conn), target_version());
         let settings: i64 = conn
             .query_row("SELECT count(*) FROM settings", [], |r| r.get(0))
             .expect("`settings` is missing after migrating from 5");
@@ -259,6 +263,127 @@ mod tests {
             })
             .expect("read back");
         assert_eq!(kept, 1, "and the library is still there");
+    }
+
+    /// The upgrade a person on 1.1's previous build makes: an export recorded at
+    /// version 6 is still there at 7, with no stamp — it was written before there
+    /// was one, and NULL says so rather than inventing one.
+    #[test]
+    fn a_workspace_at_version_six_gains_the_stamp_columns_and_keeps_its_rows() {
+        let conn = memory();
+        for (index, (_, sql)) in sources().iter().enumerate() {
+            let version = index as i64 + 1;
+            if version > 6 {
+                break;
+            }
+            conn.execute_batch(&format!(
+                "BEGIN; {sql}
+                 UPDATE workspace SET schema_version = {version} WHERE id = 1; COMMIT;"
+            ))
+            .expect("apply one migration by hand");
+        }
+        conn.execute(
+            "INSERT INTO verifications
+               (id, created_at, kind, decoder, verified, payload_sha256, decoded_sha256,
+                artefact_sha256, width, height, duration_ms, path, format)
+             VALUES ('kept', 't', 'export', 'rqrr 0.0.0', 1, 'aaaa', 'aaaa', 'cccc', 8, 8, 1,
+                     'C:/somewhere/code.png', 'png')",
+            [],
+        )
+        .expect("record an export at version 6");
+        assert_eq!(current_version(&conn), 6);
+
+        apply(&conn).expect("migrate");
+
+        assert_eq!(current_version(&conn), 7);
+        let (stamp_ref, stamp_digest): (Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT stamp_ref, stamp_digest FROM verifications WHERE id = 'kept'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .expect("the row is still there, and has the new columns");
+        assert_eq!((stamp_ref, stamp_digest), (None, None));
+    }
+
+    /// What the schema promises about a stamp: a v4 reference, a digest of 64
+    /// lowercase hex, both or neither, only on a written file, and never one
+    /// reference on two rows.
+    #[test]
+    fn a_stamp_is_a_v4_reference_and_a_digest_on_a_written_file() {
+        let conn = memory();
+        apply(&conn).expect("migrate");
+
+        let insert = "INSERT INTO verifications
+             (id, created_at, kind, decoder, verified, payload_sha256, decoded_sha256,
+              artefact_sha256, width, height, duration_ms, path, stamp_ref, stamp_digest)
+             VALUES (?1, 't', 'export', 'rqrr 0.0.0', ?2, 'aaaa', 'aaaa', 'cccc', 8, 8, 1,
+                     ?3, ?4, ?5)";
+        let v4 = "3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6b";
+        let digest = "0123456789abcdef".repeat(4);
+        let path = Some("C:/somewhere/code.png");
+
+        conn.execute(insert, rusqlite::params!["ok", 1, path, v4, digest])
+            .expect("a v4 reference and a digest on a written file are accepted");
+
+        for (name, verified, path, reference, digest) in [
+            (
+                "v7",
+                1,
+                path,
+                Some("0199a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b"),
+                Some(digest.clone()),
+            ),
+            (
+                "upper",
+                1,
+                path,
+                Some("3F2A9C1E-5B7D-4E8F-9A0B-1C2D3E4F5A6B"),
+                Some(digest.clone()),
+            ),
+            (
+                "variant",
+                1,
+                path,
+                Some("3f2a9c1e-5b7d-4e8f-7a0b-1c2d3e4f5a6b"),
+                Some(digest.clone()),
+            ),
+            (
+                "short",
+                1,
+                path,
+                Some("3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6"),
+                Some(digest.clone()),
+            ),
+            ("digest", 1, path, Some(v4), Some("ABC".repeat(21) + "a")),
+            ("ref alone", 1, path, Some(v4), None),
+            ("digest alone", 1, path, None, Some(digest.clone())),
+            ("refused", 0, None, Some(v4), Some(digest.clone())),
+            ("no file", 1, None, Some(v4), Some(digest.clone())),
+        ] {
+            let refused = conn.execute(
+                insert,
+                rusqlite::params![name, verified, path, reference, digest],
+            );
+            assert!(refused.is_err(), "`{name}` must be refused");
+        }
+
+        let twice = conn.execute(
+            insert,
+            rusqlite::params!["again", 1, path, v4, "f".repeat(64)],
+        );
+        assert!(twice.is_err(), "one reference names one row");
+
+        conn.execute(
+            insert,
+            rusqlite::params!["unstamped", 1, path, None::<String>, None::<String>],
+        )
+        .expect("a file written with stamping off has neither");
+        conn.execute(
+            insert,
+            rusqlite::params!["unstamped too", 1, path, None::<String>, None::<String>],
+        )
+        .expect("and any number of rows may have none");
     }
 
     #[test]

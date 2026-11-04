@@ -301,6 +301,20 @@ export function BatchPage({
 
   const shown = plan === null ? [] : plan.rows.slice(0, SHOWN);
 
+  /**
+   * Every sentence the look-alike guard said about a planned row, one entry per sentence, in line
+   * order (ADR-034). It never takes a row out of the plan: these rows run like any other, and the
+   * list is there to be read before the folder is chosen.
+   */
+  const toCheck =
+    plan === null
+      ? []
+      : plan.rows.flatMap((row) => row.warnings.map((sentence) => ({ line: row.line, sentence })));
+  const checkShown = toCheck.slice(0, SHOWN);
+  const flaggedRows = plan === null ? 0 : plan.rows.filter((row) => row.warnings.length > 0).length;
+  // The Status column widens only when a row in it says more than "Planned".
+  const flagged = shown.some((row) => row.warnings.length > 0);
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-6">
       <header>
@@ -395,7 +409,7 @@ export function BatchPage({
                       <th scope="col" className="py-1 pr-3 font-semibold">
                         File
                       </th>
-                      <th scope="col" className="w-20 py-1 font-semibold">
+                      <th scope="col" className={`${flagged ? 'w-48' : 'w-20'} py-1 font-semibold`}>
                         Status
                       </th>
                     </tr>
@@ -408,7 +422,16 @@ export function BatchPage({
                         <td className="truncate py-1 pr-3 font-mono text-fg-secondary">
                           {`${row.file}.${format}`}
                         </td>
-                        <td className="py-1 text-fg-secondary">Planned</td>
+                        <td className="py-1 text-fg-secondary">
+                          {row.warnings.length === 0 ? (
+                            'Planned'
+                          ) : (
+                            <>
+                              {'Planned · '}
+                              <span className="text-caution">check the address</span>
+                            </>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -419,6 +442,33 @@ export function BatchPage({
                 <p className="text-caption text-fg-tertiary">
                   {`First ${SHOWN} of ${plan.rows.length} shown`}
                 </p>
+              )}
+
+              {/* What the address in a planned row is, said under the table rather than in it:
+                  a sentence does not fit a cell, and the run is not held for it (ADR-034). The
+                  heading and the line numbers follow the list of rows that cannot be made. */}
+              {toCheck.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <p className="text-caption font-semibold text-fg-secondary">
+                    {`${rows(flaggedRows)} with an address to check`}
+                  </p>
+                  <ul
+                    aria-label="Addresses to check"
+                    className="flex flex-col gap-1 text-caption text-fg-secondary"
+                  >
+                    {checkShown.map((each, index) => (
+                      <li key={`${each.line}-${index}`}>
+                        <span className="font-semibold text-fg">{`Line ${each.line}: `}</span>
+                        {each.sentence}
+                      </li>
+                    ))}
+                  </ul>
+                  {toCheck.length > SHOWN && (
+                    <p className="text-caption text-fg-tertiary">
+                      {`First ${SHOWN} of ${toCheck.length} shown`}
+                    </p>
+                  )}
+                </div>
               )}
 
               {plan.problems.length > 0 && (

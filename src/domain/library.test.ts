@@ -5,9 +5,15 @@ import {
   applyKit,
   checkName,
   defaultName,
+  describeRecheck,
+  recheckTone,
+  recheckVerdict,
   redactForSave,
   reopens,
+  savedWithoutPassword,
   sceneHash,
+  summariseRecheck,
+  type RecheckOutcome,
 } from './library';
 import { emptyForm, type PayloadForm } from './payload';
 import { encodeText } from './qr/encode';
@@ -86,6 +92,97 @@ describe('sceneHash', () => {
     expect(sceneHash(a)).toBe(sceneHash(b));
     expect(sceneHash(a)).not.toBe(sceneHash(c));
     expect(sceneHash(a)).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('savedWithoutPassword', () => {
+  const wifi = {
+    ...(emptyForm('wifi') as Extract<PayloadForm, { kind: 'wifi' }>),
+    ssid: 'Office-5G',
+    password: 'hunter2hunter2',
+  };
+
+  it('is a Wi-Fi whose password was not kept, and nothing else', () => {
+    expect(savedWithoutPassword(redactForSave(wifi, false))).toBe(true);
+    expect(savedWithoutPassword(wifi)).toBe(false);
+    // An open network has no password to keep: it reopens, so it is checked like any other.
+    expect(savedWithoutPassword({ ...wifi, password: '', security: 'nopass' })).toBe(false);
+    // A link that no longer builds is not a withheld password: it is a code that stopped reading.
+    expect(savedWithoutPassword({ kind: 'link', url: '' })).toBe(false);
+  });
+});
+
+describe('recheckVerdict', () => {
+  it('names the three outcomes, and a code that does not read is that first', () => {
+    expect(recheckVerdict({ sceneMatches: true, verified: true })).toBe('identical');
+    expect(recheckVerdict({ sceneMatches: false, verified: true })).toBe('rebuilds-differently');
+    expect(recheckVerdict({ sceneMatches: true, verified: false })).toBe('does-not-read');
+    expect(recheckVerdict({ sceneMatches: false, verified: false })).toBe('does-not-read');
+  });
+});
+
+describe('describeRecheck', () => {
+  it('says each verdict in one sentence', () => {
+    expect(describeRecheck('identical')).toBe('Rebuilds identically and reads.');
+    expect(describeRecheck('rebuilds-differently')).toBe(
+      'Rebuilds differently from when it was saved, and still reads — check it before you print.',
+    );
+    expect(describeRecheck('does-not-read')).toBe('No longer reads. Open it to see why.');
+    expect(describeRecheck('not-checked')).toBe(
+      'Not checked: it was saved without its Wi-Fi password.',
+    );
+  });
+});
+
+describe('summariseRecheck', () => {
+  const many = (outcome: RecheckOutcome, n: number): RecheckOutcome[] =>
+    Array.from({ length: n }, () => outcome);
+
+  it('counts the codes checked and names only the parts that are not zero, in order', () => {
+    expect(summariseRecheck([...many('identical', 11), 'rebuilds-differently'])).toBe(
+      '12 codes checked: 11 identical, 1 rebuilds differently.',
+    );
+    expect(summariseRecheck(many('identical', 3))).toBe('3 codes checked: 3 identical.');
+    expect(
+      summariseRecheck([
+        'does-not-read',
+        'identical',
+        ...many('rebuilds-differently', 2),
+        ...many('does-not-read', 1),
+      ]),
+    ).toBe('5 codes checked: 1 identical, 2 rebuild differently, 2 no longer read.');
+    expect(summariseRecheck(['does-not-read'])).toBe('1 code checked: 1 no longer reads.');
+  });
+
+  it('is singular for one code', () => {
+    expect(summariseRecheck(['identical'])).toBe('1 code checked: 1 identical.');
+  });
+
+  it('says what it left out after the count, never inside it', () => {
+    expect(summariseRecheck(['identical', 'identical', 'not-checked'])).toBe(
+      '2 codes checked: 2 identical. 1 not checked: saved without its Wi-Fi password.',
+    );
+    expect(summariseRecheck(many('not-checked', 2))).toBe(
+      '2 not checked: saved without their Wi-Fi passwords.',
+    );
+    expect(summariseRecheck(['identical', 'unanswered'])).toBe(
+      '1 code checked: 1 identical. 1 could not be checked.',
+    );
+    expect(summariseRecheck([])).toBe('There was nothing to check.');
+  });
+});
+
+describe('recheckTone', () => {
+  it('is success only when every code checked is identical and the host answered', () => {
+    expect(recheckTone(['identical', 'identical'])).toBe('success');
+    // A withheld password is not a failure.
+    expect(recheckTone(['identical', 'not-checked'])).toBe('success');
+    expect(recheckTone(['identical', 'rebuilds-differently'])).toBe('caution');
+    expect(recheckTone(['identical', 'does-not-read'])).toBe('caution');
+    expect(recheckTone(['identical', 'unanswered'])).toBe('caution');
+    // Nothing checked is nothing proved.
+    expect(recheckTone(['not-checked'])).toBe('caution');
+    expect(recheckTone([])).toBe('caution');
   });
 });
 

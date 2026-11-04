@@ -116,6 +116,28 @@ describe('tokens', () => {
     expect(darkKeys.sort()).toEqual(lightKeys.filter((k) => k !== '--color-scheme').sort());
   });
 
+  it('draws the weak-spot overlay identically in both themes, because the print under it is', () => {
+    const overlay = (tokens: Record<string, string>) =>
+      Object.fromEntries(
+        Object.entries(tokens).filter(([k]) => k.startsWith('--viz-') || k.startsWith('--damage-')),
+      );
+    expect(Object.keys(overlay(light)).length).toBeGreaterThan(0);
+    expect(overlay(dark)).toEqual(overlay(light));
+  });
+
+  it('gives drawn damage an edge on ink and on paper, and the ring a halo it reads on', () => {
+    const edge = parse(light['--damage-edge'] ?? '#000');
+    for (const fill of ['--damage-ink', '--damage-paper']) {
+      const ratio = contrast(edge, parse(light[fill] ?? '#000'));
+      expect(ratio, `edge on ${fill}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
+    }
+    const ring = contrast(
+      parse(light['--viz-spot'] ?? '#000'),
+      parse(light['--viz-spot-halo'] ?? '#000'),
+    );
+    expect(ring, `ring on its halo: ${ring.toFixed(2)}:1`).toBeGreaterThanOrEqual(3);
+  });
+
   describe.each(THEMES)('$name theme', (theme) => {
     const text = (fg: string, bg: Rgb, min: number, what: string) => {
       const ratio = contrast(parse(theme.tokens[fg] ?? '#000'), bg);

@@ -172,11 +172,13 @@ belongs where the reading order puts it, not pinned over the form.
 A wrapped row that leaves the last button by itself on a second line reads as a different kind of
 action rather than the last of four, and it is the default window width that does it. A row of
 peer actions is `grid grid-cols-2`, and `lg:flex` only where the column can hold the whole row
-without wrapping — Create's export row, five buttons in half of `max-w-5xl`, cannot, so it stays a
-grid at every width, with its fifth button spanning the last row (`col-span-2`) so the odd one out
-is a deliberate wide button and not a wrap. The order is the same either way — the destructive or
-secondary one last, never promoted by the wrap. `flex-wrap` on a row of peers is what this rule
-replaces.
+without wrapping. An odd count spans its last button across the last row (`col-span-2`), so the
+odd one out is a deliberate wide button and not a wrap. Create's export row, six buttons in half of
+`max-w-5xl`, cannot hold one row, so it stays a grid at every width: three even rows — Save…,
+Export PNG…, Export SVG…, Export PDF…, Copy, Proof sheet… — and, at six, no button spans. The proof
+sheet is last because it prepares a print rather than delivering a file. The order is the same
+either way — the destructive or secondary one last, never promoted by the wrap. `flex-wrap` on a
+row of peers is what this rule replaces.
 
 ## 5. Icons
 
@@ -415,6 +417,105 @@ before** — a primitive built ahead of the screen that needs it is a guess with
   A control the host refused keeps what was typed, so the person can correct it rather than watch
   it revert. A default is a starting point: it fills the control on the screen that uses it, and
   changing it there changes that code and not the setting.
+- **"True, and worth reading before you act" is a caution `InfoBar` under the summary** (P3) — not
+  a primitive, and not a disabled button. The look-alike guard (ADR-034) has things to say that are
+  facts about an address and not reasons to stop: a link shortener, a name that mixes alphabets, a
+  private IP address. Their shape is the canonical `InfoBar` in the `caution` tone, placed directly
+  under the line that says what the code does — on Create _"Check this address"_, on each Read card
+  _"Check this address before you open it"_ — titled for the action it asks for, with each sentence
+  as its own line: plain text for one, a list for more, written once (`AddressSentences`) so that
+  both screens say it the same way. On the batch plan the same fact is a word in
+  the row's status, _Planned · check the address_, coloured from `--color-caution` and carried by
+  the words, with the sentences listed under the table by line number. Three things it never does.
+  It never **disables** anything: the export, the run and _Make a code like this_ stay exactly as
+  they were, because a disabled button says _you may not_, and the product's position here is _you
+  should know_ (§10 keeps disabled buttons for the scan gate, which has one correct answer). It
+  never **changes the verdict** beside it: the code is verified or it is not, and an address worth
+  reading about is not a code that failed to read. And it never **appears without something to
+  say**: no "this address looks fine", because the guard cannot know that, and a caution present on
+  every code would be the mark that is always on (§2). It announces itself once, as the status
+  region `InfoBar` already is, and adds no live region of its own. The sentences are the domain's,
+  shown as given, for the reason a verdict's sentence is.
+- **The Stamp card says one sentence, and only this workspace's own record earns the success
+  tone** (P2) — not a primitive: a `Card` named `Stamp` (`aria-label` and heading alike) on Read,
+  for a file opened with _Check an exported file…_ and above the code cards of a stamped PNG,
+  holding exactly one of five sentences (ADR-033). _"Verified by this workspace on 14 Sep 2026, by
+  rqrr 0.10.1 — unchanged since."_ is the only one in the success tone, with _"Saved as Menu."_ and
+  an **Open** button when the record names a saved code; the date is the workspace's row, never the
+  file's, and it is shown only for a file that is unchanged. _"This workspace verified a different file under this stamp."_ and _"Carries a Signatum
+  stamp, but the file was changed after it was verified."_ are cautions. _"This file carries no
+  Signatum stamp."_ is information, followed by _"Files exported by Signatum 1.1 or later carry one,
+  unless stamping was turned off."_ And _"Carries a Signatum stamp from another workspace: read back
+  by rqrr 0.10.1, and unchanged since. When and where it was verified is known only to the workspace
+  that made it."_ is information too — **never a green tick for a stamp from elsewhere**, because
+  anybody can write a stamp and a file that matches its own proves only that. The tone is carried by
+  the icon and the words as well as the colour (§2), and the switch that turns stamping off is one
+  more `Checkbox` on the Defaults card, **Stamp exported files**, saved on change like the others.
+- **The scan margin card is two lists, one per kind of harm** (P4) — not a primitive: a `Card`
+  titled `Scan margin` on Create, whose thirteen lines (ADR-027, ADR-035) are split in two groups,
+  each under a small heading and each its own `ul` whose `aria-label` is that heading. **"On screen
+  and in chat"** holds the nine a screen or a chat application does to a picture — shrunk, blurred,
+  recompressed. **"In print"** holds the four that paper and a phone do — ink spread on coated and
+  on uncoated paper, a 30° tilt, dim light — with one caption under it that says what they are:
+  _"Ink spread is a share of a module; the tilt is 30° from square; dim light is a third of the
+  contrast."_ Two lists rather than one with a divider, because the grouping has to be a fact for
+  somebody listening to the card rather than looking at it, and a list named for its heading says
+  which half a line belongs to without a word added to the line. The line itself is unchanged and
+  is the domain's (`describeVariant`): the host's label and one word, _"Ink spread, uncoated paper
+  — fails"_, with a tick or a cross beside it that is decoration — the word carries the answer
+  (§2, §5). The labels are the host's and the screen prints them as given; it never builds one. The
+  card has no live region of its own: thirteen lines read out unasked is a live region a person
+  turns off, and the screen announces the measurement once, in one sentence, when it lands (§7).
+  And **nothing on it ever disables anything** — a failing line, in either group, is information
+  for choosing a size, a look or a paper, and the export beside it does not hear about it (§10
+  keeps disabled buttons for the scan gate).
+- **The weak spots are a drawing over the card's own copy of the code, and the blocks are a
+  stacked bar each** (P9) — not primitives: the card `Where it breaks` on Create (ADR-037), after
+  the scan margin and under the same rule, follows the outline over somebody else's picture (F10)
+  and the verdict word above. It is a `Card` named `Where it breaks` (`aria-label` and heading
+  alike, as the Stamp card is), and it opens with **one sentence**: the figure everybody quotes,
+  what is really left after the logo, and the smudge that can stop the code, in millimetres of the
+  print. **The code it draws on is its own copy**, never the preview of what will be exported: a
+  `CodePreview` named _"The code, to try to break"_, with `framed={false}` because it already sits
+  inside a card and a frame inside a frame is a border twice. The main preview never shows damage
+  that is not in the file. `CodePreview` gained exactly those two props for it — `framed`, and
+  `layer`, a drawing laid over the whole square above the logo; the slice adds no primitive.
+  **The overlay** is that layer: an `<svg>` in the scene's own module units, so it scales with the
+  code and cannot drift off it — each data module outside the plate tinted by how much of its block
+  is spent, in three steps of one red where the strongest means spent, and the weakest spot as a
+  dashed red ring over a white halo, because the ring lands on the most-spent block by
+  construction and red on a red tint would not read. The tint and the ring are off until **Show the
+  weak spots** — a `Checkbox` — is ticked, because the preview shows the print's own colours (§2)
+  and a tint over them is a statement about the code, not the code. Damage is drawn whether or not
+  they are shown, as the host paints it before the decoder reads it: black ink or white paper, each
+  with a thin grey edge, so a paper cell still has an edge on a light module. **Every colour on
+  the code is a token, and none of them is themed**: `--viz-*` and `--damage-*` in `tokens.css`
+  sit on the print, which is the same in both themes, so they are too — the same rule as the
+  preview's inside (§2), held by the token test, which also holds the edge and the ring at 3:1 or
+  better against what they sit on. The overlay is `aria-hidden` and carries no meaning of its own:
+  **the sentence carries it**, and a person who never sees the overlay loses nothing. **The
+  controls** are four peers in two even rows (§4) — **Smudge the weakest spot**, **Draw**, **Ask
+  the decoder**, **Clear** — and a `ChoiceGroup` named **Brush** (Ink, Paper), with a caption that
+  says what Draw does. **Draw** is a toggle: a `Button` with `aria-pressed`, its label fixed, in
+  the accent appearance while it is pressed, as a chosen option in a `ChoiceGroup` is. The overlay
+  is a pointer target only while it is on, and drawing is the one thing on the card that needs a
+  pointer — **Smudge the weakest spot** is the same experiment from the keyboard. **The blocks**
+  follow the margin's groups: a small heading, _"Error-correction blocks"_, over a `ul` whose
+  `aria-label` is that heading, one row per block: the label in words — _"Block 2 — 6 of 11
+  spent"_ — over a stacked bar of the block's capacity in three segments, logo, damage and spare,
+  decorative, so the bar is never the only reading of the fact (§2, _two readings of one fact
+  agree_). The bar is themed chrome, not print: `stroke-strong`, `danger` and `success`, with a
+  legend under the list that names each segment in words beside its swatch, and names the logo
+  only when there is one (§2, _a mark that is always on_). **The prediction and the decoder's
+  answer are one line**, the arithmetic's and then the decoder's, in a polite, atomic live region
+  inside the card, and not through `announce()` (§7), because it is not a transient message: it is
+  the visible, lasting state of the experiment, read where it is shown, as the batch plan's count
+  is. While a pointer stroke is in progress the
+  region is `aria-busy`: the text follows every module on screen, and assistive technology hears
+  it once, when the stroke ends, rather than once per module. And, as on the margin, **nothing on
+  the card disables anything outside it** or changes the verdict: its own buttons rest only when
+  they have nothing to do — no weakest spot to smudge, an answer already being asked for, nothing
+  to clear — and the export beside it does not hear about any of it. Nothing on it is saved.
 
 ### Asking "are you sure"
 

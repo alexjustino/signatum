@@ -297,6 +297,8 @@ mod tests {
                 dpi: Some(300),
                 format: Some("png"),
                 code_id: None,
+                stamp_ref: None,
+                stamp_digest: None,
             },
         )
         .expect("record the evidence");

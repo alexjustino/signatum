@@ -15,7 +15,7 @@ No cloud. No account. No telemetry. No redirect. The code is a file you own.
 
 ---
 
-> **Status: 1.0.0 — "The mark", released 2026-09-14.** Installers are on the
+> **Status: 1.1.0 — "The proof", released 2026-11-02.** Installers are on the
 > [Releases page](https://github.com/alexjustino/signatum/releases): an **MSI** and an **NSIS**
 > `.exe`, either one is the whole product. They are **not code-signed**, so Windows SmartScreen
 > will show "Windows protected your PC" on first run — choose **More info**, then **Run anyway**,
@@ -43,7 +43,9 @@ a native Windows 11 application.
 
 The move none of them make: **nothing is exported that an independent decoder did not read back,
 byte for byte, at the size it will be printed.** The logo is not decoration laid on top; it is
-placed by an engine that knows which modules the code cannot lose.
+placed by an engine that knows which modules the code cannot lose. And the product says where a
+code breaks: how small a smudge in the right place can be and still stop it, in millimetres at the
+printed size, with the decoder's own answer beside the arithmetic.
 
 ## What exists today
 
@@ -97,10 +99,10 @@ really be printed; and the error-correction level and the size of the code are c
 never the smallest code and never weaker than the content forces. A logo that will not fit is
 refused with the reason — which pattern it would reach, or by how much it is over the budget —
 rather than quietly shrunk, and a smaller logo can be asked for, never a larger one. One decision
-in it is not yet settled and is written down as such: the small alignment square that some sizes of
-code place exactly in the middle is allowed to go under the logo, because refusing it would push
-the code to a far larger size, and whether real phone cameras agree is proved with two phones
-before it is accepted.
+in it rests on phones rather than on a table, and is written down as such: the small alignment
+square that some sizes of code place exactly in the middle is allowed to go under the logo, because
+refusing it would push the code to a far larger size. No decoder in this repository can say what a
+phone does with such a code, so it was accepted for 1.0.0 on the owner's phone matrix (ADR-024).
 
 F6 has given the code a look, and put a gate in front of it. Both colours can be chosen — they are
 the colours of the print rather than of the application's theme, and they are the same in a light
@@ -109,7 +111,7 @@ built: colours too close together are refused with the contrast they reached aga
 camera needs, and a code lighter than the plate it sits on is refused however strong the contrast,
 because phone cameras look for a dark code on a light background and several will not turn the
 picture over to find one. The modules can be square, softened at the corners or drawn as separate
-dots, and the three large squares in the corners square, rounded or round. What keeps its shape is
+dots, and the three large squares in the corners square or with their corners softened. What keeps its shape is
 what a camera navigates by — the lines of alternating modules between those corners, the small
 alignment squares, the strip that records how the code was drawn — because a scanner finds the grid
 by measuring those runs, and a row of dots is not a run. All nine combinations of module and corner
@@ -131,8 +133,9 @@ straight onto the clipboard — the picture, never the payload text, because a p
 clipboard is a paste into the wrong window. Every one of them is verified before it is written, and
 where "the bytes written are the bytes decoded" could not be literally true — a vector file has no
 pixels for a decoder to read — it is written down rather than glossed over. Alongside the verdict,
-the code is also shrunk, blurred and recompressed nine ways and read again, so the screen can say
-how much abuse it has left in it: a report, and never a gate.
+the code is also shrunk, blurred and recompressed nine ways and read again — thirteen since 1.1,
+which adds what print does — so the screen can say how much abuse it has left in it: a report, and
+never a gate.
 
 F8 has given the product a memory. A code that has passed the gate can be saved under a name and
 reopened later from a library of its own — after closing the window, after an update — with the
@@ -199,13 +202,58 @@ opened in both themes on every run and checked by the industry's automated acces
 where a violation fails the build, then driven by real key presses from an empty window to the
 export button, into the library and through a dialog that has to give the focus back.
 
-1.0.0 is released: the eight payload kinds, the logo placement engine, the scan gate in front of
-every way out, the look and the printed size, the library and brand kits, batch, Read, and the
-defaults that mean a choice is made once. What comes after it is not decided here. Corrections land
-as 1.0.x — bug fixes only, no schema change and no new surface — by the flow in
-[`VERSIONING.md`](VERSIONING.md) and the checklist in [`docs/RELEASE.md`](docs/RELEASE.md). A minor
-release is opened when there is a theme worth opening one for, and this page will say so when there
-is.
+All of that is 1.0.0, released 2026-09-14: the eight payload kinds, the logo placement engine, the
+scan gate in front of every way out, the look and the printed size, the library and brand kits,
+batch, Read, and the defaults that mean a choice is made once.
+
+1.1.0 keeps all of it and carries the same promise further, from the file to the paper and to the
+file in somebody else's hands, and it says where a code breaks. It adds no new kind of code and no
+new look, and nothing in the scan gate was weakened. A workspace from 1.0.0 is migrated forward on
+first launch. Corrections to a release land through the flow in [`VERSIONING.md`](VERSIONING.md) and
+the checklist in [`docs/RELEASE.md`](docs/RELEASE.md).
+
+The gate proves a file; a print is proved by printing it. So **Proof sheet…**, beside the exports on
+the Create screen, writes one A4 PDF with the code at 15, 20, 25 and 30 mm, and at the size chosen
+when it is none of those. Every size is rendered at the pixels an export of that size would have and
+read back by the same independent decoder before it is drawn, and the picture on the page is the one
+that read. A size that does not read is a box with the reason in it, never a picture, so the sheet
+shows where this code stops reading rather than hiding it. Under each code are its size, how far away
+a phone should read it — ten times the width, said as the rule of thumb it is — and a reference to
+the verification that proved it. At the foot is a bar exactly 50 mm long: if it measures anything
+else, the printer scaled the page, and the sizes above it are wrong. Like every file this product
+writes, the sheet carries no date, no author and no path.
+
+The scan margin now asks what print does as well as what a screen does. After the nine ways a screen
+or a chat app degrades a code, it reads the code back after ink has spread on coated and on uncoated
+paper — by a share of a module, not a count of pixels — held 30° off square and in dim light:
+thirteen lines under two headings. A code that reads clean and fails under ink spread says so by
+name. It is still a report and never a gate, the figures are conventional rather than measured on a
+press, and the proof sheet is still the real test.
+
+A file also travels, so every file the product writes is stamped with what was verified and never
+when: a random reference, the decoder and a digest of the file, and nothing about what the code
+holds. **Check an exported file…** on Read says whether this workspace verified a file and whether
+it has changed since. The stamp is not a signature: anybody can write one, and only a matching record
+in your own workspace says your workspace verified the file. It can be turned off in Settings.
+
+The address inside a code is said out loud before anybody follows it. On Create, on the link rows of
+a batch and on Read, a sentence says when it mixes alphabets, imitates a Latin word in another
+alphabet, carries a character that is not a letter, a digit or a hyphen, goes through a link
+shortener, or is an IP address rather than a name. It is worked out on the machine, it warns and
+never refuses, and it is not a phishing filter: silence from it says nothing about whether an address
+is safe.
+
+The whole library can be checked again in one press: every saved code rebuilt, compared with the
+drawing it was saved as, and read back again, with a line on each row. And a print can be held
+against the library: when Read finds a code that carries exactly what a saved code carries, byte for
+byte, it names that saved code and opens it in one press.
+
+A code also has a weakest place. Level H is said to survive 30 % damage, but each error-correction
+block is corrected on its own and a logo has already spent part of the blocks it sits on. So
+**Where it breaks** on Create says, in millimetres at the printed size, how small one smudge in the
+right place can be and still stop the code, shows its weak spots and lets you try to break it, with
+the arithmetic's guarantee and the gate decoder's answer side by side. It is a report: nothing is
+disabled and nothing is recorded.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 
@@ -237,6 +285,34 @@ In one list, for somebody deciding whether to install it:
   every row that could not be made and why.
 - **Read** — open any image of a QR code and see what it contains, what it would do, how it was
   built (version, error correction, mask), and whether it would scan at a given size.
+
+## What 1.1.0 adds
+
+In one list, for somebody who has 1.0.0 and is deciding whether to update:
+
+- **The proof sheet** — one A4 PDF with the code at 15, 20, 25 and 30 mm and at the size chosen,
+  each read back at its own pixels before it is drawn. A size that does not read is a box with the
+  reason. A bar exactly 50 mm long shows whether the printer scaled the page.
+- **The stamp, and Check an exported file** — every PNG, SVG and PDF the product writes carries a
+  random reference, the decoder and a digest of the file, and no date, name, path or payload. Read
+  says whether this workspace verified a file and whether it has changed since. It is not a
+  signature, and it can be turned off.
+- **The look-alike guard** — an address that mixes alphabets, imitates a Latin word, carries a
+  character that is not a letter, a digit or a hyphen, goes through a link shortener or is an IP
+  address is named in a sentence on Create, Batch and Read. It warns and never refuses, and it is
+  not a phishing filter.
+- **Print conditions in the scan margin** — ink spread on coated and on uncoated paper, a 30° tilt
+  and dim light, as four more lines under their own heading: conventional figures, and a report
+  rather than a gate.
+- **Check all again** — one press on the Library rebuilds every saved code, compares it with the
+  drawing it was saved as and reads it again, and says on each row what it found. After an update,
+  that is how you learn which saved codes it changed.
+- **A print matched against the library** — when Read finds a code that carries exactly what a saved
+  code carries, byte for byte, it says _Matches your saved code_ with the name, and **Open** reopens
+  it.
+- **Where it breaks** — what is left of the error correction once the logo is counted, how small a
+  smudge can stop the code in millimetres at the printed size, the weak spots, and a way to try it
+  and ask the decoder. A report: nothing is disabled and nothing is recorded.
 
 ## The name
 
@@ -297,7 +373,8 @@ The installers on the Releases page are not code-signed, so SmartScreen warns on
 Verify the download came from the Releases page of this repository and that its SHA-256 matches
 the release notes.
 
-Building needs Node.js 22+, a stable Rust toolchain with the MSVC build tools, and PowerShell 7.
+Building needs Node.js 22+, a stable Rust toolchain (1.88 or newer) with the MSVC build tools,
+and PowerShell 7.
 
 ## Getting started
 
@@ -316,21 +393,23 @@ npm run gates
 
 ## Roadmap
 
-| Release   | Theme               | Contents                                                                                                  |
-| --------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
-| **1.0.0** | The mark            | **released 2026-09-14** — the list above, on the Releases page                                            |
-| 1.1.0     | The card            | business-card and badge layouts (print-ready PDF sheets) · frames with a call to action · calendar events |
-| 1.2.0     | The payment         | PIX BR Code (EMV, CRC16) · EPC SEPA · payload templates per country                                       |
-| 2.0       | Only if it earns it | macOS and Linux                                                                                           |
+| Release   | Theme               | Contents                                                                                                                                                                    |
+| --------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1.0.0** | The mark            | **released 2026-09-14** — the list above, on the Releases page                                                                                                              |
+| **1.1.0** | The proof           | **released 2026-11-02** — a proof sheet, a stamp in every file, a look-alike guard, print conditions, a library check, a print matched against the library, where it breaks |
+| 1.2.0     | The card            | business-card and badge layouts (print-ready PDF sheets) · frames with a call to action · calendar events                                                                   |
+| 1.3.0     | The payment         | PIX BR Code (EMV, CRC16) · EPC SEPA · payload templates per country                                                                                                         |
+| 2.0       | Only if it earns it | macOS and Linux                                                                                                                                                             |
 
-The rows after 1.0.0 are candidate themes, not commitments: the next minor is opened when there is
-a theme worth opening one for, and this page says so when it is.
+1.1.0 "The proof" carried the promise from the file to the paper and to whoever receives the code;
+its slices and their proofs are in [`docs/SPEC.md`](docs/SPEC.md) §10. The rows after it are candidate
+themes, not commitments.
 
 Deliberately out of scope: **dynamic codes are refused on principle, not deferred** — a dynamic
 code is a redirect through a server that learns who scanned what, when, and that is precisely the
 product this is not. Along with them: redirects and scan analytics, URL shorteners, an account or
 sync, AI-generated "artistic" codes, animated output, other symbologies (Micro QR, rMQR, Data
-Matrix, barcodes), payment codes before 1.2, a business-card layout designer, plugins and
+Matrix, barcodes), payment codes before 1.3, a business-card layout designer, plugins and
 auto-update.
 
 The full specification lives in [`docs/SPEC.md`](docs/SPEC.md); binding architecture decisions in

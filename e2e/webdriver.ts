@@ -66,6 +66,27 @@ export class Element {
     return call('POST', this.url('/clear'), {});
   }
 
+  /**
+   * Replace a field's text with real key presses, and check that it took.
+   *
+   * WebDriver's clear reaches the DOM but not React, so the space and the backspace are what tell
+   * React the field is empty. A render arriving between those steps — a verdict coming back, a
+   * name being prefilled — puts the old value back, and the typing lands after it: "Office-5GOffice"
+   * instead of "Office". So the field is read back after a moment, and the whole thing done again
+   * if it does not say what was typed.
+   */
+  async fill(text: string): Promise<void> {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      await this.clear();
+      await this.sendKeys(' ');
+      await this.sendKeys(Keys.BACKSPACE);
+      if (text !== '') await this.sendKeys(text);
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      if ((await this.property('value')) === text) return;
+    }
+    throw new Error(`the field would not hold ${JSON.stringify(text)}`);
+  }
+
   text(): Promise<string> {
     return call('GET', this.url('/text'));
   }
@@ -197,6 +218,33 @@ export class Driver {
     ];
     await call('POST', this.sessionUrl('/actions'), {
       actions: [{ type: 'key', id: 'keyboard', actions }],
+    });
+    await call('DELETE', this.sessionUrl('/actions'));
+  }
+
+  /**
+   * Drag the mouse through points in viewport pixels: pressed at the first, moved through the
+   * rest, released at the last — real pointer events, the way a person draws, not a script
+   * standing in for them.
+   */
+  async drag(points: readonly { x: number; y: number }[]): Promise<void> {
+    const [first, ...rest] = points;
+    if (first === undefined) return;
+    const at = (p: { x: number; y: number }, duration: number) => ({
+      type: 'pointerMove',
+      duration,
+      origin: 'viewport',
+      x: Math.round(p.x),
+      y: Math.round(p.y),
+    });
+    const actions = [
+      at(first, 0),
+      { type: 'pointerDown', button: 0 },
+      ...rest.map((p) => at(p, 60)),
+      { type: 'pointerUp', button: 0 },
+    ];
+    await call('POST', this.sessionUrl('/actions'), {
+      actions: [{ type: 'pointer', id: 'mouse', parameters: { pointerType: 'mouse' }, actions }],
     });
     await call('DELETE', this.sessionUrl('/actions'));
   }

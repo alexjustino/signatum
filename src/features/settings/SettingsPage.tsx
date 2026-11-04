@@ -158,6 +158,7 @@ function DefaultsCard({ settings, unread }: { settings: Settings; unread: string
         <ResolutionDefault dpi={settings.defaultDpi} />
         <QuietZoneDefault modules={settings.defaultQuietZone} />
         <PasswordDefault keep={settings.keepWifiPasswords} />
+        <StampDefault stamp={settings.stampExports} />
       </div>
     </Card>
   );
@@ -407,6 +408,35 @@ function PasswordDefault({ keep }: { keep: boolean }) {
           saved
             ? 'Saved.'
             : 'Saved codes keep this password in the clear on this machine. The Save form can still untick it for one code.'
+        }
+      />
+    </div>
+  );
+}
+
+/**
+ * Whether every exported file carries a stamp (P2). On unless a person turns it off: the stamp
+ * carries nothing about them, and it is what lets Read say a file was not changed since.
+ */
+function StampDefault({ stamp }: { stamp: boolean }) {
+  const { keepNow, saved, problem } = useKeptSetting('stamp_exports');
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="flex items-center gap-2">
+        <Checkbox
+          label="Stamp exported files"
+          checked={stamp}
+          onChange={(next) => keepNow(next ? 'true' : 'false')}
+        />
+        <span className="text-body text-fg">Stamp exported files</span>
+      </label>
+      <Note
+        problem={problem}
+        caption={
+          saved
+            ? 'Saved.'
+            : 'A stamp says which decoder read the file and lets Read tell whether it was changed since. It carries no date, no name and no path.'
         }
       />
     </div>

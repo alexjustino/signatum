@@ -4,7 +4,8 @@
 //! without being asked: the page is `width_mm` square in the document's own
 //! units, and the image fills it edge to edge. There is no margin, no title and
 //! no metadata beyond the producer — a page with a border is a page somebody has
-//! to trim.
+//! to trim. From P2 the information dictionary also carries the stamp
+//! (`export::stamp`): what was verified, and never when.
 //!
 //! What is embedded is the **verified raster**, not a second drawing of the code.
 //! That keeps the promise the whole product rests on: the bytes that were read
@@ -18,9 +19,10 @@
 use std::io::Write;
 
 use image::ImageFormat;
-use pdf_writer::{Content, Filter, Finish, Name, Pdf, Rect, Ref, TextStr};
+use pdf_writer::{Content, Filter, Finish, Name, Pdf, Rect, Ref, Str, TextStr};
 
 use crate::error::{Error, Result};
+use crate::export::stamp::{self, Mark, Sealed};
 
 /// Points per millimetre: a PDF point is a seventy-second of an inch.
 pub const POINTS_PER_MM: f64 = 72.0 / 25.4;
@@ -65,7 +67,8 @@ pub fn check_width(width_mm: f64) -> Result<()> {
     Ok(())
 }
 
-/// Write a one-page PDF holding `png` at `width_mm` millimetres square.
+/// Write a one-page PDF holding `png` at `width_mm` millimetres square, stamped
+/// with `stamp` when there is one.
 ///
 /// The page size comes from `width_mm` and from nothing else. In particular it
 /// is never read out of the drawing: the SVG this host verifies carries a
@@ -76,15 +79,12 @@ pub fn check_width(width_mm: f64) -> Result<()> {
 ///
 /// [`Error::InvalidInput`] when the width is not a printable number of
 /// millimetres. [`Error::Render`] when the verified artefact cannot be read back
-/// or its samples cannot be compressed — both are this host's own bytes.
-pub fn one_page(png: &[u8], width_mm: f64) -> Result<Vec<u8>> {
+/// or its samples cannot be compressed — both are this host's own bytes — or
+/// when the stamp could not be written.
+pub fn one_page(png: &[u8], width_mm: f64, stamp: Option<&Mark>) -> Result<Sealed> {
     check_width(width_mm)?;
 
-    let image = image::load_from_memory_with_format(png, ImageFormat::Png)
-        .map_err(|error| Error::Render(format!("the artefact could not be read back: {error}")))?
-        .to_rgb8();
-    let (width, height) = (image.width(), image.height());
-    let samples = deflate(image.as_raw())?;
+    let artefact = Picture::from_png(png)?;
 
     let side = points(width_mm) as f32;
     let catalogue = Ref::new(1);
@@ -107,15 +107,7 @@ pub fn one_page(png: &[u8], width_mm: f64) -> Result<Vec<u8>> {
         written.finish();
     }
 
-    {
-        let mut embedded = pdf.image_xobject(picture, &samples);
-        embedded.filter(Filter::FlateDecode);
-        embedded.width(width as i32);
-        embedded.height(height as i32);
-        embedded.color_space().device_rgb();
-        embedded.bits_per_component(8);
-        embedded.finish();
-    }
+    artefact.embed(&mut pdf, picture);
 
     // The image's own coordinate system is the unit square, so the matrix that
     // places it is the page size itself: no offset, no scale to work out, and
@@ -130,9 +122,70 @@ pub fn one_page(png: &[u8], width_mm: f64) -> Result<Vec<u8>> {
     // The only thing said about where this came from. No author, no title, no
     // dates: a file that records when a code was made records something about
     // the person who made it.
-    pdf.document_info(about).producer(TextStr("Signatum"));
+    information(&mut pdf, about, stamp)?;
 
-    Ok(pdf.finish())
+    stamp::seal_pdf(pdf.finish(), stamp.is_some())
+}
+
+/// The document-information dictionary every PDF of this product carries: the
+/// producer, and — when there is one — the stamp, with the placeholder where its
+/// digest goes until [`stamp::seal_pdf`] writes it in.
+///
+/// Shared with the proof sheet, so both PDFs say the same two things and nothing
+/// else.
+pub(crate) fn information(pdf: &mut Pdf, id: Ref, stamp: Option<&Mark>) -> Result<()> {
+    let entry = stamp.map(stamp::pdf_entry).transpose()?;
+    let mut info = pdf.document_info(id);
+    info.producer(TextStr("Signatum"));
+    if let Some(entry) = &entry {
+        info.pair(Name(stamp::PDF_KEY), Str(entry.as_bytes()));
+    }
+    info.finish();
+    Ok(())
+}
+
+/// The verified artefact, ready to be embedded: its samples as RGB, eight bits
+/// each, deflated.
+///
+/// Shared with the proof sheet (`export::proof`), so a code on the sheet is
+/// embedded exactly as a code on its own page is — one way of putting a verified
+/// raster into a PDF, not two.
+pub(crate) struct Picture {
+    width: u32,
+    height: u32,
+    samples: Vec<u8>,
+}
+
+impl Picture {
+    /// Read the artefact back and compress its samples.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Render`] when the PNG cannot be read or its samples cannot be
+    /// compressed — both are this host's own bytes.
+    pub(crate) fn from_png(png: &[u8]) -> Result<Self> {
+        let image = image::load_from_memory_with_format(png, ImageFormat::Png)
+            .map_err(|error| {
+                Error::Render(format!("the artefact could not be read back: {error}"))
+            })?
+            .to_rgb8();
+        Ok(Self {
+            width: image.width(),
+            height: image.height(),
+            samples: deflate(image.as_raw())?,
+        })
+    }
+
+    /// Write the image XObject: `/FlateDecode`, `/DeviceRGB`, eight bits.
+    pub(crate) fn embed(&self, pdf: &mut Pdf, id: Ref) {
+        let mut embedded = pdf.image_xobject(id, &self.samples);
+        embedded.filter(Filter::FlateDecode);
+        embedded.width(self.width as i32);
+        embedded.height(self.height as i32);
+        embedded.color_space().device_rgb();
+        embedded.bits_per_component(8);
+        embedded.finish();
+    }
 }
 
 /// Deflate the samples, as `/FlateDecode` means them.
@@ -160,7 +213,9 @@ mod tests {
     fn a_page_measures_the_millimetres_it_was_asked_for() {
         let artefact = render_png(hello_world_svg().as_bytes(), 295).expect("render");
 
-        let written = one_page(&artefact.png, 25.0).expect("write the page");
+        let written = one_page(&artefact.png, 25.0, None)
+            .expect("write the page")
+            .bytes;
         let text = String::from_utf8_lossy(&written);
 
         assert!(
@@ -182,7 +237,9 @@ mod tests {
     fn the_page_size_comes_from_the_millimetres_and_not_from_the_drawing() {
         let artefact = render_png(hello_world_svg().as_bytes(), 128).expect("render");
 
-        let written = one_page(&artefact.png, 50.0).expect("write the page");
+        let written = one_page(&artefact.png, 50.0, None)
+            .expect("write the page")
+            .bytes;
 
         let expected = format!("/MediaBox [0 0 {0} {0}]", points(50.0) as f32);
         assert!(
@@ -199,7 +256,9 @@ mod tests {
     fn the_picture_in_the_page_is_the_artefact_that_was_verified() {
         let artefact = render_png(hello_world_svg().as_bytes(), 295).expect("render");
 
-        let written = one_page(&artefact.png, 25.0).expect("write the page");
+        let written = one_page(&artefact.png, 25.0, None)
+            .expect("write the page")
+            .bytes;
         let samples = inflate_first_stream(&written);
 
         assert_eq!(samples.len(), 295 * 295 * 3, "295 × 295 pixels of RGB");
@@ -219,7 +278,7 @@ mod tests {
         let artefact = render_png(hello_world_svg().as_bytes(), 64).expect("render");
 
         for width in [0.0, -25.0, f64::NAN, f64::INFINITY, 5000.0] {
-            let refused = one_page(&artefact.png, width).expect_err("that page was written");
+            let refused = one_page(&artefact.png, width, None).expect_err("that page was written");
             assert!(matches!(refused, Error::InvalidInput(_)), "{width}");
         }
     }

@@ -25,6 +25,10 @@
 //!
 //! - F11: `settings_get`, `settings_set`, `settings_all`, and the theme moved
 //!   out of the browser store and into the workspace.
+//! - P2: `stamp_exports`, the one setting the host reads itself: whether an
+//!   exported file carries a stamp. Its default is the host's too, because the
+//!   host is what writes the file — [`stamp_exports`] says `true` until somebody
+//!   says otherwise.
 
 use rusqlite::Connection;
 use serde::Serialize;
@@ -88,7 +92,25 @@ const SETTINGS: &[(&str, Rule)] = &[
     ),
     ("default_quiet_zone", Rule::Whole { low: 0, high: 16 }),
     ("keep_wifi_passwords", Rule::OneOf(&["true", "false"])),
+    ("stamp_exports", Rule::OneOf(&["true", "false"])),
 ];
+
+/// The key that switches the stamp on exported files.
+pub const STAMP_EXPORTS: &str = "stamp_exports";
+
+/// Whether an export is to be stamped: on, unless the person turned it off.
+///
+/// Read through the same rule as `settings_get`, so a value this build would
+/// not hand back — a row edited by hand, a word from a newer build — counts as
+/// never having been set, and the default holds.
+///
+/// # Errors
+///
+/// [`Error::Database`] when the table could not be read.
+pub(crate) fn stamp_exports(conn: &Connection) -> Result<bool> {
+    let chosen = settings_get_with(conn, STAMP_EXPORTS)?.value;
+    Ok(chosen.as_deref() != Some("false"))
+}
 
 /// What one setting is worth, or `null` when nobody has chosen.
 ///
@@ -248,6 +270,7 @@ mod tests {
         ("default_dpi", "300"),
         ("default_quiet_zone", "4"),
         ("keep_wifi_passwords", "true"),
+        ("stamp_exports", "false"),
     ];
 
     #[test]
@@ -385,6 +408,8 @@ mod tests {
                 "True",
                 "keep_wifi_passwords is true or false.",
             ),
+            ("stamp_exports", "off", "stamp_exports is true or false."),
+            ("stamp_exports", "1", "stamp_exports is true or false."),
         ] {
             let refused =
                 settings_set_with(&conn, key, value).expect_err("a value that does not fit");
@@ -416,6 +441,8 @@ mod tests {
             ("default_quiet_zone", "16"),
             ("keep_wifi_passwords", "true"),
             ("keep_wifi_passwords", "false"),
+            ("stamp_exports", "true"),
+            ("stamp_exports", "false"),
         ] {
             settings_set_with(&conn, key, value)
                 .unwrap_or_else(|error| panic!("`{key}` must accept `{value}`: {error}"));
@@ -500,6 +527,26 @@ mod tests {
         assert_eq!(
             all,
             serde_json::json!([{ "key": "theme", "value": "dark" }])
+        );
+    }
+
+    /// The stamp is on until somebody turns it off, and a value this build
+    /// would not hand back leaves it on.
+    #[test]
+    fn exports_are_stamped_unless_somebody_said_not_to() {
+        let conn = workspace();
+        assert!(stamp_exports(&conn).expect("read"), "on by default");
+
+        settings_set_with(&conn, STAMP_EXPORTS, "false").expect("set");
+        assert!(!stamp_exports(&conn).expect("read"));
+
+        settings_set_with(&conn, STAMP_EXPORTS, "true").expect("set");
+        assert!(stamp_exports(&conn).expect("read"));
+
+        settings::set(&conn, STAMP_EXPORTS, "no").expect("written behind the command's back");
+        assert!(
+            stamp_exports(&conn).expect("read"),
+            "a value the rule refuses is not a choice"
         );
     }
 

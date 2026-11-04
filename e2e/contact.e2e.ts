@@ -7,7 +7,6 @@ import { PNG } from 'pngjs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { startSession, type Session } from './session';
-import { Keys } from './webdriver';
 
 /**
  * F3's proof of done, against the real binary: a contact card filled in through
@@ -118,8 +117,7 @@ describe('contact cards', () => {
     await (await driver.findByXPath('//*[@role="tab" and normalize-space(.)="Contact"]')).click();
     for (const [label, value] of FIELDS) {
       const field = await driver.waitForElement(`[aria-label="${label}"]`);
-      await field.clear();
-      await field.sendKeys(value);
+      await field.fill(value);
     }
     await driver.waitForText("Adds Ana O'Brien; Jr to contacts");
     await driver.waitForText('read it back byte for byte');
@@ -161,10 +159,7 @@ describe('contact cards', () => {
     const { driver } = session;
     for (const label of ['Given name', 'Family name']) {
       const field = await driver.waitForElement(`[aria-label="${label}"]`);
-      // A bare clear does not reach React; a space typed and deleted is two real edits.
-      await field.clear();
-      await field.sendKeys(' ');
-      await field.sendKeys(Keys.BACKSPACE);
+      await field.fill('');
     }
     await driver.waitForText('needs at least a name');
     const button = await driver.findByXPath('//button[contains(normalize-space(.), "Export PNG")]');

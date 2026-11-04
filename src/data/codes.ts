@@ -86,7 +86,17 @@ export interface CopyRequest extends VerifyRequest {
   dpi: number;
 }
 
-/** How the code holds up when it is shrunk, blurred and recompressed. */
+/**
+ * The margin is asked about the same picture the gate verified, plus one fact the raster does not
+ * carry: how many modules wide the code is, quiet zone included (`matrix.size + 2 × quietZone`).
+ * It is what makes ink spread a share of a module rather than a number of pixels that means
+ * something different at every size (ADR-035). The host takes 21 to 193.
+ */
+export interface ScanMarginRequest extends VerifyRequest {
+  modules: number;
+}
+
+/** How the code holds up on a screen, in a chat app and in print. */
 export interface ScanMargin {
   variants: ScanVariant[];
 }
@@ -253,15 +263,17 @@ export async function copyPng({
 
 /**
  * How far the code can be degraded and still read: shrunk, blurred,
- * recompressed. A report about a code that already passed, never a gate on it
- * (ADR-027) — a variant that fails says so in a line and blocks nothing.
+ * recompressed, and — since P4 — spread by ink, tilted and dimmed, the way
+ * print degrades it. A report about a code that already passed, never a gate
+ * on it (ADR-027) — a variant that fails says so in a line and blocks nothing.
  */
 export async function scanMargin({
   svg,
   payload,
   pixelSize,
   logo = null,
-}: VerifyRequest): Promise<ScanMargin> {
+  modules,
+}: ScanMarginRequest): Promise<ScanMargin> {
   // The saved code's id is deliberately not forwarded: the margin is a report about the picture
   // on screen, never a reading recorded against a row in the library (ADR-027).
   const raw = await invoke<RawScanMargin>('scan_margin', {
@@ -269,6 +281,63 @@ export async function scanMargin({
     payload,
     pixel_size: pixelSize,
     logo: placementArg(logo),
+    modules,
   });
   return { variants: raw.variants };
+}
+
+/** One module the damage test paints over the print, in symbol coordinates (quiet zone excluded). */
+export interface DamageCell {
+  x: number;
+  y: number;
+  /** Ink (`true`) or bare paper (`false`). */
+  dark: boolean;
+}
+
+/**
+ * The damage test is asked about the picture the margin is asked about — the same SVG, raster,
+ * logo and module count — plus the quiet zone, so the host can find the symbol inside the scene,
+ * and the cells a person smudged or drew (ADR-037).
+ */
+export interface DamageTestRequest extends ScanMarginRequest {
+  quietZone: number;
+  cells: readonly DamageCell[];
+}
+
+/** What the gate's decoder made of the damaged picture. */
+export interface DamageReport {
+  /** True only when the decoded bytes are the payload bytes. */
+  reads: boolean;
+  /** The host's own sentence when it did not read; null when it did. */
+  reason: string | null;
+  /** The decoder that was asked, name and version. */
+  decoder: string;
+}
+
+/**
+ * Paint the cells over the print and ask the gate's decoder whether it still reads (P9). The
+ * other half of the screen's answer: the arithmetic says whether the code is still guaranteed to
+ * read, and only a decoder can say what happens past the guarantee. A report about a code that
+ * already passed, never a gate on it — it records nothing and blocks nothing (ADR-037).
+ */
+export async function damageTest({
+  svg,
+  payload,
+  pixelSize,
+  logo = null,
+  modules,
+  quietZone,
+  cells,
+}: DamageTestRequest): Promise<DamageReport> {
+  // No saved code's id, for the reason the margin forwards none: this is a question about the
+  // picture on screen with somebody's thumb on it, never a reading of a row in the library.
+  return invoke<DamageReport>('damage_test', {
+    svg,
+    payload,
+    pixel_size: pixelSize,
+    logo: placementArg(logo),
+    modules,
+    quiet_zone: quietZone,
+    cells: cells.map(({ x, y, dark }) => ({ x, y, dark })),
+  });
 }
