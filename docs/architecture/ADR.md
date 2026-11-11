@@ -43,6 +43,7 @@ part that matters most later — the cost we accepted.
 | [035](#adr-035) | Print is a degradation of its own, and the margin says so                        | Accepted                      |
 | [036](#adr-036) | The Rust version declared is the one the tree needs, and a gate holds it         | Accepted                      |
 | [037](#adr-037) | A code has a weakest place, and the screen says where                            | Accepted                      |
+| [038](#adr-038) | A code can be made tougher, and each way says what it costs                      | Accepted                      |
 
 ---
 
@@ -2119,3 +2120,116 @@ resolution — the export's raster or 1,024 pixels, whichever is smaller (`MARGI
 paints the damage as whole modules on a clean raster. A smudge on paper has soft edges, and a phone
 is not `rqrr`. The answer is the gate decoder's opinion of one damaged render, which is what it is
 asked for, and the phone matrix of each release (SPEC §6) is still what decides.
+
+## ADR-038 — A code can be made tougher, and each way says what it costs {#adr-038}
+
+**Status: Accepted.**
+
+**Context.** **Where it breaks** ([ADR-037](#adr-037)) says how small a smudge can stop a code, in
+millimetres of the print. The next question a person asks is what to change, and every answer costs
+something they can see: a smaller logo is less brand, a higher level a denser code, a shorter link a
+campaign nobody can measure, a larger print more paper. Nothing in the first nine slices of 1.1 put
+those answers side by side or said which of them moves the number. The tenth slice does, and this
+record fixes which changes are offered, how each is measured, and what using one does.
+
+**Decision.** The last section of that card lists the ways to make the code tougher: the changes
+this screen can make that ask for a larger smudge, toughest first, each with what it gives up and a
+**Use** button (`src/features/create/toughness.ts`, `TougherList.tsx`). It is worked out only once
+the gate has passed the code on screen, like the card it sits in, and it opens with the code as it
+is now: _"Now: version 3, level H — a smudge 4.9 mm across can stop it."_ There are four kinds of
+change, and only these:
+
+| Row                                   | When it is considered                    | What it gives up, as the row says it                          |
+| ------------------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
+| `Without its tracking parameters (…)` | the code is a link that carries them     | _the site can no longer tell which campaign a scan came from_ |
+| `A small logo`, `A medium logo`       | the code has a logo                      | _the mark prints 2.9 mm wide instead of 6.1 mm_               |
+| `At least Q`, `Level H`               | the code has no logo                     | _a denser code: modules 0.68 mm instead of 0.76 mm_           |
+| `Printed 30 mm wide`                  | the next width on the list, up to 200 mm | _5 mm more paper each way_                                    |
+
+- **They are the controls this screen already has.** The logo's size, the level, the link and the
+  printed width are each set by hand on Create. Nothing is invented for the list: there is no
+  control here that is not also there. With a logo, the level is the engine's to choose
+  ([ADR-017](#adr-017)), so the list offers the logo's size instead; without one, it offers the
+  levels the Look card names, in its words. The printed width steps through the proof sheet's
+  sizes and on — 15, 20, 25, 30, 40, 50, 60, 80, 100, 150 and 200 mm — one step at a time.
+- **Each row is planned by the engine and measured as the card measures.** A row is not an
+  estimate. The change is handed to the same placement engine that plans the code on screen
+  ([ADR-013](#adr-013)), and the plan it returns is measured with the same weakest-spot arithmetic
+  ([ADR-037](#adr-037)), in millimetres at the printed width. A change the engine refuses — a level
+  this content does not fit at — is left out.
+- **Only a change that moves the number is offered.** A row must ask for a smudge at least 0.1 mm
+  larger than the code on screen, which is the precision the card prints. A change that leaves the
+  number where it was is not tougher, and a row that said so would be noise. When nothing qualifies,
+  the list says _Nothing on this screen makes it tougher._
+- **Two changes that end in the same code are one row.** Rows that plan the same version, level,
+  logo width and module width are the same symbol, and only the first is kept. Without a logo, a
+  link to a menu at level M is offered _At least Q_ and not _Level H_ as well: asking for Q already
+  plans level H for it, so the two rows would be one code.
+- **Use changes the same control a person would.** It sets the logo's size, the level, the link or
+  the printed width — in inches when the size card is in inches — and nothing else, so the gate
+  asks again, the card measures the new code, and the list is worked out afresh. It is not a second
+  way of making a code. While the gate asks, the card and the button that was pressed are gone,
+  so the focus is handed to the control that changed: a keyboard user lands on the change, not on the
+  page.
+
+**The tracking parameters are a fixed list, and only attribution.** A link copied from a campaign,
+an advert or a social network often carries parameters that say only where a click came from. In a
+printed code they cost twice: every character makes the symbol denser, so its modules print
+smaller, and every scan hands the campaign's labels to whoever runs the site. The list is the `utm_`
+family and seventeen named parameters — click identifiers such as `fbclid`, `gclid` and `msclkid`,
+and the campaign identifiers some mailing tools add — matched without regard to case, after
+decoding the name (`src/domain/tracking.ts`). Anything else — `ref`, `id`, `page`, a token — may
+change what the page shows and is never touched. The rest of the link is kept byte for byte: pairs
+are kept or dropped whole and nothing is decoded and encoded again, so an escape a re-serialising
+parser would rewrite stays as it was, a query left empty loses its `?`, and the fragment is kept.
+The row names what it takes out, and it is never applied without the person: a campaign may be
+exactly what somebody wants to measure, and the row says that this is what is given up.
+
+**Why not a version picker.** A larger version is a question somebody may ask, and the screen has
+no control for it. The version follows from what the code carries, its level and its logo; the
+engine plans it from those, and a control that set it directly would be a second way of making a
+code, beside the one the engine and the gate already answer for. Every row on this list is a change
+a person could make by hand without it.
+
+**Why not automatic.** Each change gives something up, and which loss is acceptable is not
+arithmetic: a brand may need its logo at the largest size, a code on a small label may need larger
+modules more than a stronger level, and a campaign may be the reason the code exists. The list says
+what each way buys and costs; the person who knows where the code is going chooses. That is the
+scan margin's rule ([ADR-027](#adr-027)) held here as well — a report with shortcuts, never a gate.
+Nothing is disabled, no verdict changes, and nothing changes until **Use** is pressed.
+
+**The quiet zone is not on the list.** It is a control on this screen too, and narrowing it would
+make the modules larger at the same printed width. But what it costs is whether a decoder finds the
+symbol at all, which the arithmetic leaves to the decoder ([ADR-037](#adr-037)), so the list could
+not say what that row gives up, and it does not offer it.
+
+**Measured examples.** A link to `https://example.com/menu` with a logo, printed 25 mm wide, is
+version 3 at level H, and a smudge 4.9 mm across can stop it. On a link that short every logo size
+plans the same symbol, so the only row is a larger print: _Printed 30 mm wide_, where the smudge
+must be 5.9 mm. A campaign link,
+`https://example.com/menu?table=12&utm_source=flyer&utm_medium=print&utm_campaign=summer-2026`, with
+a logo is version 9; without its tracking parameters it is version 4, its modules print larger, and
+the smudge that can stop it grows from 5.3 mm to 6.7 mm. The link field then holds
+`https://example.com/menu?table=12`, with `table=12` still in it.
+
+**Cost accepted: the number is the worst case.** Every row is measured with the weakest spot, which
+counts every codeword a disk touches as lost ([ADR-037](#adr-037)). A row that raises it from
+5.3 mm to 6.7 mm raises the smallest damage that can break the code, not the smallest that will.
+And a row is arithmetic until it is used: the decoder reads the code a row leads to only after
+**Use**, when the gate asks again.
+
+**Second cost: the tracking list is finite.** It names what attribution parameters are commonly
+called today, and it will miss names — a new advertising network's, a site's own. A parameter it
+does not know stays in the link, which is the safe way to be wrong: the row is missing, and the
+link still works. Adding a name is one line in `tracking.ts`.
+
+**Third cost: a larger print is always on the list.** Printed larger, every module is larger and
+so is the smudge that can stop the code, so the row is offered on every code printed narrower than
+200 mm. That is true, and for a short link with a logo it is sometimes the only answer the screen
+has, as it is for the menu above. The
+list does not weigh one cost against another either: it orders the rows by the smudge they ask for,
+and the toughest is not always the cheapest.
+
+**Fourth cost: several plans per code.** Each row is a plan and a weakest-spot search of its own, a
+few tens of milliseconds in all. It is worked out once per code and printed size, not on every
+render, and only after the gate has passed the code.

@@ -45,7 +45,8 @@ The move none of them make: **nothing is exported that an independent decoder di
 byte for byte, at the size it will be printed.** The logo is not decoration laid on top; it is
 placed by an engine that knows which modules the code cannot lose. And the product says where a
 code breaks: how small a smudge in the right place can be and still stop it, in millimetres at the
-printed size, with the decoder's own answer beside the arithmetic.
+printed size, with the decoder's own answer beside the arithmetic — and what on the screen would
+make it tougher, with what each change gives up.
 
 ## What exists today
 
@@ -253,7 +254,10 @@ block is corrected on its own and a logo has already spent part of the blocks it
 **Where it breaks** on Create says, in millimetres at the printed size, how small one smudge in the
 right place can be and still stop the code, shows its weak spots and lets you try to break it, with
 the arithmetic's guarantee and the gate decoder's answer side by side. It is a report: nothing is
-disabled and nothing is recorded.
+disabled and nothing is recorded. At its foot it lists the changes this screen can make that ask for
+a larger smudge — the link without its tracking parameters, a smaller logo, a higher level, a larger
+print — each measured the same way, with what it gives up; **Use** sets that control as a person
+would, and the gate asks again.
 
 The specification, with a proof of done per slice, is [`docs/SPEC.md`](docs/SPEC.md).
 
@@ -313,6 +317,10 @@ In one list, for somebody who has 1.0.0 and is deciding whether to update:
 - **Where it breaks** — what is left of the error correction once the logo is counted, how small a
   smudge can stop the code in millimetres at the printed size, the weak spots, and a way to try it
   and ask the decoder. A report: nothing is disabled and nothing is recorded.
+- **Ways to make it tougher** — the changes the screen can make that ask for a larger smudge, each
+  measured, with what it gives up: knowing which campaign a scan came from, a smaller mark, a denser
+  code or more paper. Nothing changes until **Use**, and on a short link with a logo a larger print
+  is sometimes the only row.
 
 ## The name
 
