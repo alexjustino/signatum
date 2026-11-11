@@ -226,6 +226,6 @@ export function nowLine(now: Measured): string {
 }
 
 /** One row's line: what the code becomes, and what the change gives up. */
-export function optionLine(option: ToughnessOption): string {
-  return `Version ${option.version}, level ${option.ecl} — a smudge ${mm(option.smudgeMm)} across can stop it; ${option.cost}.`;
+export function optionLine(option: ToughnessOption, now: Measured): string {
+  return `Version ${option.version}, level ${option.ecl} — a smudge ${mm(option.smudgeMm)} across instead of ${mm(now.smudgeMm)} can stop it; ${option.cost}.`;
 }

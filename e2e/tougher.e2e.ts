@@ -116,6 +116,12 @@ describe('make it tougher', () => {
     await (await session.driver.waitForElement(`button[aria-label="Use: ${label}"]`)).click();
   };
 
+  /** The accessible name of whatever has the focus now. */
+  const focused = () =>
+    session.driver.execute<string | null>(
+      `return document.activeElement ? document.activeElement.getAttribute('aria-label') : null;`,
+    );
+
   const scrollTougherIntoView = () =>
     session.driver.execute(
       `const ul = document.querySelector('ul[aria-label="Ways to make it tougher"]') ||
@@ -145,6 +151,8 @@ describe('make it tougher', () => {
           `return document.querySelector('input[aria-label="Link"]').value;`,
         )) === CLEANED,
     );
+    // The card went away while the gate asked again; the focus went to the field that changed.
+    await driver.waitFor('the focus on the link', async () => (await focused()) === 'Link');
     await driver.waitForText(VERIFIED);
     await waitForNow('the smaller code', (line) => line.startsWith('Now: version'));
     expect(await versionNow()).toBeLessThan(before);
@@ -166,6 +174,7 @@ describe('make it tougher', () => {
           `return document.querySelector('input[aria-label="Width"]').value;`,
         )) === '30',
     );
+    await driver.waitFor('the focus on the width', async () => (await focused()) === 'Width');
     await driver.waitForText(VERIFIED);
     await waitForNow('the larger print', (line) => line.includes('5.9 mm'));
   });
@@ -184,6 +193,10 @@ describe('make it tougher', () => {
         (await driver.execute<string>(
           `return document.querySelector('select[aria-label="Error correction"]').value;`,
         )) === 'Q',
+    );
+    await driver.waitFor(
+      'the focus on the level',
+      async () => (await focused()) === 'Error correction',
     );
     await driver.waitForText(VERIFIED);
     await waitForNow('the higher level', (line) => !line.includes('level M'));

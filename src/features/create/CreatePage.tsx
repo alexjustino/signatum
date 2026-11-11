@@ -612,6 +612,20 @@ export function CreatePage({
    * downstream follows from that control, as if the person had changed it by hand.
    */
   const applyTougher = (choice: ToughnessChoice) => {
+    // Using a row changes the code, so the gate asks again and the card — with the button that was
+    // pressed — goes away until it answers. Focus is handed to the control that changed rather than
+    // dropped on the page: a keyboard user lands where the change is, and sees it.
+    const changed =
+      'logoSize' in choice
+        ? 'select[aria-label="Size"]'
+        : 'ecl' in choice
+          ? 'select[aria-label="Error correction"]'
+          : 'url' in choice
+            ? 'input[aria-label="Link"]'
+            : 'input[aria-label="Width"]';
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(changed)?.focus({ preventScroll: false });
+    });
     if ('logoSize' in choice) {
       if (logo !== null) onLogo({ ...logo, size: choice.logoSize });
     } else if ('ecl' in choice) {

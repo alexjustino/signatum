@@ -103,8 +103,8 @@ describe('the rows in words', () => {
     const t = toughnessOptions(request({}));
     if (t === null) throw new Error('no plan');
     expect(nowLine(t.now)).toBe('Now: version 3, level H — a smudge 4.9 mm across can stop it.');
-    expect(optionLine(t.options[0] as NonNullable<(typeof t.options)[0]>)).toBe(
-      'Version 3, level H — a smudge 5.9 mm across can stop it; 5 mm more paper each way.',
+    expect(optionLine(t.options[0] as NonNullable<(typeof t.options)[0]>, t.now)).toBe(
+      'Version 3, level H — a smudge 5.9 mm across instead of 4.9 mm can stop it; 5 mm more paper each way.',
     );
   });
 });
