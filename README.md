@@ -15,7 +15,7 @@ No cloud. No account. No telemetry. No redirect. The code is a file you own.
 
 ---
 
-> **Status: 1.1.0 — "The proof", released 2026-11-02.** Installers are on the
+> **Status: 1.1.0 — "The proof", released 2026-11-11.** Installers are on the
 > [Releases page](https://github.com/alexjustino/signatum/releases): an **MSI** and an **NSIS**
 > `.exe`, either one is the whole product. They are **not code-signed**, so Windows SmartScreen
 > will show "Windows protected your PC" on first run — choose **More info**, then **Run anyway**,
@@ -404,7 +404,7 @@ npm run gates
 | Release   | Theme               | Contents                                                                                                                                                                    |
 | --------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **1.0.0** | The mark            | **released 2026-09-14** — the list above, on the Releases page                                                                                                              |
-| **1.1.0** | The proof           | **released 2026-11-02** — a proof sheet, a stamp in every file, a look-alike guard, print conditions, a library check, a print matched against the library, where it breaks |
+| **1.1.0** | The proof           | **released 2026-11-11** — a proof sheet, a stamp in every file, a look-alike guard, print conditions, a library check, a print matched against the library, where it breaks |
 | 1.2.0     | The card            | business-card and badge layouts (print-ready PDF sheets) · frames with a call to action · calendar events                                                                   |
 | 1.3.0     | The payment         | PIX BR Code (EMV, CRC16) · EPC SEPA · payload templates per country                                                                                                         |
 | 2.0       | Only if it earns it | macOS and Linux                                                                                                                                                             |

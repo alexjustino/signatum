@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.1.0] — 2026-11-02 — The proof
+## [1.1.0] — 2026-11-11 — The proof
 
 Signatum makes QR codes with a brand mark in the middle, on your own machine, and refuses to let
 one out until an independent decoder has read it back. That proves a file. It does not prove the
