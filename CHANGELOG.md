@@ -154,9 +154,10 @@ downloaded, and download only from this repository's Releases page.
   byte for byte, with nothing lost. A verification names the decoder that made it, so a code
   verified by 1.0.0 keeps saying `rqrr 0.10.1`, and **Check all again** on the Library asks the new
   one.
-- **Building from source needs Rust 1.88.** The manifest said 1.80, but the libraries Tauri brings
-  in already needed 1.88, so 1.0.0 could not have been built by the compiler it named. It now says
-  1.88, and a gate fails when a dependency needs more than the manifest declares (ADR-036).
+- **Building from source needs Rust 1.90.** The manifest said 1.80, but the libraries Tauri brings
+  in already needed 1.88, so 1.0.0 could not have been built by the compiler it named. A gate now
+  fails when a dependency needs more than the manifest declares, and it moved the floor once more
+  when Tauri 2.12 arrived (ADR-036).
 
 ### Fixed
 
