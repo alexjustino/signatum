@@ -59,6 +59,7 @@ function Invoke-Gate {
 $tauri = Join-Path $root 'src-tauri'
 
 Invoke-Gate 'version'      { node scripts/check-version.mjs }
+Invoke-Gate 'msrv'         { node scripts/check-msrv.mjs }
 Invoke-Gate 'cargo fmt'    { cargo fmt --all -- --check } $tauri
 Invoke-Gate 'cargo clippy' { cargo clippy --all-targets -- -D warnings } $tauri
 Invoke-Gate 'cargo test'   { cargo test } $tauri

@@ -54,6 +54,25 @@
 //!   becomes a place the interface leaves notes for itself. The theme moves out
 //!   of the browser store and into the file, which is where a preference that
 //!   has to survive a reinstall of the web view belongs.
+//! - P1: the proof sheet. The export at several sizes on one A4 page, each size
+//!   rendered at its own pixels and verified exactly as an export is, only the
+//!   sizes that read drawn — the rest are boxes with the reason — and a 50 mm
+//!   bar that tells a person whether the printer scaled the page. One
+//!   verification row per size attempted; nothing written when no size reads.
+//! - P2: the stamp. Every exported PNG, SVG and PDF — every batch file and the
+//!   proof sheet — carries a stamp saying what was verified and never when: a
+//!   UUID v4 reference, the decoder, and a digest of the file by its kind's
+//!   rule — and no digest of the payload (`export::stamp`). The row keeps the reference and
+//!   the digest (migration 007). `check_file` is Read's third door: it finds
+//!   the stamp in a `.png`, `.svg` or `.pdf` without rendering or decoding
+//!   anything, and says whether the file is unchanged and whether this
+//!   workspace is the one that verified it. The setting `stamp_exports` turns
+//!   stamping off; the clipboard is never stamped.
+//! - P9: where it breaks. `damage_test` paints the cells somebody smudged or
+//!   drew over the artefact the scan margin measures, logo included, and asks
+//!   the gate's decoder whether it still reads — the decoder's say past what
+//!   the error-correction arithmetic in the domain guarantees (ADR-037). It
+//!   records nothing and blocks nothing.
 
 pub mod commands;
 pub mod db;
@@ -109,6 +128,8 @@ pub fn run() {
             commands::codes::export_pdf,
             commands::codes::copy_png,
             commands::codes::scan_margin,
+            commands::codes::damage_test,
+            commands::proof::export_proof_sheet,
             commands::logos::import_logo,
             commands::logos::list_logos,
             commands::logos::logo_data_url,
@@ -127,6 +148,7 @@ pub fn run() {
             commands::batch::write_batch_report,
             commands::read::read_image,
             commands::read::read_clipboard,
+            commands::read::check_file,
             commands::settings::settings_get,
             commands::settings::settings_set,
             commands::settings::settings_all,

@@ -35,6 +35,24 @@ interface Report {
 
 type InvokeResult<T> = T | { __error: string };
 
+/** The PNG with its `signatum` tEXt chunk removed, or unchanged when it carries none. */
+function withoutStamp(png: Buffer): Buffer {
+  let at = 8;
+  while (at + 8 <= png.length) {
+    const length = png.readUInt32BE(at);
+    const type = png.toString('latin1', at + 4, at + 8);
+    if (
+      type === 'tEXt' &&
+      png.toString('latin1', at + 8, at + 17) === 'signatum' + String.fromCharCode(0)
+    ) {
+      return Buffer.concat([png.subarray(0, at), png.subarray(at + 12 + length)]);
+    }
+    if (type === 'IEND') break;
+    at += 12 + length;
+  }
+  return png;
+}
+
 describe('create', () => {
   let session: Session;
   let dir: string;
@@ -99,7 +117,9 @@ describe('create', () => {
 
     const bytes = await readFile(file);
     expect((await stat(file)).size).toBe(ok.bytes_written);
-    expect(createHash('sha256').update(bytes).digest('hex')).toBe(ok.artefact_sha256);
+    // The file carries a stamp (P2): one tEXt chunk before IEND. Without it, the file is byte for
+    // byte the PNG the decoder read.
+    expect(createHash('sha256').update(withoutStamp(bytes)).digest('hex')).toBe(ok.artefact_sha256);
     expect(decodePng(bytes)).toBe(LINK);
   });
 
@@ -121,8 +141,7 @@ describe('create', () => {
   it('says why when the link is not a link', async () => {
     const { driver } = session;
     const input = await driver.waitForElement('input[aria-label="Link"]');
-    await input.clear();
-    await input.sendKeys('javascript:alert(1)');
+    await input.fill('javascript:alert(1)');
     await driver.waitForText('has to start with https://');
     const button = await driver.findByXPath('//button[contains(normalize-space(.), "Export PNG")]');
     expect(await button.attribute('disabled')).not.toBeNull();
@@ -131,8 +150,7 @@ describe('create', () => {
   it('renders the preview identically in the dark theme', async () => {
     const { driver } = session;
     const input = await driver.waitForElement('input[aria-label="Link"]');
-    await input.clear();
-    await input.sendKeys(LINK);
+    await input.fill(LINK);
     await driver.waitForText('read it back byte for byte');
     const light = await sceneOnScreen();
 

@@ -39,10 +39,7 @@ describe('settings', () => {
 
   async function typeInto(label: string, value: string): Promise<void> {
     const field = await session.driver.waitForElement(`input[aria-label="${label}"]`);
-    await field.clear();
-    await field.sendKeys(' ');
-    await field.sendKeys(Keys.BACKSPACE);
-    await field.sendKeys(value);
+    await field.fill(value);
   }
 
   /** A number field set through React's own setter: a controlled input ignores WebDriver's clear. */

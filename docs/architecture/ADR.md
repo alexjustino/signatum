@@ -37,6 +37,13 @@ part that matters most later — the cost we accepted.
 | [029](#adr-029) | A batch is the Create pipeline in a loop, written only inside the chosen folder  | Accepted                      |
 | [030](#adr-030) | Read is the gate's own decoder on somebody else's pixels, and nothing is stored  | Accepted                      |
 | [031](#adr-031) | Settings are a closed list of keys the host owns, and the theme lives there      | Accepted                      |
+| [032](#adr-032) | A proof sheet is the export at several sizes, each proved, with a printer check  | Accepted                      |
+| [033](#adr-033) | A stamp says what was verified, and never when                                   | Accepted                      |
+| [034](#adr-034) | The address inside a code is said out loud, and never refused                    | Accepted                      |
+| [035](#adr-035) | Print is a degradation of its own, and the margin says so                        | Accepted                      |
+| [036](#adr-036) | The Rust version declared is the one the tree needs, and a gate holds it         | Accepted                      |
+| [037](#adr-037) | A code has a weakest place, and the screen says where                            | Accepted                      |
+| [038](#adr-038) | A code can be made tougher, and each way says what it costs                      | Accepted                      |
 
 ---
 
@@ -531,6 +538,17 @@ and not one of them needed to draw a background rectangle and a path. `usvg` and
 not declared as dependencies at all — `resvg` re-exports the exact versions it was built against,
 and a second copy of `tiny-skia` at another version would be two incompatible `Pixmap` types.
 
+**From 1.1, `usvg` is declared, for one feature.** From 0.48 the writer that re-serialises a logo's
+SVG from its parsed tree ([ADR-016](#adr-016)) is a feature of its own, and it goes off with
+resvg's defaults. `usvg` is declared at resvg's own version only to turn it back on; Cargo still
+builds one copy, and the code still reaches it as `resvg::usvg`.
+
+**From 1.1, the decoder is `rqrr` 0.11.0 and the renderer `resvg` 0.48.1.** Both moved in the
+dependency round of 1.1, each only after the corpus ([ADR-020](#adr-020)) had read 10 000 of 10 000
+codes back byte for byte with it. The table above is the day F0 landed; `Cargo.lock` is the version
+today. A verification records the decoder that made it, so rows written before the move go on
+saying 0.10.1.
+
 **`jsQR` is the third decoder**, in the end-to-end suite only, never in the product. It runs in
 the Node process that drives the binary, reads the PNG from disk after the product wrote it, and
 shares its lineage with neither the encoder (Nayuki) nor the host's decoder (`rqrr`, a port of
@@ -549,6 +567,9 @@ newer compiler, so 0.45 and 0.10 are what F0 takes rather than the latest publis
 real cost, and it comes due the day one of these crates fixes something that matters upstream:
 the answer then is to raise the MSRV across the family deliberately, in its own record, not to
 raise it quietly here for one crate.
+
+**From 1.1, the floor is 1.90 ([ADR-036](#adr-036)): 1.88 at first, then 1.90 with Tauri 2.12.** The tree Tauri brought in had already passed
+1.80 without anybody raising it; the declaration now says what the tree needs, and a gate checks it.
 
 ## ADR-020 — The matrix is proven against the standard, and the corpus is a proof, not a gate {#adr-020}
 
@@ -981,6 +1002,13 @@ months later.
   terminal, into a document that is about to be sent. The clipboard is an export like any other
   and goes through the same verification before anything is put on it.
 
+**From 1.1, every file also carries a stamp ([ADR-033](#adr-033)).** A PNG gains one `tEXt` chunk
+before `IEND` that the decoder never saw: remove it and what is left is, byte for byte, the PNG
+that was decoded, so the first sentence above becomes a claim anybody can check rather than a
+weaker one. An SVG gains one comment after the root's opening tag and a PDF one entry in its
+information dictionary, and neither is drawn. The clipboard carries none. With stamping turned off
+in Settings, each file is exactly what this record describes.
+
 **Why.** Four ways out is four chances to verify one artefact and write another, which is the one
 bug [ADR-010](#adr-010) was written to make impossible and the one that reaches paper without
 anybody noticing. Stating per format what the verified bytes are turns that from a property
@@ -1032,6 +1060,12 @@ Each variant reports its label and whether it read, and the screen shows them as
 gate an export, it does not change the verdict, and a code the gate passed is exportable whatever
 the nine lines say. Nothing in F7 writes the margin down: it is a report about one render at one
 moment, not evidence about a file that was written.
+
+**From 1.1, the margin is thirteen lines ([ADR-035](#adr-035)).** Four print conditions follow the
+nine above — ink spread on coated and on uncoated paper, a 30° tilt and dim light — under this
+record's rule unchanged: each is read by the same decoder, shown as a line, and blocks nothing.
+Where this record says nine, it means the half of the margin that a screen and a chat application
+do to a picture.
 
 **Why.** The two questions are different, and answering the second one with a refusal would be a
 category error. The gate answers _does this file read_ — a fact about one artefact, with one
@@ -1142,6 +1176,15 @@ and size, and editing the kit afterwards changes nothing that was already made. 
 behaviour the screen promises — one click sets the look — and it means there is no lineage to show
 a person who wonders why their older codes did not follow the kit. Recorded here so that the
 question has an answer.
+
+**From 1.1, the whole library can be asked the same question at once (P5).** "Check all again" on
+the Library runs, for every saved code in turn, exactly what Open runs — the fields rebuilt into a
+scene, the scene's digest compared with the one it was saved under, and the decoder asked again —
+and says on each row whether it rebuilds identically and reads, rebuilds differently but still
+reads, or no longer reads. It is the cost this record accepted, measured on demand rather than
+discovered on paper: after an update to the product, one press says which saved codes it changed.
+A Wi-Fi code saved without its password cannot be rebuilt into what was printed, and is reported
+as not checked rather than counted as a failure.
 
 ---
 
@@ -1417,7 +1460,8 @@ much later.
   the Save form's checkbox starts from rather than asking the same question about every network
   ([ADR-018](#adr-018)). A default is a starting point and never a rule: it is what a new code
   begins with, it is visible in the control it fills, and changing it on one code changes that
-  code, not the setting.
+  code, not the setting. From 1.1 the list has a sixth key, `stamp_exports`, the one setting the
+  host reads for itself ([ADR-033](#adr-033)).
 - **What is deliberately not kept.** **The window's position and size**, because they are the
   operating system's to remember and a product that restores its own geometry is a product
   fighting Windows about which monitor somebody is on. **A list of recent files**, because nothing
@@ -1453,3 +1497,739 @@ until a person cannot find the one they are looking for — the closed list is w
 short screen a year from now, and what lets `SECURITY.md` say plainly that the table holds no
 secret: `keep_wifi_passwords` holds the word `true` or the word `false`, and a table that refuses
 every key but five cannot be used as a store for anything at all.
+
+## ADR-032 — A proof sheet is the export at several sizes, each one proved, on a page that checks the printer {#adr-032}
+
+**Status: Accepted.**
+
+**Context.** The scan gate ([ADR-010](#adr-010)) proves a file: the bytes written are bytes a
+decoder read back, at the pixels they were rendered at. It cannot prove a print, and a print is
+what a person is about to pay for. Between the file and the paper stand a print dialog that may
+scale the page, a paper that spreads ink, and a phone camera in a room nobody measured — and the
+question somebody actually has, _what is the smallest size this code still reads at, from my
+printer_, is answered today by exporting four PDFs, printing four pages and hoping each was
+printed at 100 %. The cheapest test of a print is a print. The first slice of 1.1 makes that one
+page, and this record fixes what may be on it.
+
+**Decision.** The proof sheet is the PDF export ([ADR-026](#adr-026)) run at several sizes onto
+one A4 page. Nothing is drawn on it that was not proved, and one thing on it proves the printer.
+
+- **Which sizes.** 15, 20, 25 and 30 mm — a lapel badge, a label, a business card, a table tent —
+  and the size chosen on the Create screen when it is none of them, smallest first (`proofSizes`
+  in `src/domain/proof.ts`). A chosen size wider than the page can hold — 190 mm, the A4 width less
+  a 10 mm margin on each side — is left off, and a sentence at the foot of the sheet says so.
+  Shrinking it to fit would be the very scaling the sheet exists to catch.
+- **Each size is verified at its own raster, and only a verified size is drawn.** The domain gives
+  each size the pixels an export of that size would have, by the same rounding (`pixelsFor`), so
+  25 mm at 300 dpi on the sheet is the 295-pixel raster a 25 mm export would be. The host checks
+  each pixel count against its millimetres and the resolution before it renders anything, then
+  verifies each size exactly as a single export is verified — the same decoder, the same logo
+  placement, the same resolution — and the image placed on the page is **that** raster, at exactly
+  the size in points that `points` in `src-tauri/src/export/pdf.rs` gives its millimetres.
+  Verifying the largest size once and scaling it down for the others would be a proof of one size
+  and a claim about four: the second render [ADR-010](#adr-010) forbids, at another size instead
+  of in another format.
+- **A size that does not read is a box with its reason, never a picture.** A size is refused in
+  one of two places. The decoder refuses a size that rendered and did not read back — the case that
+  matters, because it is a dense code at 15 mm, and it is what the sheet is for. The domain refuses
+  a size whose raster falls outside the 64 to 4,096 pixels the host renders ([ADR-026](#adr-026),
+  second cost), and the host never renders that one; with the resolutions the Create screen offers
+  and a size it accepted, no size on the sheet falls outside, so this is a guard rather than a
+  case. Either way the cell is a dashed square with the sentence inside it. The box stays on the
+  sheet rather than being dropped, because the lesson of the sheet is the smallest size that reads,
+  and a sheet that quietly began at 20 mm would teach that 15 mm was never tried. If **no** size
+  reads, nothing is written: the command refuses with a sentence, and the attempts are recorded
+  without a path.
+- **A 50 mm bar against "fit to page".** The most common way a 25 mm code becomes 23 mm is not the
+  code: it is a print dialog shrinking an A4 page into the printable area of a printer that cannot
+  print to the edge. So the sheet carries a filled bar exactly 50 mm long, ticked every 10 mm, and
+  under it the sentence that says what a different measurement means — the printer scaled the page,
+  and the sizes above are wrong. The header asks for the page to be printed at 100 %. A ruler is
+  the only instrument the person needs.
+- **Ten times the width, said as a rule of thumb.** Under each code are its size, how far away to
+  hold a phone — `Hold about 25 cm away` for 25 mm (`readingDistanceCm`) — and a reference to the
+  verification that proved it. The distance is the rule of thumb printers use, ten times the width,
+  and it is printed as one, with _about_ in front of it: it is not something this product measured,
+  and the sheet itself is how the person finds out.
+- **No date, no author, no title, no path.** The sheet's document information says
+  `/Producer (Signatum)` and nothing else, as every PDF this product writes (`one_page`, F7): a
+  file that records when a code was made records something about the person who made it. That
+  holds for the page as well as the metadata, and it decides which part of the verification id is
+  printed: an id here is a UUID v7, whose leading digits are the millisecond it was made, so its
+  first eight characters would put the time of the print on the paper to within about a minute — a
+  date in all but name. The reference under each code is taken from the id's random end instead.
+  The stamp planned for 1.1 (P2) will put what was verified into every exported file, and it too
+  is planned without a date; it is not part of this record. It landed as [ADR-033](#adr-033): the
+  sheet's information dictionary now carries `/Signatum` beside `/Producer`, and still no date.
+- **The text is WinAnsi, and a summary the font cannot draw is replaced by a sentence.** The sheet
+  sets its text in Helvetica and Helvetica-Bold, the fonts every PDF reader carries, with no font
+  embedded, so the text it can draw is the Windows-1252 set. The product's own sentences are
+  written to fit it. The one line that comes from the person — what scanning the code does, "Opens
+  example.com", "Adds Ana Souza to contacts" — may not, since a domain in another script or a name
+  in Cyrillic is a perfectly good code. That line is never printed with letters replaced: when any
+  character falls outside the font's set, or the line is longer than 200 characters, it is replaced
+  by _"What this code does is shown in Signatum; this sheet prints only the characters its font can
+  draw."_ A summary with question marks where the letters were would be a printed sentence saying
+  something the code does not. A line that fits the font is wrapped to at most four lines and, in
+  the rare case it needs more — a long name with no space to break on — the fourth line ends in an
+  ellipsis: shortened, never altered.
+- **One verification row per size the host rendered.** Each is recorded in `verifications` as an
+  export would be — `kind` `export`, `format` `pdf`, the resolution, the saved code when one is
+  attached — and the sheet's path is written only on the rows whose image is on the page. A size
+  that read and a size that did not are both evidence; a row naming the sheet for a size the sheet
+  shows as a box would be a row saying a file holds something it does not. A size the domain
+  refused was never rendered and has no row: no decoder answered for anything. As for the
+  single-page PDF, the artefact each row hashes is the verified raster, which is the image the page
+  carries.
+
+**Why one page and not five exports.** Five exports printed separately are five chances for a print
+dialog to treat them differently, and none of them carries the bar. One page printed once puts
+every size under the same driver, the same paper and the same scaling, so the sizes can be compared
+with each other — and the bar beside them says whether any of them can be trusted.
+
+**Cost accepted: the sheet proves the raster, not the print.** What a decoder read is the picture
+on the page. What the printer, the paper and the phone then do to it is still the person's to find
+out, which is why the sheet asks to be printed and scanned rather than claiming to have done either.
+Each code on it is a picture of a code, as in the single-page PDF ([ADR-026](#adr-026)), for the
+same reason.
+
+**Second cost: up to five render-and-decode passes per press.** A sheet is up to five verifications
+where an export is one, so the command runs off the window's thread and the screen waits on it.
+That is the price of verifying each size rather than one.
+
+**Third cost: some people do not get their summary printed.** A code whose summary is in Greek gets
+the replacement sentence on its sheet. Embedding a font would lift that, at the cost of a font file
+in the binary and in every sheet; that is a decision for the day the replacement turns out to be
+common, and it is not made here.
+
+## ADR-033 — A stamp says what was verified, and never when {#adr-033}
+
+**Status: Accepted.**
+
+**Context.** The scan gate proves a file at the moment it is written ([ADR-010](#adr-010)), and the
+workspace keeps the row that says so. Then the file leaves — into an e-mail, onto a print shop's
+server, into somebody's layout — and months later a person holding `menu-final-2.png` asks the
+question that row cannot answer from where it sits: is this the file that was proved, and has it
+been changed since? Until 1.1 nothing in the file pointed back at its row, so there was no way to
+say. The second slice of 1.1 puts a stamp in every file this product writes. Three shortcuts came
+with it, and each is refused below. Writing the verification id into the file is the obvious one,
+and the id is a UUID v7 whose leading 48 bits are the moment it was made. Writing the date is the
+next one, because the workspace knows it. Signing the stamp is the third, and a key inside a
+desktop binary is a key everybody who has the binary holds.
+
+**Decision.** Every PNG, SVG and PDF an export writes — a single export, every file of a batch, and
+the proof sheet — carries exactly one stamp, unless the person has turned stamping off. The stamp
+is one line of ASCII JSON, four keys in this order, no whitespace, and nothing else
+(`src-tauri/src/export/stamp.rs`):
+
+```text
+{"signatum":1,"ref":"<uuid v4>","decoder":"rqrr 0.10.1","digest":"<sha256>"}
+```
+
+- **`ref` is a reference of its own, a UUID v4, and never the verification id.** Row identifiers
+  are v7 ([`DATA_MODEL.md`](../DATA_MODEL.md)), and the first twelve hex digits of a v7 are the
+  millisecond it was made: a stamp carrying one would put the time of the export inside the file,
+  which no export of this product does — the reason the proof sheet prints the random end of the id
+  and not its start ([ADR-032](#adr-032)). So each stamped file gets a fresh v4, 122 random bits
+  and no time, made for that file and recorded on the row that proved it.
+- **`decoder` is the name and version that read the artefact back**, and it must read
+  `name x.y.z` — `rqrr 0.10.1` — so a stamp cannot carry a sentence, a path or anything that needs
+  escaping where it is written: not in a PDF string, where a parenthesis would end it, and not in an
+  XML comment, where `--` is not allowed.
+- **The stamp carries nothing about the payload — not the payload, and not its digest.** The
+  slice's first design put the payload's SHA-256 in the stamp, on the argument that anybody holding
+  the code can scan it anyway. It was taken out before it shipped, for two reasons. The reference
+  and the digest already bind the file to its row, so a payload digest adds nothing Read needs. And
+  a file outlives its code: crop the code out of a stamped picture, or paste the drawing into a
+  layout that keeps the metadata, and what is left is a hash of the payload with nothing visible
+  beside it. A payload with little entropy — a Wi-Fi code for a network whose name is known, where
+  only the password is unknown — can be guessed offline against that hash, as fast as a machine can
+  hash, with nobody to notice. A stamp that names no payload cannot be used that way. The file's
+  name, its folder and the person who made it are not in the stamp either.
+- **`digest` is defined per format, so a reader can recompute it from the file alone.**
+  - **PNG** — the stamp is one `tEXt` chunk, keyword `signatum`, whose text is the JSON alone, with
+    no prefix, and it counts only as **the last chunk before `IEND`, with a correct CRC**; a
+    `signatum` chunk anywhere else, or one whose CRC does not match, is a stamp that could not be
+    read. `digest` is the SHA-256 of the file **with that chunk removed**.
+  - **SVG** — the stamp is the comment `<!-- signatum:{json} -->`, right after the root element's
+    opening tag. `digest` is the SHA-256 of the whole file with the 64 hex characters of the
+    `digest` value replaced by 64 zeros.
+  - **PDF** — the stamp is the entry `/Signatum (signatum:{json})` in the document-information
+    dictionary, beside `/Producer (Signatum)`. `digest` follows the SVG's rule.
+- **The PNG's digest is the decoded artefact, which makes [ADR-026](#adr-026) stronger.** The chunk
+  goes in around bytes the decoder already read and touches none of them, so the file minus its
+  stamp is, byte for byte, the PNG that was decoded, and the stamp's `digest` is the row's
+  `artefact_sha256`. "The written file is the verified pixmap" becomes "remove the stamp and you
+  hold exactly what was decoded" — a claim anybody can check with a chunk walk and a hash, and the
+  one the tests now make, after removing the chunk, in every place they used to compare the whole
+  file.
+- **SVG and PDF use a placeholder, because their stamp sits inside the text it hashes.** The file
+  is written with 64 zeros where the digest goes, hashed, and the digest is written over the zeros.
+  Nothing moves: 64 characters replace 64 characters, so every cross-reference offset in the PDF
+  stays true without the file being rebuilt. A reader puts the zeros back and hashes again. Unlike
+  the PNG's, this digest covers the stamp's own other fields as well as the drawing.
+- **Reading a stamp is bounded, and parses nothing but the stamp.** A PNG is walked chunk by chunk
+  and never past its own bytes; an SVG or a PDF is searched for its marker as bytes, never parsed,
+  drawn or decoded. The marker must occur **exactly once** — a file with two stamps is refused,
+  because neither can be trusted — and the JSON is at most 512 bytes, parsed into a closed struct
+  and accepted only if writing it back out gives the very same bytes. So whitespace, reordered
+  keys, an unknown key — a `payload` included — an upper-case digest, a v7 reference, a decoder
+  that does not read `name x.y.z` and `"signatum":2` all read as _"This file's Signatum stamp could
+  not be read."_ That last one is deliberate: a future format needs a reader that knows it, and
+  this build does not guess at a stamp it was not written to read.
+- **The workspace keeps the two halves the file cannot vouch for.** Migration 007 adds `stamp_ref`
+  and `stamp_digest` to `verifications`, schema version 7. They are set together or not at all, and
+  only on a verified row that has a path — a stamp on a refusal would be a stamp on nothing — with
+  a unique index on the reference. For a batch, each file has its own reference on its own row. For
+  the proof sheet, which holds several verifications on one page, the stamp's `digest` covers the
+  whole sheet and its reference is recorded on one row: the chosen size's when it was drawn, else
+  the smallest drawn size's.
+- **Read checks a file, and the date it shows is the workspace's.** **Check an exported file…**
+  opens a `.png`, `.svg` or `.pdf` through `check_file`, the fourth door that reads a file
+  ([`SECURITY.md`](../../SECURITY.md)). It recomputes the digest and looks the reference up. The
+  stamp _matches the record_ when this workspace holds a row with that reference whose
+  `stamp_digest` is the stamp's digest. When, in which format, at which resolution and of which
+  saved code the file was verified are read from that row, and shown **only when the file is also
+  unchanged**: a stamp copied onto edited pixels is reported as changed, with no date, because the
+  row's date is about a file this one no longer is. A file that matches no row here is told nothing
+  but what its own stamp says. A PNG opened through _Open an image…_ reports the same check when it
+  carries a stamp this build can read. Like the rest of Read ([ADR-030](#adr-030)), checking a file
+  stores nothing.
+- **Turning it off is a setting, and it is on by default.** `stamp_exports` joins the closed list
+  ([ADR-031](#adr-031)) as **Stamp exported files** under Settings → Defaults. Off, every file is
+  written exactly as before the stamp existed, and the row's two columns are `NULL`, which is the
+  truth: that file was not stamped.
+- **The clipboard carries no stamp.** The system copies pixels, not files, and a stamp on the
+  clipboard would be one the next paste throws away.
+
+**What the stamp proves, and what it does not.** _Unchanged_ proves one thing: the file matches its
+own stamp. Only a row in **this** workspace holding the same reference and the same stamp digest,
+for a file that is unchanged, says this workspace verified it. The stamp is not a signature and not
+authentication. Its format is in this record and the code is open, so anybody can write one — onto
+a file of their own, with a correct digest — and such a file reads as stamped and unchanged. That
+is why a stamp that matches its file and no row here is reported as exactly that, _a stamp from
+another workspace_, with the decoder it names and nothing said about when or where, and never with
+the mark this product gives its own verified work. A reference this workspace issued, carrying a
+digest that is not the one recorded, is a different file under a borrowed stamp, and it is said so.
+
+**Why not a signature.** A signature needs a private key, and a private key in an offline desktop
+product is either in the binary, where anybody can take it out, or per workspace, where it proves
+only what the matching row already proves. Either way it would turn "this workspace has a record of
+this file" into "this file is authentic", a claim the product could not back. The row is the
+evidence; the stamp is how a file finds its row.
+
+**Cost accepted: a stamp is easy to lose, and losing it proves nothing.** A PNG optimiser that
+strips ancillary chunks, an SVG optimiser that strips comments, an editor that re-saves the file —
+any of them may drop the stamp, and Read then says the file carries none, which is true and is no
+evidence of anything. One that keeps the stamp while changing the bytes leaves a stamp that no
+longer matches, and Read says the file was changed after it was verified. Stamps written before
+this slice do not exist, so every file exported by 1.0.0 carries none.
+
+**Second cost: in a PNG the stamp's own fields are outside its digest.** The PNG's digest is the
+decoded artefact so that the stronger [ADR-026](#adr-026) claim holds, and the price is that its
+`ref` and `decoder` can be rewritten without making the file read as changed. That is the forger's
+case above, met the same way: what binds a file to a verification is the row, and a rewritten
+reference either names no row here or names one whose digest is not this file's.
+
+**Third cost: one shape, stated in two places.** The shape of a reference and of a digest is checked
+in the host, before a stamp is written and when one is read, and again by the `CHECK` constraints of
+migration 007. The file is written before its row, so a change to one side without the other would
+be a stamped file on disk whose row the database then refuses, and an export that reports an error
+about a file it did write. A host test and a migration test each pin their own side, as the raster
+bounds are pinned in [ADR-026](#adr-026).
+
+## ADR-034 — The address inside a code is said out loud, and never refused {#adr-034}
+
+**Status: Accepted.**
+
+**Context.** A printed code is followed by somebody who cannot see where it goes. Whoever holds the
+flyer, the menu or the sticker on a parking meter sees a square; the phone shows the address for a
+moment, in a font made for small screens, to a person whose thumb is already on it. The product
+already shows a link both ways, before it is printed and when it is read (SPEC §5): an
+internationalised domain in Unicode **and** in punycode, `bücher.example (xn--bcher-kva.example)`.
+That makes a look-alike visible to somebody who knows what the second form means. It does not say
+why it matters, and it says nothing about three other things an address can be that a person
+cannot tell by looking at it. The third slice of 1.1 says them, and this record fixes what is said,
+where, and what it does not do.
+
+**Decision.** The host of a link, and the domain of an e-mail address, go through a pure function
+in the domain (`checkHost` and `checkLink` in `src/domain/lookalike.ts`), and each thing it finds is
+one sentence, shown before the code is made and again when a code is read. Five things are named:
+
+- **A label that mixes alphabets.** `аpple.com`, with a Cyrillic `а`: one letter from another
+  alphabet is the cheapest way to make an address that reads as a known one and belongs to somebody
+  else. When every foreign letter in the label stands for a Latin one, the sentence names the word
+  it reads as — _"“аpple” mixes Latin and Cyrillic letters: it reads as “apple”, but it is a
+  different address."_ — and otherwise it says that real names rarely mix alphabets in one name.
+- **A label in another alphabet that imitates a Latin word.** `ѕсоре.com` is Cyrillic from end to
+  end, so nothing in it is mixed, and every letter of it is drawn like a Latin one: it reads as
+  `scope`. The sentence names the Latin word and says it is a different address. A Latin letter that
+  is not the plain one — `ɡ`, U+0261, in `ɡoogle.com` — is named the same way.
+- **A character that is not a letter, a digit or a hyphen.** A host name needs none, and every one of
+  them can be drawn as punctuation that is not there: a fraction slash in `bank.com⁄login.evil.com`
+  makes a host that reads as a path on `bank.com`. Kana that look like a slash or a dash count too
+  when they stand alone among Latin letters (`paypalーlogin.com`); inside a Japanese name they are
+  letters and say nothing. The sentence names each character by its code point, `U+2044`, and every
+  label quoted in any sentence has such characters written that way, so a label cannot add words,
+  quotes or spaces to the sentence that quotes it.
+- **A known link shortener.** `bit.ly`, `t.co`, `tinyurl.com` and the rest of a fixed list
+  (`SHORTENERS`), matched as the host or a parent of it, so `www.tinyurl.com` counts and
+  `notbit.ly.example.com` does not. A shortener is a dynamic code somebody else made: the printed
+  code opens a redirect, and where it lands is decided by whoever controls the short link, on the
+  day of the print run and every day after. It is the thing this product refuses to make
+  ([ADR-014](#adr-014)), and the person holding the code deserves to know when it is in there.
+- **An IP address instead of a name.** A raw address tells nobody reading it whose server it is.
+  When it is on a private network — `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, the
+  carrier-grade `100.64.0.0/10`, `0.0.0.0/8`, loopback and link-local, their IPv6 counterparts, and an
+  IPv4 address carried inside IPv6 — the sentence says what somebody printing it most needs
+  to hear: it opens only on that network, and not from a phone outside it.
+
+What is judged is the host a URL parser finds: the one the summary names and the phone will open.
+Where it is said is the interface's half of the slice. On Create, under the line that says what the
+code does, a caution `InfoBar` titled _Check this address_ lists the sentences, for a link and for
+the domain of an e-mail address. On Batch, a link row's status reads _Planned · check the address_,
+and the sentences are listed under the plan by line number. On Read, each code's card carries
+_Check this address before you open it_ above what the code holds. Each is computed from the payload
+the screen already has: no second build and no second timer.
+
+**It warns, and it never refuses.** No button is disabled, no verdict changes, no batch row is held
+back, and Read still offers to make a code like the one it found. Each of the four has an honest
+use. A shortener can be somebody's own, on an account they control. A private address is exactly
+right for a code on the door of a plant room, read only from inside that network. A brand can mix
+alphabets on purpose. A product that refused them would be wrong for those people, and would send
+them with the same link to a generator that says nothing at all — so the warning would end up
+reaching nobody. Said in a sentence, it costs the person who meant it one line of reading; the
+person who did not — who pasted a link from a message, or is about to follow one off a sticker —
+learns it while it can still change something. This is the scan margin's rule
+([ADR-027](#adr-027)) applied to the address: a fact worth knowing is information, and the one gate
+in this product is the one with a single correct answer ([ADR-010](#adr-010)).
+
+**Mixed scripts are judged by Unicode's "highly restrictive" profile (UTS #39 §5.2).** A label in a
+single alphabet is quiet, and so are the mixtures real names use: Japanese writes Han, Hiragana and
+Katakana together, Chinese pairs Han with Bopomofo, Korean pairs Han with Hangul — each with Latin
+beside it. Anything else in one label is named. A simpler rule, "two alphabets is a warning", would
+speak on every Japanese domain and teach the people who read them to stop reading it; the corpus
+carries `日本語とカタカナ.jp`, `中文.example` and `한국어.kr` as names that must stay quiet.
+
+**A whole label in another alphabet is named only away from its home domains.** `οικο` is a Greek
+word, and under `.gr` it is a Greek address; the same letters under `.com` read as the Latin `oiko`,
+and that is what a look-alike is made of. So a label written wholly in Cyrillic, Greek or Armenian
+that reads as a Latin word is named unless its top-level domain is one where that alphabet is at
+home — the country-code domains of the countries that write it, and the top-level domains written
+in it (`HOME_DOMAINS`). It is the idea browsers apply to whole-script confusables, kept narrower
+than they do: a country-code domain that is sold to everybody — `.me`, `.am` — is nobody's home and
+exempts nothing. Without the rule the corpus row `οικο.gr` would be a false alarm about somebody's
+own language. A mixture is named
+wherever it is: a Latin word with one Cyrillic letter in it is a word in no language.
+
+**The corpus is the specification.** `src/domain/lookalike.test.ts` lists hosts with the warnings
+each must produce, in order: ordinary names in Latin, Chinese, Japanese, Korean, Cyrillic and Greek
+that must produce none; mixtures; imitations at home and away from it; shorteners, and a name that
+only contains one; public and private addresses, in both IP versions. A change to the tables is a
+change to that list first.
+
+**No network.** The guard is a function of the characters of a host. It looks nothing up, asks no
+service, downloads no list, and does not follow a redirect to see where it lands
+([ADR-006](#adr-006)).
+
+**Cost accepted: the table of look-alike letters is a short one.** It holds the lower-case Cyrillic,
+Greek and Armenian letters, and the Latin `ɡ`, that are actually used to imitate domains
+(`IMITATES`), not Unicode's
+whole confusables table. A mixed label that imitates a word with a letter not on it is still named
+as a mixture, but the sentence cannot say which word it reads as; a label written wholly in another
+alphabet with such a letter says nothing. Latin letters with an accent or a dot that imitate the
+plain one (`ạpple`, `lınkedin`), and those built with combining marks, are not in it and say
+nothing. Letters of an alphabet outside the fifteen the guard knows are not counted at all. The whole table runs to thousands of entries, most of them characters no
+registry accepts in a domain, and a guard that named every theoretical confusion would be the mark
+that is always on ([`DESIGN_SYSTEM.md`](../../DESIGN_SYSTEM.md) §2).
+
+**Second cost: a shortener that is not on the list says nothing.** The list is a list. A new
+service, a company's own short domain, a redirect served from an ordinary one — none of them can be
+told from the host, and finding out would mean following the link, which this product does not do.
+Silence from the guard is therefore not a statement that a link is safe, and nothing on the screen
+says it is: the guard names what it found, and it has no "this address is fine".
+
+**Third cost: it is not a phishing filter.** It knows nothing of who owns a domain, of whether a
+correctly spelled name is malicious, or of whether a page changed after the code was printed. An
+ordinary-looking `.com` that serves a fake login page passes in silence, and so does a swap that
+stays inside plain ASCII — `paypa1` for `paypal`, `rn` for `m`. What it does is narrower, and can be
+checked against its corpus: it says the five things an address can be that a person cannot see by
+looking at it. On Read an e-mail code is checked on every address it writes to — the list before
+the `?` and the `to`, `cc` and `bcc` fields after it — so a second recipient cannot hide behind the
+first.
+
+**Fourth cost: it reads links and e-mail domains, and nothing else.** The link and the e-mail
+address inside a contact card are not checked — not on Create, not in a batch of contact cards, not
+on Read — and a text code that happens to contain a URL is text. They are left as they are in this
+slice; taking one of them in is a call to the same function.
+
+## ADR-035 — Print is a degradation of its own, and the margin says so {#adr-035}
+
+**Status: Accepted.**
+
+**Context.** The scan margin ([ADR-027](#adr-027)) degrades the verified render nine ways — shrunk,
+blurred, recompressed — and asks the gate's decoder about each. Those are what a screen and a chat
+application do to a picture. Print does something else. Ink spreads into the paper, so the dark
+modules grow and the light gaps between them close, more on uncoated stock than on coated. A phone
+is held at an angle, not square to the page. And the light on a wall, a table or a shop window is
+not the light of a monitor. These are the questions a printer asks before a run, and a margin that
+answered only the screen's left the print's to the proof sheet ([ADR-032](#adr-032)) — after the
+paper. The fourth slice of 1.1 adds them, and this record fixes which, how each is made, and what
+the answers are worth.
+
+**Decision.** Four variants follow the nine, in this order and with exactly these labels — the
+labels are a contract with the screen, which prints them and does not build them
+(`src-tauri/src/imaging/margin.rs`):
+
+| Line                         | What is done to the verified raster                                                                            | The question it answers                                 |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `Ink spread, coated paper`   | every dark area grows by 8 % of a module on each edge                                                          | will it survive a coated label, a glossy card           |
+| `Ink spread, uncoated paper` | the same at 18 % of a module                                                                                   | will it survive office paper, a paper bag, a newspaper  |
+| `Tilted 30°`                 | the plane turned 30° about its vertical centre line, seen in perspective                                       | will it read from a phone that is not held square to it |
+| `Dim light`                  | the contrast cut to 35 % around the mid-grey, a fixed-seed noise of up to 12 grey levels, then a 1 px box blur | will it read in the room it hangs in, not on a monitor  |
+
+- **Ink spread is a grey-scale erosion.** A minimum filter over a square window of radius
+  `max(1, round(share × module_px))` pixels, with `share` 0.08 for coated paper and 0.18 for
+  uncoated, grows every dark area by that radius on each edge, and a light gap narrower than twice
+  the radius closes — which is how ink takes a code: not by blurring it, but by filling the white
+  between its modules. The window is square because a module is: its edges are horizontal and
+  vertical, where a square and a disc grow it by the same amount. The edge of the raster is
+  extended outwards, as the paper continues past what was printed on it.
+- **The radius is a share of a module, so the screen says how many modules there are.**
+  `module_px` is the raster's width divided by the code's side in modules, and the raster does not
+  know that number; the domain does. So `scan_margin` takes `modules` — the matrix size plus twice
+  the quiet zone — and refuses one outside 21 to 209, a version-1 symbol with no quiet zone to a
+  version-40 symbol with the widest quiet zone the Create screen allows, sixteen modules a side, as
+  invalid input before anything is rendered. A spread in pixels would mean something different at
+  every size: two pixels is a fifth of a 10-pixel module and a twentieth of a 40-pixel one, and the
+  margin is measured on the export's raster or on 1,024 pixels, whichever is smaller
+  (`MARGIN_MAX_PIXELS`), so the same code would get a different answer from a different cap. A
+  share of a module is the same part of the code at any raster.
+- **The tilt is a projective warp, not a shear.** The plane is turned 30° about its vertical centre
+  line and seen from three times its width, with a focal length equal to that distance, so the
+  centre line keeps its size, the near half grows and the far half shrinks, as a camera sees a page
+  at an angle. Sampling is bilinear, because a camera's pixels average what falls on them; the
+  image keeps its size, and whatever the turned code no longer covers is white, as the paper around
+  it would be.
+- **Dim light is deterministic.** Each grey `v` becomes `127.5 + (v − 127.5) × 0.35` — black and
+  white land near 83 and 172, about a third of the range — then gains uniform noise of up to 12
+  grey levels either way, drawn from SplitMix64 with a fixed seed, and a 1 px box blur follows. The
+  seed is fixed so the same artefact gets the same verdict on every machine and every run: a margin
+  that changed its answer between two asks would be measuring the dice, not the code.
+- **Each is read by the same decoder as the nine**, `rqrr` ([ADR-019](#adr-019)), and reported the
+  same way: a label, and whether the payload came back byte for byte.
+- **On the screen they are a group of their own.** The margin card lists the nine under _On screen
+  and in chat_ and the four under _In print_, with a caption that says what the four are
+  ([`DESIGN_SYSTEM.md`](../../DESIGN_SYSTEM.md) §8). The line is unchanged: _"Ink spread, uncoated
+  paper — fails"_.
+
+**Still a report, never a gate.** [ADR-027](#adr-027) holds as written. Nothing about the four
+disables an export, changes the verdict or is recorded: the margin writes no row. The case the slice
+was built to show is a code that reads clean and fails under ink spread, and the margin says so on
+the line named for it. A test draws one by hand — a heavy look at 12 pixels a module, every dark
+module grown 3 pixels on each edge, so a lone light module is a 6-pixel gap. It reads clean; coated
+paper spreads it by one pixel, the gap keeps four, and it reads; uncoated paper spreads it by two,
+the gap keeps two, and it fails. That code is still a true code, and on a coated label it may be
+exactly right. A failing line is information for choosing a size, a look or a paper, and the person
+who knows what the code is going onto is the one who chooses. The real test of a print is a print:
+the proof sheet ([ADR-032](#adr-032)), on the paper that will be used, read with a phone.
+
+**Why these four.** They are the conditions that separate a print from a file and that a raster can
+stand in for without knowing anything about the printer: paper on two common kinds of stock, an
+angle, and a room. Glare, a curved surface, a crease and a press's halftone screen are not
+modelled; each is better answered by the proof sheet than by a synthetic picture of it.
+
+**Cost accepted: the figures are conventional, not calibrated.** 8 % and 18 % stand for coated and
+uncoated stock as approximations of how far apart the two are — uncoated paper drinks more ink and
+spreads it further — and not as a measurement of any press, paper or ink. 30° is an angle somebody
+plausibly holds a phone at, and dim light a room somebody plausibly reads in; neither was measured
+against a camera. And ink spreads by a distance on the paper, not by a share of anything: a fixed
+share is kinder than paper to a code printed small and harsher to one printed large. The margin is
+not told the printed size — it measures pixels — so a share of a module is the simplification the
+raster allows. The honest reading of _"Ink spread, uncoated paper — reads"_ is therefore "this code
+has room for 18 % of a module of spread", not "this code reads from any uncoated paper". The
+figures sit in constants beside their reasons (`INK_SPREAD`, `TILT_DEGREES`, `DIM_CONTRAST`,
+`DIM_NOISE`), so changing one is one line and one record.
+
+**Second cost: a spread is never less than one pixel.** A spread that rounded to nothing would
+report a small code as surviving print because the arithmetic could not see it, so the radius has a
+floor of one pixel. On a very small raster, where a module is not a whole number of pixels, that
+pixel is a large share of the narrowest light gap, and both ink-spread lines can fail while the
+clean read passes — coated and uncoated then say the same thing. What they lead to, printing it
+larger, is what a code that small needs anyway, and the proof sheet is where it is settled.
+
+**Third cost: thirteen decodes, not nine.** The margin takes about 40 % longer to arrive. It is
+still asked for after the verdict and off the window's thread, never between a verdict and a file,
+and the bound it is held to is unchanged: three seconds on the release build at the largest raster
+it measures.
+
+## ADR-036 — The Rust version declared is the one the tree needs, and a gate holds it {#adr-036}
+
+**Status: Accepted.**
+
+**Context.** ADR-019 kept `rust-version = "1.80"` so that one toolchain would build the whole
+family, and said that raising it would be done deliberately, in a record of its own. The dependency
+round of 1.1 found that it had already been raised, silently, by the tree. Tauri 2.11 brings in
+`darling` 0.24 and the `icu` 2.3 crates, and each of them declares Rust 1.88; the product released
+as 1.0.0 could not have been built by the compiler its manifest named. Nothing noticed, because CI
+installs the newest stable compiler and never the declared one, and Cargo checks a crate's
+`rust-version` only against the compiler in hand. The updates that started the round — `sha2` 0.11,
+`resvg` 0.48 and `rqrr` 0.11 — need 1.85, which is below the floor the tree already had.
+
+**Decision.** `rust-version` is **1.88**: the highest any crate in the Windows build declares, and
+so the first version the declaration is true at. `scripts/check-msrv.mjs` holds it there. It asks
+Cargo for the dependency graph that builds on Windows, takes the highest `rust-version` in it, and
+fails the gates when that is newer than the one declared, naming the crates. A dependency update
+that raises the floor therefore says so in the pull request that brings it, and raising the
+declaration is one line in that change, with the reason beside it.
+
+**Why not a second toolchain in CI.** Building once more with exactly the declared compiler is the
+stronger proof — it would also catch a language feature used before its time — and it costs a
+toolchain download and a full build on every run. The gate costs one `cargo metadata`. What went
+wrong here was a claim the tree contradicted, and that is the part the gate checks; the compiler a
+contributor actually uses is the newest stable one, as CI's is.
+
+**From the November round, 1.90.** Tauri 2.12, brought in with `tauri-plugin-log` 2.10, declares
+Rust 1.90; the gate failed that update's pull request, as it was built to, and the floor moved
+with it in the same change.
+
+**Cost accepted: the family drifts apart.** The siblings declare their own floors, and they are no
+longer one number. The reason ADR-019 gave — one toolchain builds everything — still holds, because
+that toolchain is the current stable compiler, newer than any floor; what is given up is a single
+figure to quote, which was not true here anyway.
+
+## ADR-037 — A code has a weakest place, and the screen says where {#adr-037}
+
+**Status: Accepted.**
+
+**Context.** It is commonly said that level H survives 30 % damage, and this product raises a code
+with a logo to level H when the logo needs it ([ADR-017](#adr-017)). The figure is true of damage
+spread perfectly evenly over the symbol, and of nothing else. ISO/IEC 18004 splits a symbol's
+codewords into error-correction blocks, and Reed–Solomon corrects each block on its own: a block can
+lose half its error-correction codewords and still be corrected, and the code fails the moment any
+one block loses more. Damage is not spread evenly. A smudge, a scratch, a staple or a drop of
+coffee lands in one place, and the codewords in one place belong to a few blocks. A logo has spent
+part of the budget before anything is printed: the plate covers codewords, the placement engine
+charges them to the blocks they belong to ([ADR-013](#adr-013)), and each of those blocks starts
+with part of its correction gone. So a code has a weakest place, and a smudge there can stop it
+long before 30 % of anything is gone. Nothing in 1.0.0 said where that place is, or how small the smudge
+that finds it. The ninth slice of 1.1 says both, and this record fixes how they are worked out,
+what the screen does with them, and what the answers are worth.
+
+**Decision.** Four answers come from the matrix alone, in the domain, with the standard's
+arithmetic and no decoder (`src/domain/resilience.ts`):
+
+- **What each block can still lose** (`blockBudgets`). Each block's capacity is half its
+  error-correction codewords; the codewords under the plate — the logo box grown by the engine's
+  padding — are charged to the blocks they belong to; what is left is the spare.
+- **Whether given damage is still guaranteed to read** (`predictDamage`). Damage is a set of
+  modules, each left as ink or as paper. A codeword is lost when at least one of its eight modules
+  changes — ink on a dark module, or paper on a light one, changes nothing — and a codeword the
+  plate already took is not counted twice. The answer is one of three: _guaranteed_, every block
+  within its capacity and nothing structural touched; _past its guarantee_, at least one block lost
+  more than it can correct; or _the decoder decides_, below.
+- **Where the code is weakest** (`weakestSpot`). The smallest round smudge, centred on a data
+  module outside the plate, that pushes one block past its capacity when every codeword it touches
+  is counted as lost. The search grows a disk around every module centre and stops at the first
+  radius where some block runs out; ties go to the spot nearest the top left, so the answer is the
+  same every time it is asked.
+- **The figures to set beside "30 %"** (`headroom`). The share of all codewords the code could lose
+  if damage were spread evenly — the textbook figure; the same after the logo; and the share of the
+  symbol's modules the weakest spot covers.
+
+On Create, a card titled **Where it breaks** follows the scan margin, shown only after the gate has
+passed the code:
+
+- **One sentence**, with the level's conventional figure (L 7 %, M 15 %, Q 25 %, H 30 %), what is
+  left after the logo spread evenly, and the weakest spot's width in millimetres at the printed size
+  the size card holds: the printed width divided by the modules across it, quiet zone included,
+  times the spot's width in modules. Without a logo, the clause about the logo is dropped.
+- **Show the weak spots**, off by default: an overlay on the card's own copy of the code that tints
+  each data module by how much of its block is spent, and draws the weakest spot as a dashed circle.
+  It is never drawn on the preview above: that is the picture of what will be exported, and it does
+  not show damage that is not in the file.
+- **The blocks**, one row each, with what the logo, the damage and the spare take of its capacity,
+  and a label that says it in words.
+- **Try to break it.** Damage can be drawn with a pointer, module by module, as ink or as paper, and
+  the prediction follows as it is drawn; or the weakest spot can be smudged in one press, which
+  inverts every module under it and gives the same experience to somebody without a pointer. **Ask
+  the decoder** sends the damaged code to the host, which renders it as the scan margin does, paints
+  the damage on top of the print — logo included — and asks the gate's own decoder whether the
+  payload comes back byte for byte. The prediction and the decoder's answer are shown side by side.
+
+**It informs, and it never blocks.** This is the scan margin's rule ([ADR-027](#adr-027)) applied to
+the matrix: nothing on the card disables an export or changes the verdict, and nothing is recorded.
+The decoder check writes no verification row and no file, and is not tied to a saved code.
+
+**The guarantee runs one way, so the decoder's answer stands beside it.** Codewords under the plate
+are counted as lost, because what is drawn there is a picture and not the code. That makes
+_guaranteed_ a promise and _past its guarantee_ not a sentence of death: some of what the plate
+covers may still be right, and a decoder may correct the rest. The arithmetic can say that a code
+will read; it cannot say that one will not. So the card asks the decoder as well and shows both,
+and when the prediction is past its guarantee and the decoder still reads, the sentence says why —
+some of what the logo covers survived better than the guarantee counts. A screen that showed only
+the arithmetic would call codes broken that read; one that showed only the decoder would say
+nothing about the next smudge.
+
+**Function patterns and the quiet zone are left to the decoder.** Whether a decoder still finds a
+symbol with a finder smudged, a timing line broken or ink in the quiet zone is not arithmetic: it
+depends on the decoder, and two decoders may answer differently. Damage there is counted and named
+— _a finder or the quiet zone was hit: only a decoder can say_ — and never predicted. The weakest
+spot does not count the function patterns it crosses either: it is about the blocks.
+
+**Proven against an independent decoder.** `src/domain/resilience.test.ts` holds the arithmetic to
+jsQR, a decoder that is neither the encoder nor the gate's. Six codes — two with a logo, and four
+without one at L, M, Q and H — each take 120 seeded trials of one to three round blots, ink or
+paper, up to a sixth of the symbol's side across. Every trial the domain calls guaranteed is
+rasterised with its damage and read back by jsQR, byte for byte; the sample has to land on both
+sides of the line, or it proves nothing. Every weakest spot, inverted, stops jsQR, and a disk one
+step smaller at the same centre keeps every block within its capacity. The seed is fixed, so a
+failure names a case that can be run again.
+
+**Why not ISO/IEC 15415 grading.** Verifiers grade a printed code, and one of their parameters is
+the error correction left unused — one figure for the whole symbol, never where. A grade is a
+measurement of a print: it needs a calibrated image of that print, under a specified light, at a
+specified resolution. This is arithmetic on the matrix before anything is printed, and it claims
+nothing about ink, paper or a camera. The test of the paper remains the proof sheet
+([ADR-032](#adr-032)), printed and read with a phone.
+
+**A measured example.** A link to `https://example.com/menu` with a logo plans to version 3 at
+level H: two blocks of 35 codewords, each able to correct 11. The textbook figure is 31 %. After the
+logo, 14 % is left spread evenly. And one smudge about 4.9 mm across on a code printed 25 mm wide —
+4.4 % of the symbol — in the right place, can stop it.
+
+**Why "can".** The card says a smudge that size can stop the code, not that it does. The size is the
+worst case, with every module it covers turned to its opposite, and that case is what the tests
+prove stops a decoder. A real blot leaves the modules that were already its colour, so one the same
+size is sometimes survived; **Try to break it** is there to see which.
+
+**Cost accepted: the weakest spot is conservative.** Every codeword the disk touches is assumed
+lost, because a smudge may darken or lighten and the worst case is the one a guarantee can stand
+on. A real smudge does one or the other: ink on a dark module and paper on a light one change
+nothing, so it often changes fewer modules than the disk covers, and a code can survive a smudge of
+exactly that size in exactly that place. The spot is the smallest damage that can break the code,
+not the smallest that will.
+
+**Second cost: the millimetres are the size card's.** The width in the sentence assumes the code is
+printed at the size the size card holds. Printed at another size, the spot scales with it and the
+sentence is wrong by the same factor; a page scaled by the print dialog is what the proof sheet's
+calibration bar is for.
+
+**Third cost: the decoder check is one decoder on one render.** It renders at the scan margin's
+resolution — the export's raster or 1,024 pixels, whichever is smaller (`MARGIN_MAX_PIXELS`) — and
+paints the damage as whole modules on a clean raster. A smudge on paper has soft edges, and a phone
+is not `rqrr`. The answer is the gate decoder's opinion of one damaged render, which is what it is
+asked for, and the phone matrix of each release (SPEC §6) is still what decides.
+
+## ADR-038 — A code can be made tougher, and each way says what it costs {#adr-038}
+
+**Status: Accepted.**
+
+**Context.** **Where it breaks** ([ADR-037](#adr-037)) says how small a smudge can stop a code, in
+millimetres of the print. The next question a person asks is what to change, and every answer costs
+something they can see: a smaller logo is less brand, a higher level a denser code, a shorter link a
+campaign nobody can measure, a larger print more paper. Nothing in the first nine slices of 1.1 put
+those answers side by side or said which of them moves the number. The tenth slice does, and this
+record fixes which changes are offered, how each is measured, and what using one does.
+
+**Decision.** The last section of that card lists the ways to make the code tougher: the changes
+this screen can make that ask for a larger smudge, toughest first, each with what it gives up and a
+**Use** button (`src/features/create/toughness.ts`, `TougherList.tsx`). It is worked out only once
+the gate has passed the code on screen, like the card it sits in, and it opens with the code as it
+is now: _"Now: version 3, level H — a smudge 4.9 mm across can stop it."_ There are four kinds of
+change, and only these:
+
+| Row                                   | When it is considered                    | What it gives up, as the row says it                          |
+| ------------------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
+| `Without its tracking parameters (…)` | the code is a link that carries them     | _the site can no longer tell which campaign a scan came from_ |
+| `A small logo`, `A medium logo`       | the code has a logo                      | _the mark prints 2.9 mm wide instead of 6.1 mm_               |
+| `At least Q`, `Level H`               | the code has no logo                     | _a denser code: modules 0.68 mm instead of 0.76 mm_           |
+| `Printed 30 mm wide`                  | the next width on the list, up to 200 mm | _5 mm more paper each way_                                    |
+
+- **They are the controls this screen already has.** The logo's size, the level, the link and the
+  printed width are each set by hand on Create. Nothing is invented for the list: there is no
+  control here that is not also there. With a logo, the level is the engine's to choose
+  ([ADR-017](#adr-017)), so the list offers the logo's size instead; without one, it offers the
+  levels the Look card names, in its words. The printed width steps through the proof sheet's
+  sizes and on — 15, 20, 25, 30, 40, 50, 60, 80, 100, 150 and 200 mm — one step at a time.
+- **Each row is planned by the engine and measured as the card measures.** A row is not an
+  estimate. The change is handed to the same placement engine that plans the code on screen
+  ([ADR-013](#adr-013)), and the plan it returns is measured with the same weakest-spot arithmetic
+  ([ADR-037](#adr-037)), in millimetres at the printed width. A change the engine refuses — a level
+  this content does not fit at — is left out.
+- **Only a change that moves the number is offered.** A row must ask for a smudge at least 0.1 mm
+  larger than the code on screen, which is the precision the card prints. A change that leaves the
+  number where it was is not tougher, and a row that said so would be noise. When nothing qualifies,
+  the list says _Nothing on this screen makes it tougher._
+- **Two changes that end in the same code are one row.** Rows that plan the same version, level,
+  logo width and module width are the same symbol, and only the first is kept. Without a logo, a
+  link to a menu at level M is offered _At least Q_ and not _Level H_ as well: asking for Q already
+  plans level H for it, so the two rows would be one code.
+- **Use changes the same control a person would.** It sets the logo's size, the level, the link or
+  the printed width — in inches when the size card is in inches — and nothing else, so the gate
+  asks again, the card measures the new code, and the list is worked out afresh. It is not a second
+  way of making a code. While the gate asks, the card and the button that was pressed are gone,
+  so the focus is handed to the control that changed: a keyboard user lands on the change, not on the
+  page.
+
+**The tracking parameters are a fixed list, and only attribution.** A link copied from a campaign,
+an advert or a social network often carries parameters that say only where a click came from. In a
+printed code they cost twice: every character makes the symbol denser, so its modules print
+smaller, and every scan hands the campaign's labels to whoever runs the site. The list is the `utm_`
+family and seventeen named parameters — click identifiers such as `fbclid`, `gclid` and `msclkid`,
+and the campaign identifiers some mailing tools add — matched without regard to case, after
+decoding the name (`src/domain/tracking.ts`). Anything else — `ref`, `id`, `page`, a token — may
+change what the page shows and is never touched. The rest of the link is kept byte for byte: pairs
+are kept or dropped whole and nothing is decoded and encoded again, so an escape a re-serialising
+parser would rewrite stays as it was, a query left empty loses its `?`, and the fragment is kept.
+The row names what it takes out, and it is never applied without the person: a campaign may be
+exactly what somebody wants to measure, and the row says that this is what is given up.
+
+**Why not a version picker.** A larger version is a question somebody may ask, and the screen has
+no control for it. The version follows from what the code carries, its level and its logo; the
+engine plans it from those, and a control that set it directly would be a second way of making a
+code, beside the one the engine and the gate already answer for. Every row on this list is a change
+a person could make by hand without it.
+
+**Why not automatic.** Each change gives something up, and which loss is acceptable is not
+arithmetic: a brand may need its logo at the largest size, a code on a small label may need larger
+modules more than a stronger level, and a campaign may be the reason the code exists. The list says
+what each way buys and costs; the person who knows where the code is going chooses. That is the
+scan margin's rule ([ADR-027](#adr-027)) held here as well — a report with shortcuts, never a gate.
+Nothing is disabled, no verdict changes, and nothing changes until **Use** is pressed.
+
+**The quiet zone is not on the list.** It is a control on this screen too, and narrowing it would
+make the modules larger at the same printed width. But what it costs is whether a decoder finds the
+symbol at all, which the arithmetic leaves to the decoder ([ADR-037](#adr-037)), so the list could
+not say what that row gives up, and it does not offer it.
+
+**Measured examples.** A link to `https://example.com/menu` with a logo, printed 25 mm wide, is
+version 3 at level H, and a smudge 4.9 mm across can stop it. On a link that short every logo size
+plans the same symbol, so the only row is a larger print: _Printed 30 mm wide_, where the smudge
+must be 5.9 mm. A campaign link,
+`https://example.com/menu?table=12&utm_source=flyer&utm_medium=print&utm_campaign=summer-2026`, with
+a logo is version 9; without its tracking parameters it is version 4, its modules print larger, and
+the smudge that can stop it grows from 5.3 mm to 6.7 mm. The link field then holds
+`https://example.com/menu?table=12`, with `table=12` still in it.
+
+**Cost accepted: the number is the worst case.** Every row is measured with the weakest spot, which
+counts every codeword a disk touches as lost ([ADR-037](#adr-037)). A row that raises it from
+5.3 mm to 6.7 mm raises the smallest damage that can break the code, not the smallest that will.
+And a row is arithmetic until it is used: the decoder reads the code a row leads to only after
+**Use**, when the gate asks again.
+
+**Second cost: the tracking list is finite.** It names what attribution parameters are commonly
+called today, and it will miss names — a new advertising network's, a site's own. A parameter it
+does not know stays in the link, which is the safe way to be wrong: the row is missing, and the
+link still works. Adding a name is one line in `tracking.ts`.
+
+**Third cost: a larger print is always on the list.** Printed larger, every module is larger and
+so is the smudge that can stop the code, so the row is offered on every code printed narrower than
+200 mm. That is true, and for a short link with a logo it is sometimes the only answer the screen
+has, as it is for the menu above. The
+list does not weigh one cost against another either: it orders the rows by the smudge they ask for,
+and the toughest is not always the cheapest.
+
+**Fourth cost: several plans per code.** Each row is a plan and a weakest-spot search of its own, a
+few tens of milliseconds in all. It is worked out once per code and printed size, not on every
+render, and only after the gate has passed the code.

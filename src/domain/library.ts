@@ -115,6 +115,109 @@ export function sceneHash(svg: string): string {
   return sha256(svg);
 }
 
+/**
+ * Whether a stored form cannot become a code only because its Wi-Fi password was deliberately
+ * not kept (ADR-018). That code is not broken: it is waiting for a password, and a check of the
+ * library leaves it out rather than counting it as a code that stopped reading.
+ */
+export function savedWithoutPassword(form: PayloadForm): boolean {
+  return form.kind === 'wifi' && form.password === '' && !reopens(form).ok;
+}
+
+/**
+ * What checking a saved code again found (P5): the rebuilt scene against the digest it was saved
+ * with, and the decoder's answer about it now.
+ */
+export type RecheckVerdict = 'identical' | 'rebuilds-differently' | 'does-not-read';
+
+/**
+ * One code's line in a check of the library: a verdict, or why there is none. `not-checked` is a
+ * Wi-Fi saved without its password — nothing to rebuild, and not a failure. `unanswered` is a
+ * check the host never answered, which is not a verdict either: the gate never shows a state
+ * that did not come back from a decoder.
+ */
+export type RecheckOutcome = RecheckVerdict | 'not-checked' | 'unanswered';
+
+/**
+ * The verdict on one rebuilt code. A code that no longer reads is that first, whatever its scene
+ * did: a matching digest is no comfort about a code nobody can scan.
+ */
+export function recheckVerdict({
+  sceneMatches,
+  verified,
+}: {
+  sceneMatches: boolean;
+  verified: boolean;
+}): RecheckVerdict {
+  if (!verified) return 'does-not-read';
+  return sceneMatches ? 'identical' : 'rebuilds-differently';
+}
+
+const RECHECK_SENTENCES: Record<RecheckVerdict | 'not-checked', string> = {
+  identical: 'Rebuilds identically and reads.',
+  'rebuilds-differently':
+    'Rebuilds differently from when it was saved, and still reads — check it before you print.',
+  'does-not-read': 'No longer reads. Open it to see why.',
+  'not-checked': 'Not checked: it was saved without its Wi-Fi password.',
+};
+
+/** The sentence a row shows under its name once the library was checked again. */
+export function describeRecheck(verdict: RecheckVerdict | 'not-checked'): string {
+  return RECHECK_SENTENCES[verdict];
+}
+
+function tally(results: readonly RecheckOutcome[], outcome: RecheckOutcome): number {
+  return results.filter((result) => result === outcome).length;
+}
+
+/**
+ * The check of the library in one sentence: how many codes were checked, then only the parts
+ * that are not zero — identical, rebuilds differently, no longer reads — in that order. Codes
+ * that were not checked are said after it, never folded into the count: a view says what it left
+ * out (DESIGN_SYSTEM §2).
+ */
+export function summariseRecheck(results: readonly RecheckOutcome[]): string {
+  const identical = tally(results, 'identical');
+  const differently = tally(results, 'rebuilds-differently');
+  const unread = tally(results, 'does-not-read');
+  const withheld = tally(results, 'not-checked');
+  const unanswered = tally(results, 'unanswered');
+  const checked = identical + differently + unread;
+
+  const sentences: string[] = [];
+  if (checked > 0) {
+    const parts = [
+      identical > 0 ? `${identical} identical` : null,
+      differently > 0
+        ? `${differently} ${differently === 1 ? 'rebuilds' : 'rebuild'} differently`
+        : null,
+      unread > 0 ? `${unread} ${unread === 1 ? 'no longer reads' : 'no longer read'}` : null,
+    ].filter((part): part is string => part !== null);
+    sentences.push(`${checked} ${checked === 1 ? 'code' : 'codes'} checked: ${parts.join(', ')}.`);
+  }
+  if (withheld > 0) {
+    sentences.push(
+      `${withheld} not checked: saved without ${withheld === 1 ? 'its Wi-Fi password' : 'their Wi-Fi passwords'}.`,
+    );
+  }
+  if (unanswered > 0) sentences.push(`${unanswered} could not be checked.`);
+  return sentences.length > 0 ? sentences.join(' ') : 'There was nothing to check.';
+}
+
+/**
+ * The tone of the summary: success only when something was checked, every code checked rebuilt
+ * identically and read, and the host answered every time. A Wi-Fi saved without its password
+ * does not spoil it — it is not a failure — but nothing checked at all is no success either.
+ */
+export function recheckTone(results: readonly RecheckOutcome[]): 'success' | 'caution' {
+  const checked = results.filter(
+    (result) => result !== 'not-checked' && result !== 'unanswered',
+  ).length;
+  const clean =
+    checked > 0 && tally(results, 'identical') === checked && tally(results, 'unanswered') === 0;
+  return clean ? 'success' : 'caution';
+}
+
 export interface AppliedKit {
   style: Style;
   eclFloor: EclFloor | undefined;

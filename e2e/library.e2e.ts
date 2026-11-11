@@ -6,7 +6,6 @@ import { PNG } from 'pngjs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { startSession, type Session } from './session';
-import { Keys } from './webdriver';
 
 /**
  * F8's proof of done, against the real binary: a saved code reopens after a restart with the
@@ -88,10 +87,7 @@ describe('library', () => {
 
   async function typeInto(label: string, value: string): Promise<void> {
     const field = await session.driver.waitForElement(`input[aria-label="${label}"]`);
-    await field.clear();
-    await field.sendKeys(' ');
-    await field.sendKeys(Keys.BACKSPACE);
-    await field.sendKeys(value);
+    await field.fill(value);
   }
 
   async function setColour(label: string, hex: string): Promise<void> {

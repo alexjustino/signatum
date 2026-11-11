@@ -4,8 +4,9 @@
 //! pixels, compare byte for byte — and records what happened. The difference is
 //! what follows: `verify_code` returns the verdict, the exports write a file or
 //! reach the clipboard, and only ever on the strength of a verification of the
-//! artefact that leaves (ADR-010). `scan_margin` asks a different question
-//! altogether and answers it without writing anything down.
+//! artefact that leaves (ADR-010). `scan_margin` and `damage_test` ask
+//! different questions altogether and answer them without writing anything
+//! down.
 //!
 //! # Changelog of this boundary
 //!
@@ -24,6 +25,23 @@
 //!   verifying exactly as the PNG does and each recording what it was
 //!   (`format`, `dpi` — migration 003). `scan_margin` reports how much the
 //!   artefact survives, and never blocks anything.
+//! - P2: every file an export writes carries a stamp — a reference, the
+//!   decoder and a digest of what was verified; no payload digest and no
+//!   date (`export::stamp`) — unless the setting `stamp_exports` is off. The row
+//!   keeps the stamp's reference and digest (migration 007). A PNG's stamp is a
+//!   chunk the decoder never saw, so the file minus that chunk is still,
+//!   byte for byte, the artefact that was decoded. The clipboard is never
+//!   stamped: the system copies pixels, not files.
+//! - P4: `scan_margin` takes `modules` — the code's side in modules, quiet zone
+//!   included, 21 to 209 — and reports thirteen variants instead of nine: the
+//!   four new ones are print (ink spread on coated and on uncoated paper, a 30°
+//!   tilt, dim light), and ink spread is a share of a module, which is what the
+//!   count is for (ADR-035). Still a report and never a gate (ADR-027).
+//! - P9: `damage_test` paints cells of ink or paper — symbol coordinates, so
+//!   it takes the `quiet_zone` too — over the artefact the margin measures,
+//!   logo included, and asks the gate's decoder whether it still reads. It
+//!   answers past what the error-correction arithmetic guarantees, and like
+//!   the margin it records nothing and blocks nothing (ADR-037).
 
 use std::path::Path;
 
@@ -36,8 +54,10 @@ use crate::db::logos;
 use crate::db::verifications::{self, VerificationRow};
 use crate::db::Db;
 use crate::error::{Error, Result};
+use crate::export::stamp::{self as stamping, Mark, Stamp};
 use crate::export::{pdf, svg as svg_file};
 use crate::imaging::compose::LogoBox;
+use crate::imaging::damage::{self, DamageCell, DamageReport};
 use crate::imaging::logo::NormalisedLogo;
 use crate::imaging::margin::{self, ScanMargin};
 use crate::imaging::render::{MAX_PIXEL_SIZE, MAX_SVG_BYTES, MIN_PIXEL_SIZE};
@@ -344,16 +364,23 @@ pub fn copy_png(
     )
 }
 
-/// How much abuse the artefact survives: nine variants, nine verdicts.
+/// How much abuse the artefact survives: thirteen variants, thirteen verdicts —
+/// nine on screen and in chat, four in print (ADR-035).
 ///
 /// A report and never a gate (ADR-027) — it writes no row and refuses no export.
 /// The artefact it measures is composed exactly as the one the gate answers for,
 /// so the margin is a fact about the code somebody is about to print.
 ///
+/// `modules` is the code's side in modules, quiet zone included — the matrix
+/// size plus twice the quiet zone. The domain knows it and the raster does not,
+/// and it is what makes ink spread a share of a module rather than a number of
+/// pixels.
+///
 /// # Errors
 ///
-/// [`Error::InvalidInput`] for a size, a drawing, a payload or a logo the host
-/// will not accept, and [`Error::Render`] when the artefact could not be made.
+/// [`Error::InvalidInput`] for a size, a drawing, a payload, a logo or a module
+/// count the host will not accept, and [`Error::Render`] when the artefact could
+/// not be made.
 #[tauri::command(async, rename_all = "snake_case")]
 pub fn scan_margin(
     db: State<'_, Db>,
@@ -361,6 +388,7 @@ pub fn scan_margin(
     payload: String,
     pixel_size: u32,
     logo: Option<LogoRef>,
+    modules: u32,
 ) -> Result<ScanMargin> {
     // The margin is a measurement and writes no row, so there is nothing for a
     // `code_id` to be recorded on: it is deliberately not an argument here.
@@ -371,18 +399,73 @@ pub fn scan_margin(
             svg: &svg,
             payload: &payload,
             // The margin measures how a code degrades, not the export: a render past this side
-            // costs seconds of blur and nine decodes for no better answer, so it is measured at
-            // the export's size or this one, whichever is smaller — and off the main thread.
+            // costs seconds of blur and thirteen decodes for no better answer, so it is measured
+            // at the export's size or this one, whichever is smaller — and off the main thread.
             pixel_size: pixel_size.min(MARGIN_MAX_PIXELS),
             logo: logo.as_ref(),
             dpi: None,
             code_id: None,
         },
+        modules,
     )
 }
 
 /// The largest raster the scan margin is measured on; the test that bounds its time uses it.
 pub const MARGIN_MAX_PIXELS: u32 = 1024;
+
+/// Paint the cells somebody smudged or drew over the code and ask the gate's
+/// decoder whether it still reads (ADR-037).
+///
+/// The artefact is composed exactly as the scan margin composes its clean one —
+/// same inputs, same logo, at most [`MARGIN_MAX_PIXELS`] a side — and the cells
+/// land on top of it, logo included, at the scene's own module grid. `cells`
+/// are in symbol coordinates, which is how the domain counts them; `quiet_zone`
+/// is what finds the symbol inside the scene.
+///
+/// A report about a code that already passed, never a gate on it: it writes no
+/// row and no file, and takes no `code_id` for the reason the margin takes
+/// none — there is nothing to record a link on.
+///
+/// # Errors
+///
+/// [`Error::InvalidInput`] for anything the margin refuses, a quiet zone that
+/// leaves no symbol, a cell off the code, more cells than the code has modules,
+/// or a module count that is not the drawing's own side. [`Error::Render`] when
+/// the artefact could not be made.
+#[tauri::command(async, rename_all = "snake_case")]
+#[allow(clippy::too_many_arguments)]
+// Flat, snake-case arguments are the contract with the interface: the margin's
+// own, plus the two things only damage needs.
+pub fn damage_test(
+    db: State<'_, Db>,
+    svg: String,
+    payload: String,
+    pixel_size: u32,
+    logo: Option<LogoRef>,
+    modules: u32,
+    quiet_zone: u32,
+    cells: Vec<DamageCell>,
+) -> Result<DamageReport> {
+    let asked = Asked {
+        svg: &svg,
+        payload: &payload,
+        // The margin's size, for the margin's reason: past this side a render costs time and
+        // buys no better answer — and the two reports are about the same picture.
+        pixel_size: pixel_size.min(MARGIN_MAX_PIXELS),
+        logo: logo.as_ref(),
+        dpi: None,
+        code_id: None,
+    };
+    check_damage(&asked, modules, quiet_zone, &cells)?;
+    // The workspace is held only while the logo is fetched, never through the render and the
+    // decode: a command that runs on the window's thread and wants it — an export clicked while
+    // this runs — must not wait for a picture it has nothing to do with.
+    let logo = {
+        let conn = db.0.lock().expect("the database lock was poisoned");
+        load_logo(&conn, asked.logo)?
+    };
+    damage_rendered(&asked, logo, modules, quiet_zone, &cells)
+}
 
 /// What [`verify_code`] does once the database is in hand.
 fn verify_code_with(
@@ -498,26 +581,60 @@ pub(crate) fn export_once(
         });
     }
 
-    let bytes = match written {
-        Written::Png => verification.png,
-        Written::Svg => svg_file::to_write(asked.svg, placed)?.into_bytes(),
-        Written::Pdf { width_mm } => pdf::one_page(&verification.png, width_mm)?,
+    // The stamp's reference is made here, for this file, and is never the
+    // row's identifier: that is a v7, and its first digits are the time.
+    let reference = crate::db::new_stamp_ref();
+    let mark = super::settings::stamp_exports(conn)?.then_some(Mark {
+        reference: &reference,
+        decoder: &report.decoder,
+    });
+    let (bytes, stamp) = match written {
+        Written::Png => match &mark {
+            // The chunk goes in around the decoded bytes, which are not touched:
+            // the file minus the chunk is the artefact, and that is the digest.
+            Some(mark) => {
+                let (bytes, stamp) = stamping::stamp_png(&verification.png, mark)?;
+                (bytes, Some(stamp))
+            }
+            None => (verification.png, None),
+        },
+        Written::Svg => {
+            let text = svg_file::to_write(asked.svg, placed)?;
+            match &mark {
+                Some(mark) => {
+                    let (text, stamp) = stamping::stamp_svg(&text, mark)?;
+                    (text.into_bytes(), Some(stamp))
+                }
+                None => (text.into_bytes(), None),
+            }
+        }
+        Written::Pdf { width_mm } => {
+            let sealed = pdf::one_page(&verification.png, width_mm, mark.as_ref())?;
+            (sealed.bytes, sealed.stamp)
+        }
     };
 
     let bytes_written = write_atomically(Path::new(path), &bytes)?;
-    let verification_id = record(
+    let verification_id = record_as(
         conn,
+        &crate::db::new_id(),
         "export",
         &report,
         Some(path),
         asked.dpi,
         format,
         asked.code_id,
+        stamp.as_ref(),
     )?;
     log::info!(
-        "exported {bytes_written} bytes as {} verified by {}",
+        "exported {bytes_written} bytes as {} verified by {}, {}",
         written.token(),
-        report.decoder
+        report.decoder,
+        if stamp.is_some() {
+            "stamped"
+        } else {
+            "unstamped"
+        }
     );
 
     Ok(Export {
@@ -529,7 +646,7 @@ pub(crate) fn export_once(
 
 /// The sentence for a code that did not read back, with a fallback for the
 /// report that somehow carries none: a refusal always owes a reason.
-fn refusal(report: &VerificationReport) -> String {
+pub(crate) fn refusal(report: &VerificationReport) -> String {
     report
         .reason
         .clone()
@@ -585,8 +702,12 @@ fn copy_png_with(
 }
 
 /// What [`scan_margin`] does once the database is in hand.
-fn scan_margin_with(conn: &Connection, asked: &Asked) -> Result<ScanMargin> {
+///
+/// The module count is refused before anything is rendered, with the rest of
+/// what the host will not accept.
+fn scan_margin_with(conn: &Connection, asked: &Asked, modules: u32) -> Result<ScanMargin> {
     check_inputs(asked)?;
+    margin::check_modules(modules)?;
     let logo = load_logo(conn, asked.logo)?;
 
     let artefact = crate::imaging::verify::artefact(
@@ -596,7 +717,57 @@ fn scan_margin_with(conn: &Connection, asked: &Asked) -> Result<ScanMargin> {
         asked.dpi,
     )?;
 
-    margin::scan_margin(&artefact.png, asked.payload.as_bytes())
+    margin::scan_margin(&artefact.png, asked.payload.as_bytes(), modules)
+}
+
+/// What [`damage_test`] does, in one piece, with a connection in hand — the order the tests
+/// hold it to. The command runs the same three steps but holds the lock for the logo alone.
+///
+/// Everything a request can get wrong is refused before anything is rendered,
+/// except the one thing only the render knows — whether `modules` is the
+/// drawing's own side — which is refused before anything is painted.
+#[cfg(test)]
+fn damage_test_with(
+    conn: &Connection,
+    asked: &Asked,
+    modules: u32,
+    quiet_zone: u32,
+    cells: &[DamageCell],
+) -> Result<DamageReport> {
+    check_damage(asked, modules, quiet_zone, cells)?;
+    let logo = load_logo(conn, asked.logo)?;
+    damage_rendered(asked, logo, modules, quiet_zone, cells)
+}
+
+/// Everything a damage test can be refused for before anything is fetched or drawn.
+fn check_damage(asked: &Asked, modules: u32, quiet_zone: u32, cells: &[DamageCell]) -> Result<()> {
+    check_inputs(asked)?;
+    margin::check_modules(modules)?;
+    damage::check_cells(modules, quiet_zone, cells)
+}
+
+/// The render, the damage and the decode, with the logo already in hand and no lock held.
+fn damage_rendered(
+    asked: &Asked,
+    logo: Option<(NormalisedLogo, LogoBox)>,
+    modules: u32,
+    quiet_zone: u32,
+    cells: &[DamageCell],
+) -> Result<DamageReport> {
+    let mut raster = crate::imaging::verify::composed(
+        asked.svg.as_bytes(),
+        asked.pixel_size,
+        logo.as_ref().map(|(logo, area)| (logo, *area)),
+    )?;
+    damage::check_grid(&raster, modules)?;
+
+    damage::read_damaged(
+        &mut raster.pixmap,
+        asked.payload.as_bytes(),
+        modules,
+        quiet_zone,
+        cells,
+    )
 }
 
 /// Fetch the logo a request named, and the box it asked for.
@@ -604,7 +775,7 @@ fn scan_margin_with(conn: &Connection, asked: &Asked) -> Result<ScanMargin> {
 /// A logo that is not in the workspace is a refusal rather than a silently
 /// logo-less code: the person asked for one, and a code that quietly comes back
 /// without it is a code they will print.
-fn load_logo(
+pub(crate) fn load_logo(
     conn: &Connection,
     logo: Option<&LogoRef>,
 ) -> Result<Option<(NormalisedLogo, LogoBox)>> {
@@ -631,7 +802,7 @@ fn load_logo(
 }
 
 /// Everything the host refuses before it renders anything.
-fn check_inputs(asked: &Asked) -> Result<()> {
+pub(crate) fn check_inputs(asked: &Asked) -> Result<()> {
     if !(MIN_PIXEL_SIZE..=MAX_PIXEL_SIZE).contains(&asked.pixel_size) {
         return Err(Error::InvalidInput(format!(
             "a code is made between {MIN_PIXEL_SIZE} and {MAX_PIXEL_SIZE} pixels square"
@@ -671,11 +842,10 @@ pub(crate) fn check_destination(path: &str, extension: &str) -> Result<()> {
             "an export needs the full path of the file to write".to_string(),
         ));
     }
-    // `is_absolute` is true of a UNC path (`\\host\share\code.png`) and of a verbatim one
-    // (`\\?\...`). Writing there would make the host open a network connection on the
-    // interface's word, in a product that promises nothing leaves the machine. The system's
-    // save dialog never produces one for a local file, so a request that carries one is refused.
-    if path.starts_with("\\\\") || path.starts_with("//") {
+    // `is_absolute` is true of a network path in any of its spellings. Writing there would
+    // make the host open a connection on the interface's word, in a product that promises
+    // nothing leaves the machine; `os::paths` decides from the prefix Windows parses.
+    if !crate::os::paths::is_local(path) {
         return Err(Error::InvalidInput(
             "an export is written to a local drive, not to a network path".to_string(),
         ));
@@ -740,6 +910,37 @@ fn record(
     format: Option<&str>,
     code_id: Option<&str>,
 ) -> Result<String> {
+    record_as(
+        conn,
+        &crate::db::new_id(),
+        kind,
+        report,
+        path,
+        dpi,
+        format,
+        code_id,
+        None,
+    )
+}
+
+/// [`record`], under an identifier the caller already holds — the proof sheet
+/// prints each size's identifier on the page before the page is written, and
+/// writes the rows after it, as every export does — and with the stamp the
+/// written file carries, when it carries one.
+#[allow(clippy::too_many_arguments)]
+// One value per column the evidence has; a struct for it would be a second
+// `VerificationRow`.
+pub(crate) fn record_as(
+    conn: &Connection,
+    id: &str,
+    kind: &str,
+    report: &VerificationReport,
+    path: Option<&str>,
+    dpi: Option<u32>,
+    format: Option<&str>,
+    code_id: Option<&str>,
+    stamp: Option<&Stamp>,
+) -> Result<String> {
     let linked = match code_id {
         Some(id) if !library::exists(conn, id)? => {
             log::warn!("a verification named a saved code that is no longer in the workspace");
@@ -748,8 +949,9 @@ fn record(
         other => other,
     };
 
-    let id = verifications::record(
+    let id = verifications::record_as(
         conn,
+        id,
         &VerificationRow {
             kind,
             decoder: &report.decoder,
@@ -765,6 +967,8 @@ fn record(
             dpi,
             format,
             code_id: linked,
+            stamp_ref: stamp.map(|stamp| stamp.reference.as_str()),
+            stamp_digest: stamp.map(|stamp| stamp.digest.as_str()),
         },
     )?;
     Ok(id)
@@ -774,8 +978,29 @@ fn record(
 mod tests {
     use super::*;
     use crate::db::migrations;
+    use crate::export::stamp::{png_without_stamp, read_stamp, Kind};
     use crate::imaging::fixtures::{blank_svg, hello_world_svg, HELLO_WORLD};
     use crate::imaging::verify::sha256_hex;
+
+    /// What a stamped PNG was before its stamp: the artefact the decoder read.
+    fn unstamped(png: &[u8]) -> Vec<u8> {
+        png_without_stamp(png).expect("a PNG")
+    }
+
+    /// Every row's identifier, stamp reference and stamp digest, in the order
+    /// written.
+    #[allow(clippy::type_complexity)]
+    fn stamps(conn: &Connection) -> Vec<(String, Option<String>, Option<String>)> {
+        let mut statement = conn
+            .prepare("SELECT id, stamp_ref, stamp_digest FROM verifications ORDER BY id")
+            .expect("prepare");
+        let found = statement
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .expect("query")
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .expect("rows");
+        found
+    }
 
     fn workspace() -> Connection {
         let conn = Connection::open_in_memory().expect("in-memory database");
@@ -1032,9 +1257,16 @@ mod tests {
         let written = std::fs::read(&path).expect("the file exists");
         assert_eq!(export.bytes_written, written.len() as u64);
         assert_eq!(
-            sha256_hex(&written),
+            sha256_hex(&unstamped(&written)),
             export.report.artefact_sha256,
-            "the file on disk is the artefact that was verified"
+            "the file on disk, minus its stamp, is the artefact that was verified"
+        );
+        assert_eq!(
+            unstamped(&written),
+            crate::imaging::verify::artefact(hello_world_svg().as_bytes(), 512, None, Some(DPI))
+                .expect("render again")
+                .png,
+            "byte for byte"
         );
         assert!(export.report.verified);
         assert_eq!(export.path, path);
@@ -1067,7 +1299,7 @@ mod tests {
             "300 dpi is 11 811 pixels per metre"
         );
         assert_eq!(
-            sha256_hex(&written),
+            sha256_hex(&unstamped(&written)),
             export.report.artefact_sha256,
             "the bytes that carry the resolution are the bytes that were decoded"
         );
@@ -1087,7 +1319,16 @@ mod tests {
             export(&conn, &scene, HELLO_WORLD, 295, &path, None, Written::Svg).expect("export");
 
         let written = std::fs::read_to_string(&path).expect("the file exists");
-        assert_eq!(written, scene, "the domain's scene is written as it stands");
+        let stamp = read_stamp(written.as_bytes(), Kind::Svg)
+            .expect("read")
+            .expect("a stamp")
+            .stamp;
+        let comment = format!("<!-- signatum:{} -->", stamp.json().expect("json"));
+        assert_eq!(
+            written.replacen(&comment, "", 1),
+            scene,
+            "the domain's scene is written as it stands, and the stamp is all that was added"
+        );
         assert!(
             written.contains("width=\"25mm\""),
             "the printed size is in the file"
@@ -1218,7 +1459,10 @@ mod tests {
             .expect("export");
 
         let written = std::fs::read(&path).expect("the file exists");
-        assert_eq!(sha256_hex(&written), export.report.artefact_sha256);
+        assert_eq!(
+            sha256_hex(&unstamped(&written)),
+            export.report.artefact_sha256
+        );
     }
 
     #[test]
@@ -1330,6 +1574,9 @@ mod tests {
             "\\\\server\\share\\code.png",
             "\\\\?\\C:\\code.png",
             "//server/share/code.png",
+            "\\/server/share/code.png",
+            "/\\server\\share\\code.png",
+            "\\\\.\\C:\\code.png",
         ] {
             let error = check_destination(path, "png").expect_err(path);
             assert!(matches!(error, Error::InvalidInput(_)), "{path}: {error:?}");
@@ -1382,7 +1629,10 @@ mod tests {
         .expect("export");
 
         let written = std::fs::read(&path).expect("the file exists");
-        assert_eq!(sha256_hex(&written), export.report.artefact_sha256);
+        assert_eq!(
+            sha256_hex(&unstamped(&written)),
+            export.report.artefact_sha256
+        );
     }
 
     #[test]
@@ -1573,9 +1823,12 @@ mod tests {
         assert_eq!(rows(&conn), vec![("export".to_string(), 0, None)]);
     }
 
-    /// The margin is a report: nine lines, and not one row in the workspace.
+    /// The modules of the fixture's side, quiet zone included: 21 + 2 × 4.
+    const FIXTURE_MODULES: u32 = 29;
+
+    /// The margin is a report: thirteen lines, and not one row in the workspace.
     #[test]
-    fn the_scan_margin_reports_nine_variants_and_records_nothing() {
+    fn the_scan_margin_reports_thirteen_variants_and_records_nothing() {
         let conn = workspace();
 
         let margin = scan_margin_with(
@@ -1588,10 +1841,11 @@ mod tests {
                 dpi: None,
                 code_id: None,
             },
+            FIXTURE_MODULES,
         )
         .expect("margin");
 
-        assert_eq!(margin.variants.len(), 9);
+        assert_eq!(margin.variants.len(), 13);
         assert!(margin.variants.iter().all(|variant| variant.verified));
         assert!(
             rows(&conn).is_empty(),
@@ -1616,12 +1870,307 @@ mod tests {
                 dpi: None,
                 code_id: None,
             },
+            FIXTURE_MODULES,
         )
         .expect("margin");
 
         assert!(
             margin.variants.iter().all(|variant| !variant.verified),
             "a logo over the budget cannot read at any size"
+        );
+    }
+
+    /// A module count no code has is refused before anything is rendered —
+    /// and, the margin being a measurement, still without a row.
+    #[test]
+    fn the_scan_margin_refuses_a_module_count_no_code_has() {
+        let conn = workspace();
+
+        for modules in [0, 20, 210, u32::MAX] {
+            let refused = scan_margin_with(
+                &conn,
+                &Asked {
+                    svg: &hello_world_svg(),
+                    payload: HELLO_WORLD,
+                    pixel_size: 512,
+                    logo: None,
+                    dpi: None,
+                    code_id: None,
+                },
+                modules,
+            )
+            .expect_err("a module count outside 21..=209 must be refused");
+
+            assert_eq!(kind_of(&refused), "invalid_input", "{modules} modules");
+        }
+        for modules in [21, 209] {
+            assert!(
+                scan_margin_with(
+                    &conn,
+                    &Asked {
+                        svg: &hello_world_svg(),
+                        payload: HELLO_WORLD,
+                        pixel_size: 128,
+                        logo: None,
+                        dpi: None,
+                        code_id: None,
+                    },
+                    modules,
+                )
+                .is_ok(),
+                "{modules} modules is a code's side"
+            );
+        }
+        assert!(rows(&conn).is_empty());
+    }
+
+    /// The fixture's quiet zone, as the damage test is told it.
+    const FIXTURE_QUIET_ZONE: u32 = 4;
+
+    /// The damage test on the fixture at 512 pixels, built the way the command
+    /// builds it.
+    fn damage(
+        conn: &Connection,
+        logo: Option<&LogoRef>,
+        modules: u32,
+        quiet_zone: u32,
+        cells: &[DamageCell],
+    ) -> Result<DamageReport> {
+        damage_test_with(
+            conn,
+            &Asked {
+                svg: &hello_world_svg(),
+                payload: HELLO_WORLD,
+                pixel_size: 512,
+                logo,
+                dpi: None,
+                code_id: None,
+            },
+            modules,
+            quiet_zone,
+            cells,
+        )
+    }
+
+    /// Ink over every module of the 21-module symbol that is not a finder
+    /// pattern or its separator: the data, the format and the timing — nearly
+    /// all of what the decoder corrects from.
+    fn a_blot_over_the_data() -> Vec<DamageCell> {
+        let finder = |x: i32, y: i32| (x < 8 && y < 8) || (x >= 13 && y < 8) || (x < 8 && y >= 13);
+        (0..21)
+            .flat_map(|y| (0..21).map(move |x| (x, y)))
+            .filter(|&(x, y)| !finder(x, y))
+            .map(|(x, y)| DamageCell { x, y, dark: true })
+            .collect()
+    }
+
+    #[test]
+    fn a_code_with_no_damage_reads_through_the_damage_test() {
+        let conn = workspace();
+
+        let report = damage(&conn, None, FIXTURE_MODULES, FIXTURE_QUIET_ZONE, &[]).expect("damage");
+
+        assert!(report.reads, "reason: {:?}", report.reason);
+        assert_eq!(report.reason, None);
+        assert_eq!(report.decoder, decoder());
+    }
+
+    /// One smudged module is what error correction is for, and the decoder
+    /// corrects it.
+    #[test]
+    fn one_damaged_module_is_corrected() {
+        let conn = workspace();
+        // Symbol (11, 10) is a light module of the fixture, in the data.
+        let cell = DamageCell {
+            x: 11,
+            y: 10,
+            dark: true,
+        };
+
+        let report =
+            damage(&conn, None, FIXTURE_MODULES, FIXTURE_QUIET_ZONE, &[cell]).expect("damage");
+
+        assert!(report.reads, "reason: {:?}", report.reason);
+    }
+
+    #[test]
+    fn a_dark_blot_over_the_data_stops_the_code_reading() {
+        let conn = workspace();
+
+        let report = damage(
+            &conn,
+            None,
+            FIXTURE_MODULES,
+            FIXTURE_QUIET_ZONE,
+            &a_blot_over_the_data(),
+        )
+        .expect("damage");
+
+        assert!(!report.reads, "a code with its data inked over still read");
+        assert!(
+            matches!(
+                report.reason.as_deref(),
+                Some(crate::imaging::verify::REASON_NO_CODE)
+                    | Some(crate::imaging::verify::REASON_DIFFERENT)
+            ),
+            "the reason is the gate's own sentence: {:?}",
+            report.reason
+        );
+    }
+
+    /// The blot lands on the logo as it lands on everything else: the logo is
+    /// under the damage, never over it.
+    #[test]
+    fn damage_lands_on_top_of_the_logo() {
+        let conn = workspace();
+        let logo = a_stored_logo(&conn);
+        let placed = centred_logo(&logo, 0.2);
+
+        let clean = damage(
+            &conn,
+            Some(&placed),
+            FIXTURE_MODULES,
+            FIXTURE_QUIET_ZONE,
+            &[],
+        )
+        .expect("clean");
+        let blotted = damage(
+            &conn,
+            Some(&placed),
+            FIXTURE_MODULES,
+            FIXTURE_QUIET_ZONE,
+            &a_blot_over_the_data(),
+        )
+        .expect("blotted");
+
+        assert!(clean.reads, "reason: {:?}", clean.reason);
+        assert!(!blotted.reads);
+    }
+
+    /// A cell off the code, or a quiet zone that leaves no symbol, is refused
+    /// before anything is rendered — and without a row.
+    #[test]
+    fn a_damaged_module_off_the_code_is_refused() {
+        let conn = workspace();
+        let cell = |x, y| DamageCell { x, y, dark: true };
+
+        for (x, y) in [(-5, 0), (0, -5), (25, 0), (0, 25)] {
+            let refused = damage(
+                &conn,
+                None,
+                FIXTURE_MODULES,
+                FIXTURE_QUIET_ZONE,
+                &[cell(x, y)],
+            )
+            .expect_err("a cell off the code was painted");
+            assert_eq!(kind_of(&refused), "invalid_input", "({x}, {y})");
+        }
+        assert!(
+            damage(
+                &conn,
+                None,
+                FIXTURE_MODULES,
+                FIXTURE_QUIET_ZONE,
+                &[cell(-4, -4), cell(24, 24)],
+            )
+            .is_ok(),
+            "the quiet zone is part of the code, and damage there is damage"
+        );
+
+        let no_symbol = damage(&conn, None, FIXTURE_MODULES, 14, &[]).expect_err("no symbol");
+        assert_eq!(kind_of(&no_symbol), "invalid_input");
+        let no_code = damage(&conn, None, 20, FIXTURE_QUIET_ZONE, &[]).expect_err("no code");
+        assert_eq!(kind_of(&no_code), "invalid_input");
+        assert!(rows(&conn).is_empty());
+    }
+
+    #[test]
+    fn more_damaged_modules_than_the_code_has_are_refused() {
+        let conn = workspace();
+        let most = (FIXTURE_MODULES * FIXTURE_MODULES) as usize;
+        let cell = DamageCell {
+            x: 0,
+            y: 0,
+            dark: true,
+        };
+
+        assert!(
+            damage(
+                &conn,
+                None,
+                FIXTURE_MODULES,
+                FIXTURE_QUIET_ZONE,
+                &vec![cell; most]
+            )
+            .is_ok(),
+            "as many cells as the code has modules, duplicates and all"
+        );
+        let refused = damage(
+            &conn,
+            None,
+            FIXTURE_MODULES,
+            FIXTURE_QUIET_ZONE,
+            &vec![cell; most + 1],
+        )
+        .expect_err("more cells than modules were painted");
+        assert_eq!(kind_of(&refused), "invalid_input");
+    }
+
+    /// The cells are painted at `pixels / modules` a module, which is the
+    /// scene's grid only when the drawing is that many modules wide.
+    #[test]
+    fn a_module_count_that_is_not_the_drawings_own_is_refused() {
+        let conn = workspace();
+
+        let refused = damage(&conn, None, FIXTURE_MODULES + 2, FIXTURE_QUIET_ZONE, &[])
+            .expect_err("the damage would have been painted between modules");
+
+        assert_eq!(kind_of(&refused), "invalid_input");
+    }
+
+    /// A damage test is a question, not evidence: the workspace has the same
+    /// rows after it as before, whatever the decoder answered.
+    #[test]
+    fn a_damage_test_records_nothing() {
+        let conn = workspace();
+        verify_code_with(&conn, &hello_world_svg(), HELLO_WORLD, 128, None, None).expect("verify");
+        let before = rows(&conn);
+
+        damage(&conn, None, FIXTURE_MODULES, FIXTURE_QUIET_ZONE, &[]).expect("clean");
+        damage(
+            &conn,
+            None,
+            FIXTURE_MODULES,
+            FIXTURE_QUIET_ZONE,
+            &a_blot_over_the_data(),
+        )
+        .expect("blotted");
+
+        assert_eq!(rows(&conn), before);
+        assert_eq!(before.len(), 1);
+    }
+
+    #[test]
+    fn a_damage_report_reaches_the_interface_as_three_keys() {
+        let conn = workspace();
+
+        let report = damage(&conn, None, FIXTURE_MODULES, FIXTURE_QUIET_ZONE, &[]).expect("damage");
+        let json = serde_json::to_value(&report).expect("serialise");
+
+        assert_eq!(
+            json,
+            serde_json::json!({ "reads": true, "reason": null, "decoder": decoder() })
+        );
+        let cell: DamageCell =
+            serde_json::from_value(serde_json::json!({ "x": -1, "y": 3, "dark": false }))
+                .expect("a cell arrives as the interface sends it");
+        assert_eq!(
+            cell,
+            DamageCell {
+                x: -1,
+                y: 3,
+                dark: false
+            }
         );
     }
 
@@ -1649,5 +2198,174 @@ mod tests {
                 "`{key}` is missing from the report"
             );
         }
+    }
+
+    /// P2's proof of done, on this side: a PNG, an SVG and a PDF each carry a
+    /// stamp that reads back intact, whose reference and digest are the row's,
+    /// whose payload is the report's — and whose reference is a v4 and never
+    /// the row's own identifier.
+    #[test]
+    fn every_kind_of_export_is_stamped_and_the_row_keeps_the_stamp() {
+        let conn = workspace();
+        let scratch = Scratch::new();
+        let scene = sized(&hello_world_svg(), "25");
+
+        for (name, written, kind) in [
+            ("code.png", Written::Png, Kind::Png),
+            ("code.svg", Written::Svg, Kind::Svg),
+            ("code.pdf", Written::Pdf { width_mm: 25.0 }, Kind::Pdf),
+        ] {
+            let path = scratch.file(name);
+            let export =
+                export(&conn, &scene, HELLO_WORLD, 295, &path, None, written).expect("export");
+
+            let bytes = std::fs::read(&path).expect("the file exists");
+            let found = read_stamp(&bytes, kind)
+                .expect("read")
+                .unwrap_or_else(|| panic!("{name} carries no stamp"));
+            assert!(found.intact, "{name} does not match its own stamp");
+            assert!(
+                !found
+                    .stamp
+                    .json()
+                    .expect("json")
+                    .contains(&export.report.payload_sha256),
+                "{name}: the payload's digest is not in the stamp"
+            );
+            assert_eq!(found.stamp.decoder, export.report.decoder);
+            assert_eq!(
+                found.stamp.reference.as_bytes()[14],
+                b'4',
+                "{name}: not a v4"
+            );
+
+            let (id, stamp_ref, stamp_digest) = stamps(&conn).pop().expect("a row");
+            assert_eq!(stamp_ref.as_deref(), Some(found.stamp.reference.as_str()));
+            assert_eq!(stamp_digest.as_deref(), Some(found.stamp.digest.as_str()));
+            assert_ne!(found.stamp.reference, id, "the stamp is not the row's v7");
+        }
+    }
+
+    /// The PNG's digest is the artefact's: the row's `artefact_sha256` and its
+    /// `stamp_digest` are the same number, because the file minus the chunk is
+    /// the bytes that were decoded.
+    #[test]
+    fn a_png_stamp_digest_is_the_artefact_that_was_decoded() {
+        let conn = workspace();
+        let scratch = Scratch::new();
+        let path = scratch.file("code.png");
+
+        let export = export_png_with(&conn, &hello_world_svg(), HELLO_WORLD, 295, &path, None)
+            .expect("export");
+
+        let (_, _, digest) = stamps(&conn).pop().expect("a row");
+        assert_eq!(
+            digest.as_deref(),
+            Some(export.report.artefact_sha256.as_str())
+        );
+    }
+
+    /// The setting off: every kind of file is written without a stamp, and the
+    /// rows say so with NULL.
+    #[test]
+    fn with_stamping_off_no_file_is_stamped_and_no_row_has_a_stamp() {
+        let conn = workspace();
+        crate::db::settings::set(&conn, crate::commands::settings::STAMP_EXPORTS, "false")
+            .expect("turn it off");
+        let scratch = Scratch::new();
+        let scene = sized(&hello_world_svg(), "25");
+
+        for (name, written, kind) in [
+            ("code.png", Written::Png, Kind::Png),
+            ("code.svg", Written::Svg, Kind::Svg),
+            ("code.pdf", Written::Pdf { width_mm: 25.0 }, Kind::Pdf),
+        ] {
+            let path = scratch.file(name);
+            let export =
+                export(&conn, &scene, HELLO_WORLD, 295, &path, None, written).expect("export");
+            let bytes = std::fs::read(&path).expect("the file exists");
+            assert_eq!(read_stamp(&bytes, kind).expect("read"), None, "{name}");
+            match kind {
+                Kind::Png => assert_eq!(sha256_hex(&bytes), export.report.artefact_sha256),
+                Kind::Svg => assert_eq!(String::from_utf8(bytes).expect("text"), scene),
+                Kind::Pdf => assert!(!String::from_utf8_lossy(&bytes).contains("/Signatum")),
+            }
+        }
+        let recorded = stamps(&conn);
+        assert_eq!(recorded.len(), 3);
+        assert!(recorded
+            .iter()
+            .all(|(_, reference, digest)| reference.is_none() && digest.is_none()));
+    }
+
+    /// A preview, a refusal and a copy write no file, so none of them carries a
+    /// stamp.
+    #[test]
+    fn nothing_that_wrote_no_file_has_a_stamp() {
+        fn places(_: &clipboard::Image) -> Result<()> {
+            Ok(())
+        }
+
+        let conn = workspace();
+        let scratch = Scratch::new();
+        verify_code_with(&conn, &hello_world_svg(), HELLO_WORLD, 128, None, None).expect("verify");
+        let _ = export_png_with(
+            &conn,
+            &blank_svg(),
+            HELLO_WORLD,
+            128,
+            &scratch.file("x.png"),
+            None,
+        );
+        copy_png_with(
+            &conn,
+            &Asked {
+                svg: &hello_world_svg(),
+                payload: HELLO_WORLD,
+                pixel_size: 128,
+                logo: None,
+                dpi: Some(DPI),
+                code_id: None,
+            },
+            places,
+        )
+        .expect("copy");
+
+        let recorded = stamps(&conn);
+        assert_eq!(recorded.len(), 3);
+        assert!(recorded
+            .iter()
+            .all(|(_, reference, digest)| reference.is_none() && digest.is_none()));
+    }
+
+    /// The stamp says what was verified and nothing about where or when: not
+    /// the folder, not the file's name, not a date.
+    #[test]
+    fn a_stamp_carries_no_path_no_name_and_no_date() {
+        let conn = workspace();
+        let scratch = Scratch::new();
+        let path = scratch.file("private-folder-menu.png");
+
+        export_png_with(&conn, &hello_world_svg(), HELLO_WORLD, 295, &path, None).expect("export");
+
+        let bytes = std::fs::read(&path).expect("the file exists");
+        let json = read_stamp(&bytes, Kind::Png)
+            .expect("read")
+            .expect("stamp")
+            .stamp
+            .json()
+            .expect("json");
+        let folder = scratch.0.to_string_lossy().into_owned();
+        assert!(!json.contains("private-folder"), "{json}");
+        assert!(!json.contains(&folder), "{json}");
+        assert!(!json.contains("signatum-"), "{json}");
+        assert!(
+            !json.contains(&chrono::Utc::now().format("%Y-%m").to_string()),
+            "{json}"
+        );
+        assert!(
+            !json.contains('T') && !json.contains('Z'),
+            "no timestamp: {json}"
+        );
     }
 }

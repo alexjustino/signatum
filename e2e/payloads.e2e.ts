@@ -143,8 +143,7 @@ describe('payload kinds', () => {
       await chooseKind(c.kind);
       for (const [label, value] of c.fill) {
         const field = await driver.waitForElement(`[aria-label="${label}"]`);
-        await field.clear();
-        await field.sendKeys(value);
+        await field.fill(value);
       }
       await driver.waitForText(c.summary);
       await driver.waitForText('read it back byte for byte');
@@ -166,8 +165,7 @@ describe('payload kinds', () => {
     const { driver } = session;
     await chooseKind('Location');
     const latitude = await driver.waitForElement('[aria-label="Latitude"]');
-    await latitude.clear();
-    await latitude.sendKeys('-23,5505');
+    await latitude.fill('-23,5505');
     await driver.waitForText('dot');
     expect(await latitude.attribute('aria-invalid')).toBe('true');
     const button = await driver.findByXPath('//button[contains(normalize-space(.), "Export PNG")]');

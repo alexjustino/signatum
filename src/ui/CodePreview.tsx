@@ -35,20 +35,37 @@ export function CodePreview({
   name,
   svg,
   overlay,
+  layer,
   caption,
   placeholder,
+  framed = true,
 }: {
   name: string;
   /** The scene from `domain/scene.ts`, or null when there is nothing to show. */
   svg: string | null;
   overlay?: CodeOverlay | undefined;
+  /**
+   * A drawing about the code, laid over the whole square above the logo (P9): the weak spots and
+   * the damage somebody drew. The square is the scene's `side × side` viewBox, so a layer drawn in
+   * the same units lands on the modules it is about at any size. The layer owns its own pointer
+   * behaviour — the box it sits in takes none — and its own `aria-hidden`.
+   */
+  layer?: ReactNode;
   caption?: ReactNode;
   placeholder?: ReactNode;
+  /**
+   * Whether the figure draws its own card. A preview that sits inside a card already (the copy
+   * "Where it breaks" draws on) is not framed twice.
+   */
+  framed?: boolean;
 }) {
   return (
     <figure
       aria-label={name}
-      className="flex flex-col items-center gap-3 rounded-xl border border-stroke-subtle bg-card p-4 shadow-card"
+      className={[
+        'flex flex-col items-center gap-3',
+        framed ? 'rounded-xl border border-stroke-subtle bg-card p-4 shadow-card' : '',
+      ].join(' ')}
     >
       {svg === null ? (
         <div className="w-full">{placeholder}</div>
@@ -86,6 +103,9 @@ export function CodePreview({
                 height: `${(overlay.box.height / overlay.side) * 100}%`,
               }}
             />
+          )}
+          {layer !== undefined && layer !== null && (
+            <div className="pointer-events-none absolute inset-0">{layer}</div>
           )}
         </div>
       )}

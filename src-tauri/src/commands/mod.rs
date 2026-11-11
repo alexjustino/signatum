@@ -9,6 +9,7 @@ pub mod batch;
 pub mod codes;
 pub mod library;
 pub mod logos;
+pub mod proof;
 pub mod read;
 pub mod settings;
 pub mod system;

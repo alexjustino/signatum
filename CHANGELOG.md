@@ -7,6 +7,212 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-11-11 — The proof
+
+Signatum makes QR codes with a brand mark in the middle, on your own machine, and refuses to let
+one out until an independent decoder has read it back. That proves a file. It does not prove the
+print, or that the file in somebody else's hands is the one that was proved, or that the address
+inside a code is the one it looks like, and it does not say how much a code can lose before it stops
+reading. 1.1 carries the promise those steps further, and adds no new kind of code and no new look.
+A proof sheet puts the code on one A4 page at the sizes people print, each size read back first,
+with a bar that shows whether the printer scaled the page, and the scan margin now also asks what
+ink spread, an angle and dim light do to it. Every file the product writes carries a stamp, and Read
+can say whether this workspace verified a file and whether it has changed since. A look-alike guard
+says in a sentence when an address is not what it looks like, before it is printed and before it is
+followed. The library can be checked again in one press, and a code photographed off a wall can be
+traced back to the saved code it came from. And a new card says where a code breaks: how small a
+smudge, in the right place, can stop this code, in millimetres at the printed size, with the
+decoder's own answer beside the arithmetic, and lists the ways to make the code tougher, each with
+what it gives up.
+
+Nothing in the scan gate was weakened. A code is still read back byte for byte before it can leave,
+a code that does not read back is still refused and still leaves no file, and the print conditions,
+the guard and the card are reports that disable nothing and change no verdict. Two things around the
+gate did change, and both are stated below: the decoder in it is a newer version, moved only after
+it read ten thousand randomised codes without a loss, and a file now carries a stamp the decoder
+never saw. The costs stay stated too. A stamp is not a signature, the print conditions are
+conventional approximations rather than a measurement of any press or camera, and the only test of
+paper is printing the sheet and scanning it with a phone. There is still no account and no network
+request of any kind. The installers on the Releases page are still **not code-signed**, so Windows
+SmartScreen will warn on first run. Check the SHA-256 in the release notes against the file you
+downloaded, and download only from this repository's Releases page.
+
+### Added
+
+#### On paper
+
+- **A proof sheet: the code at the sizes people print, on one page, each one read back first.**
+  **Proof sheet…** on the Create screen writes one A4 PDF with the code at 15, 20, 25 and 30 mm,
+  and at the chosen size when it is none of those. Each size is rendered at the pixels an export of
+  that size would have and read back by the same independent decoder before it is drawn, and the
+  picture on the page is the one that read. A size that does not read is a box with the reason
+  inside it, never a picture, so the sheet shows where this code stops reading instead of leaving
+  it out; when no size reads, nothing is written. Under each code are its size, how far away to
+  hold a phone — ten times the width, printed as the rule of thumb it is — and a reference to the
+  verification that proved it. Each size is a verification of its own in the workspace (ADR-032).
+- **A bar that checks the printer.** At the foot of the sheet is a bar exactly 50 mm long, ticked
+  every 10 mm. If it measures anything else, the print dialog scaled the page — "fit to page" is
+  the most common way a 25 mm code becomes 23 mm — and the sizes above it are wrong. The sheet asks
+  to be printed at 100 %.
+- **Nothing on the sheet about who made it, or when.** Like every PDF this product writes, the
+  sheet names what produced it and carries its stamp, and says nothing else about itself: no date,
+  no author, no title, no path. What the code
+  does is printed in one line under the heading when the sheet's font can draw every character of
+  it, and replaced by a sentence saying so when it cannot — never printed with question marks where
+  the letters were.
+- **The scan margin asks what print does, too.** After a code passes, the margin already shrank,
+  blurred and recompressed it nine ways — what a screen or a chat app does to a picture — and read
+  each one back. Four more lines now ask what paper and a phone do: ink spreading on coated and on
+  uncoated paper, which grows every dark module by 8 % and 18 % of a module on each edge and
+  closes the light gaps between them; the code seen 30° off square, in perspective; and dim light —
+  a third of the contrast, a camera's noise and a slight blur, the same every time it is asked. The
+  card shows them under their own heading, **In print**, below **On screen and in chat**, so a code
+  that reads clean and fails under ink spread says so on the line named for it. It is still a
+  report and never a gate: nothing is disabled and the verdict does not change. The figures are
+  conventional approximations, not a measurement of any press or camera, and on a very small code
+  a pixel of spread is the least that can be applied, so both paper lines can fail while the code
+  reads — a reason to print it larger, and to print the proof sheet (ADR-035).
+
+#### In somebody else's hands
+
+- **A stamp in every file, saying what was verified and never when.** Every PNG, SVG and PDF the
+  product writes — a single export, every file of a batch, and the proof sheet — carries one stamp:
+  a random reference, the decoder that read it back, and a digest of the file. It carries no date,
+  no name, no path and nothing about what the code holds — not even a hash of it, which for a
+  Wi-Fi code with a known network name would be something to test password guesses against. In a PNG
+  it is one text chunk the decoder never saw, so removing it gives back, byte for byte, the picture
+  that was decoded; in an SVG it is a comment after the opening tag, and in a PDF an entry in the
+  document information beside the producer. The workspace keeps the reference and the digest on
+  the verification that proved the file (schema 7). Copying to the clipboard carries no stamp: the
+  system copies pixels, not files (ADR-033).
+- **Read checks an exported file.** **Check an exported file…** opens a PNG, SVG or PDF and says
+  whether this workspace verified it and whether it has changed since — _verified by this
+  workspace, unchanged_, with the date and the saved code taken from the workspace and never from
+  the file, and only for a file that is unchanged; _changed after it was verified_ when one pixel or
+  byte is different, with no date; a stamp from another workspace, said as exactly that; or no
+  stamp at all. An SVG or a PDF is searched for the
+  stamp and never drawn or parsed. A PNG opened as a picture on Read shows the same check above its
+  codes. The stamp is not a signature: anybody can write one, and only a matching record in your own
+  workspace says your workspace verified the file.
+- **Stamping can be turned off.** **Stamp exported files** under Settings → Defaults, on by
+  default. Turned off, every file is written exactly as before.
+
+#### The address inside a code
+
+- **The address inside a code, said out loud before anybody follows it.** When the link in a code
+  is not what it looks like, the product says so in a sentence: a name that mixes alphabets, such as
+  `аpple.com` with a Cyrillic `а`, and which word it reads as; a name written wholly in another
+  alphabet that reads as a Latin word, away from the domains where that alphabet is at home; a
+  character that is not a letter, a digit or a hyphen, named by its code point; a link shortener,
+  whose owner decides where the code lands; and an IP address instead of a name, with the warning
+  that a private one opens only on its own network. It is shown on Create under the
+  line that says what the code does — for a link, and for the domain of an e-mail address — on the
+  link rows of a batch plan, and on Read before anybody opens what a code holds. It warns and
+  never refuses: nothing is disabled and no verdict changes, because a shortener can be your own
+  and a private address can be the point. Japanese, Chinese and Korean names, and a Greek or
+  Cyrillic word under its own country's domain, stay quiet. It is worked out on the machine from the
+  address alone — no list is downloaded and nothing is looked up — so it is not a phishing filter,
+  and a shortener it does not know says nothing (ADR-034).
+
+#### The library, and a print held against it
+
+- **The library, checked again in one press.** "Check all again" on the Library rebuilds every
+  saved code the way Open does, compares it with the drawing it was saved as, and asks the decoder
+  again — one at a time, with a progress bar — then says on each row whether it rebuilds
+  identically and reads, rebuilds differently but still reads ("check it before you print"), or no
+  longer reads, and sums it up once. After an update, that is how you learn which saved codes it
+  changed. A Wi-Fi code saved without its password is reported as not checked.
+- **A print, held against the library.** When Read finds a code that carries exactly what a saved
+  code carries — the same bytes, compared one by one, not a resemblance — it says so above the
+  details: _Matches your saved code Menu_, with **Open**, which reopens that saved code exactly as
+  it was saved. A code that is not in the library says nothing. So a printed code on a wall, a
+  menu or a label can be photographed and traced back to the code it came from, without anybody
+  having to remember its name. A Wi-Fi code saved without its password is never matched, because
+  what it would carry is not known.
+
+#### Where a code breaks
+
+- **Where a code breaks, said in millimetres.** Level H is said to survive 30 % damage, and that is
+  true only of damage spread perfectly evenly: each error-correction block is corrected on its own,
+  and a logo has already spent part of the blocks it sits on. After a code passes, a card on the
+  Create screen, **Where it breaks**, says how much is left once the logo is counted and how small
+  a smudge in the right place can be and still stop the code, measured at the printed size — for a
+  link to a menu with a logo, 14 % left of the textbook 31 %, and a smudge about 4.9 mm across on a
+  25 mm code. **Show the weak spots** marks, on the card's own copy of the code, where each block is
+  spent and where that smudge would go; the blocks are listed with what each has left; and the code
+  can be damaged by hand, in ink or paper, or smudged at its weakest spot in one press, with the
+  prediction following. The preview of what is exported never shows damage that is not in the file.
+  **Ask the decoder** paints the damage onto the code and asks the gate's own decoder, and its
+  answer is shown beside the prediction, because the guarantee runs one way: what the logo covers
+  is counted as lost, so a code past its guarantee may still read, and only a decoder can say. A
+  smudge on a finder or in the quiet zone is named and left to the decoder. It is a report and
+  never a gate: nothing is disabled, the verdict does not change, and nothing is recorded (ADR-037).
+- **Ways to make it tougher, each with what it gives up.** Once a code passes, **Where it breaks**
+  ends with the changes this screen can make that ask for a larger smudge, toughest first: the link
+  without its tracking parameters, a smaller logo, a higher level when there is no logo, and the
+  next printed width. Each is planned by the same engine and measured the way the card measures, and
+  is offered only when the smudge it asks for is at least 0.1 mm larger; two changes that end in the
+  same code are one row. Each row says what it gives up — telling which campaign a scan came from,
+  how much narrower the mark prints, how much smaller the modules, how much more paper — and
+  **Use** changes the same control a person would, so the gate asks again and the card measures the
+  new code. A campaign link to a menu with a logo is version 9; without `utm_source`, `utm_medium`
+  and `utm_campaign` it is version 4, and the smudge that can stop it at 25 mm grows from 5.3 mm to
+  6.7 mm. Tracking parameters are a fixed list of names whose only job is attribution — the `utm_`
+  family and click identifiers such as `fbclid` and `gclid` — and the rest of the link is kept byte
+  for byte; the list will miss names, and the link is never changed unless the person presses
+  **Use**. On a short link with a logo a larger print is sometimes the only row, which is the true
+  answer. It is a report with shortcuts: nothing is disabled and the verdict does not change
+  (ADR-038).
+
+### Changed
+
+- **The independent decoder is `rqrr` 0.11, and the renderer `resvg` 0.48.** Each moved only after
+  ten thousand randomised codes were drawn by the new renderer and read back by the new decoder,
+  byte for byte, with nothing lost. A verification names the decoder that made it, so a code
+  verified by 1.0.0 keeps saying `rqrr 0.10.1`, and **Check all again** on the Library asks the new
+  one.
+- **Tauri 2.12.** The application framework and its dialog and log plugins move to their current
+  releases, with the interface's packages alongside so the two halves are the same version.
+- **Building from source needs Rust 1.90.** The manifest said 1.80, but the libraries Tauri brings
+  in already needed 1.88, so 1.0.0 could not have been built by the compiler it named. A gate now
+  fails when a dependency needs more than the manifest declares, and it moved the floor once more
+  when Tauri 2.12 arrived (ADR-036).
+
+### Fixed
+
+- **The workspace's SQLite is past a published vulnerability.** The SQLite compiled into the
+  product, the one that keeps the workspace, was a version with a published flaw
+  (CVE-2026-119375, RUSTSEC-2026-0459). It is now a patched release, and the workspace file is
+  opened, migrated and read exactly as before — including one written by 1.0.0, which the
+  end-to-end suite opens on every run. 1.0.0 carries the affected version; updating to 1.1.0 is
+  the fix.
+- **A network path is refused in every spelling.** Every door that reads or writes a file a person
+  chose refused a path beginning with `\\` or `//`; Windows also reads `\/server/share` as a network
+  path, and that spelling passed. The check now asks Windows how it parses the path, accepts only a
+  drive letter, and refuses a drive letter mapped to a network share as well.
+- **A link is not a file somebody chose.** The logo import, Read, the stamp check and the batch CSV
+  each refuse a file that is itself a symbolic link, because its target is a place nobody chose.
+- **The device names Windows reserves, all of them.** The list gained `COM0`, `LPT0` and the
+  spellings with a superscript digit, which Windows also resolves as ports. The logo import now
+  refuses a device name before it reads anything, as the other doors already did, and a batch's file
+  names avoid the same names the host refuses.
+- **One way to write a day.** The Library wrote the day a code was kept in the runtime's numeric
+  format, `10/5/2026`, which half the world reads as the tenth of May, beside a Read screen that
+  writes `5 Oct 2026`. Both now write it the second way.
+
+### Migrations
+
+- `007_stamps.sql` — `stamp_ref` and `stamp_digest` on a verification: the reference a file was
+  given and the digest written into it, which is how Read tells a file this workspace verified from
+  one it did not. The reference is a UUID v4 and never the row's own identifier, whose leading digits
+  are a time. Both are nullable and are set together, only on a row that proved a file that was
+  written: a preview, a refusal, a copy to the clipboard, a row written with stamping turned off and
+  every row from before this migration have neither, because NULL here means the file was not
+  stamped, which is the truth. No two rows share a reference.
+
+Migrations are forward-only. A workspace from 1.0.0 is at schema version 6 and is migrated to 7 on
+first launch, and Diagnostics says which version it holds.
+
 ## [1.0.0] — 2026-09-14 — The mark
 
 Signatum makes QR codes with a brand mark in the middle, on your own machine, and refuses to let
@@ -459,5 +665,6 @@ Migrations are forward-only. A workspace created by 1.0.0 starts at schema versi
 from an earlier build is migrated forward to 6 on first launch, and Diagnostics says which version
 it holds.
 
-[Unreleased]: https://github.com/alexjustino/signatum/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/alexjustino/signatum/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/alexjustino/signatum/releases/tag/v1.1.0
 [1.0.0]: https://github.com/alexjustino/signatum/releases/tag/v1.0.0

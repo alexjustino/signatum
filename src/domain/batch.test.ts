@@ -95,6 +95,8 @@ describe('file names', () => {
     expect(sanitiseFileStem('CON')).toBe('code-CON');
     expect(sanitiseFileStem('con.txt')).toBe('code-con.txt');
     expect(sanitiseFileStem('COM3')).toBe('code-COM3');
+    expect(sanitiseFileStem('COM0')).toBe('code-COM0');
+    expect(sanitiseFileStem('lpt².png')).toBe('code-lpt².png');
     expect(sanitiseFileStem('conin$')).toBe('code-conin$');
     expect(sanitiseFileStem('  . . ')).toBe('code');
     expect(sanitiseFileStem('..')).toBe('code');
@@ -207,5 +209,19 @@ describe('the report', () => {
       '4,Late,003-Late,refused,The decoder found no code.',
       '',
     ]);
+  });
+});
+
+describe('planBatch — the address on each row', () => {
+  it('carries the look-alike guard for a link row, and nothing for an ordinary one', () => {
+    const csv = ['name,url', 'short,https://bit.ly/x', 'plain,https://example.com/'].join('\r\n');
+    const plan = planBatch(parseCsv(csv), {
+      style: DEFAULT_STYLE,
+      size: DEFAULT_PRINT_SIZE,
+      logo: null,
+    });
+    if (!('rows' in plan)) throw new Error('the rows must plan');
+    expect(plan.rows[0]?.warnings[0]).toMatch(/^bit\.ly is a link shortener/);
+    expect(plan.rows[1]?.warnings).toEqual([]);
   });
 });

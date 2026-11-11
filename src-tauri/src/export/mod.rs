@@ -11,7 +11,14 @@
 //! the bytes that are written (ADR-010). What is here is the two files that are
 //! *built around* that artefact — an SVG that carries the same scene and the same
 //! logo as markup (ADR-026), and a PDF page of exactly the millimetres a person
-//! asked for with the verified raster on it.
+//! asked for with the verified raster on it — and, from P1, the proof sheet: the
+//! same code at several sizes on one A4 page, each one a verified raster of its
+//! own size, with a bar that checks the printer.
+//!
+//! From P2 every one of those files carries a stamp (`stamp`): a reference, the decoder,
+//! and a digest of what was verified — and no payload digest, no date, no name, no path.
 
 pub mod pdf;
+pub mod proof;
+pub mod stamp;
 pub mod svg;

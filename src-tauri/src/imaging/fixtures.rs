@@ -42,6 +42,12 @@ const MODULES: [&str; 21] = [
     "#######....#.###....#",
 ];
 
+/// The 21 rows of the symbol, dark modules as `#` — for a test that has to
+/// draw the modules itself, at a size or in a shape the renderer would not.
+pub fn hello_world_modules() -> &'static [&'static str; 21] {
+    &MODULES
+}
+
 /// The scene the interface draws, as the host receives it: one background
 /// rectangle and one path of dark modules, self-contained, no external anything
 /// (spec §3).

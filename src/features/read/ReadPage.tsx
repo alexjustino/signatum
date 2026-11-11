@@ -3,10 +3,21 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useMemo, useState } from 'react';
 
 import { describeError } from '@/data/errors';
-import { useReadClipboard, useReadImage } from '@/data/hooks';
-import type { ReadCode, Reading } from '@/data/read';
+import {
+  useCheckFile,
+  useCode,
+  useReadClipboard,
+  useReadImage,
+  useSavedCodesInFull,
+  type SavedCodesInFull,
+} from '@/data/hooks';
+import type { SavedCode } from '@/data/library';
+import type { ReadCode, Reading, StampCheck } from '@/data/read';
+import { describeMatch, matchSaved } from '@/domain/match';
 import { describeBytes, wouldScanAt, type ReadKind, type ScanVerdict } from '@/domain/read';
 import { LENGTH_UNIT_LABELS, LENGTH_UNITS, toMillimetres, type LengthUnit } from '@/domain/size';
+import { AddressSentences } from '@/features/create/AddressSentences';
+import { stampSentence } from '@/features/read/stampSentence';
 import { announce } from '@/ui/announce';
 import { Button } from '@/ui/Button';
 import { Card } from '@/ui/Card';
@@ -20,9 +31,12 @@ import { Select } from '@/ui/Select';
  *
  * Two doors in — a file and the clipboard — and one thing on the way out: what the bytes mean,
  * how the symbol was built, and whether a code of that many modules survives being printed at a
- * width. The decoding is the host's and the meaning is the domain's; this screen owns neither,
- * which is what makes a code that was read and a code that was made describe themselves in the
- * same sentences.
+ * width. A third door (P2) checks a file this product exported: it is never drawn and never
+ * decoded, only its stamp is read, and the answer is one sentence on a Stamp card — the same card
+ * a stamped PNG opened through the first door shows above its codes. A code that carries exactly
+ * what a saved code carries says which one, with Open (P6). The decoding is the host's and the
+ * meaning is the domain's; this screen owns neither, which is what makes a code that was read and
+ * a code that was made describe themselves in the same sentences.
  *
  * Nothing read is stored, and nothing found in an image is ever acted on: a link in a photograph
  * is shown as text, never followed. The content is data here, the way a payload is data on
@@ -61,8 +75,15 @@ export interface MadeFromRead {
   text: string;
 }
 
+/** A door that refused, in the door's own title and the host's own sentence. */
+export interface ReadRefusal {
+  title: string;
+  sentence: string;
+}
+
 /**
- * What the screen is looking at: one reading, or the sentence that refused it — never both.
+ * What the screen is looking at: one reading, one checked file, or the sentence that refused
+ * either — never two of them.
  *
  * It is held by the shell, for the reason the batch's rows are: a person goes to Settings to
  * switch the theme and comes back, and the photograph they were reading has to still be there.
@@ -70,8 +91,16 @@ export interface MadeFromRead {
  */
 export interface ReadState {
   reading: Reading | null;
-  problem: string | null;
+  check: StampCheck | null;
+  problem: ReadRefusal | null;
 }
+
+/** What Open answers — the Library's own contract, because it is the Library's own path. */
+type OpenSaved = (saved: SavedCode) => Promise<{ ok: true } | { ok: false; reason: string }>;
+
+/** The titles a refusal carries, one per kind of door. */
+const IMAGE_REFUSED = 'The image could not be read';
+const FILE_REFUSED = 'The file could not be checked';
 
 /** `1 code`, `2 codes` — a count that reads as English at both ends. */
 function codes(n: number): string {
@@ -82,35 +111,50 @@ export function ReadPage({
   state,
   onState,
   onMake,
+  onOpen,
 }: {
   state: ReadState;
   onState: (state: ReadState) => void;
   onMake: (made: MadeFromRead) => void;
+  /** Open a saved code in Create — the path the Library's Open button takes. */
+  onOpen: OpenSaved;
 }) {
-  const { reading, problem } = state;
+  const { reading, check, problem } = state;
 
   const { mutateAsync: readFile, isPending: opening } = useReadImage();
   const { mutateAsync: readPasted, isPending: pasting } = useReadClipboard();
-  const busy = opening || pasting;
+  const { mutateAsync: checkStamp, isPending: checking } = useCheckFile();
+  const busy = opening || pasting || checking;
+
+  // The library in full, asked for once there is a decoded code to match and shared by every card
+  // (P6). `list_codes` carries no payload, so each saved code is fetched once into the window's
+  // cache — the same entry a Library row reads — and not again for the next card or the next image.
+  const library = useSavedCodesInFull(reading?.codes.some((code) => code.error === null) ?? false);
 
   /** One reading replaces the last one whole: a picture and a list about two images is a lie. */
   const took = (result: Reading) => {
-    onState({ reading: result, problem: null });
-    announce(
+    onState({ reading: result, check: null, problem: null });
+    const found =
       result.codes.length === 0
         ? (result.note ?? 'Nothing was found in this image.')
-        : `The image was read — ${codes(result.codes.length)} found.`,
-    );
+        : `The image was read — ${codes(result.codes.length)} found.`;
+    announce(result.stamp === null ? found : `${found} ${stampSentence(result.stamp).sentence}`);
+  };
+
+  /** A checked file replaces whatever was on screen, for the same reason. */
+  const checked = (result: StampCheck) => {
+    onState({ reading: null, check: result, problem: null });
+    announce(stampSentence(result).sentence);
   };
 
   /**
-   * A refused image clears what was on screen.
+   * A refusal clears what was on screen.
    *
    * The alternative is a sentence about the file that was just refused sitting above the picture
    * of a different one, which is the kind of half-truth this screen exists to remove.
    */
-  const failed = (error: unknown) => {
-    onState({ reading: null, problem: describeError(error) });
+  const failed = (title: string, error: unknown) => {
+    onState({ reading: null, check: null, problem: { title, sentence: describeError(error) } });
   };
 
   const chooseImage = async () => {
@@ -122,7 +166,7 @@ export function ReadPage({
       if (typeof path !== 'string') return;
       took(await readFile(path));
     } catch (error) {
-      failed(error);
+      failed(IMAGE_REFUSED, error);
     }
   };
 
@@ -130,12 +174,30 @@ export function ReadPage({
     try {
       took(await readPasted());
     } catch (error) {
-      failed(error);
+      failed(IMAGE_REFUSED, error);
     }
   };
 
+  const chooseExported = async () => {
+    try {
+      const path = await open({
+        multiple: false,
+        filters: [{ name: 'Exported files', extensions: ['png', 'svg', 'pdf'] }],
+      });
+      if (typeof path !== 'string') return;
+      checked(await checkStamp(path));
+    } catch (error) {
+      failed(FILE_REFUSED, error);
+    }
+  };
+
+  // Exactly one thing is on screen, so at most one stamp is: the checked file's, or the stamp of
+  // the PNG that was opened.
+  const stamp = check ?? reading?.stamp ?? null;
+  const showing = reading !== null || check !== null;
+
   /**
-   * The two doors, rendered once.
+   * The three doors, rendered once.
    *
    * They sit in the empty state while there is nothing to look at and in the card's header once
    * there is, rather than in both places at once: two buttons with the same name on one surface
@@ -148,6 +210,9 @@ export function ReadPage({
       </Button>
       <Button disabled={busy} onClick={() => void pasteImage()}>
         Paste from clipboard
+      </Button>
+      <Button disabled={busy} onClick={() => void chooseExported()}>
+        Check an exported file…
       </Button>
     </div>
   );
@@ -165,29 +230,41 @@ export function ReadPage({
       <Card
         title="Image"
         description="Nothing opened here is stored, and nothing found in it is ever followed."
-        actions={reading === null ? undefined : doors}
+        actions={showing ? doors : undefined}
       >
         <div className="flex flex-col gap-3">
           {problem !== null && (
-            <InfoBar severity="danger" title="The image could not be read">
-              {problem}
+            <InfoBar severity="danger" title={problem.title}>
+              {problem.sentence}
             </InfoBar>
           )}
 
           {/* Not a live region: the buttons are disabled while this is on screen, and the
               outcome is announced when it arrives (DESIGN_SYSTEM §7). */}
-          {busy && <p className="text-caption text-fg-secondary">Reading the image…</p>}
+          {busy && (
+            <p className="text-caption text-fg-secondary">
+              {checking ? 'Checking the file…' : 'Reading the image…'}
+            </p>
+          )}
 
-          {reading === null && problem === null && (
+          {!showing && problem === null && (
             <EmptyState
               icon={<ScanCamera24Regular />}
               title="Nothing read yet"
-              description="Open a photograph or a screenshot of a code, and what it holds appears here."
+              description="Open a photograph or a screenshot of a code, and what it holds appears here — or check whether a file this product exported was changed."
               action={doors}
             />
           )}
 
-          {reading === null && problem !== null && doors}
+          {!showing && problem !== null && doors}
+
+          {/* A checked file is never drawn, so there is no picture here — and the card says so
+              rather than standing empty, which would look like a picture that failed to load. */}
+          {check !== null && (
+            <p className="text-caption text-fg-tertiary">
+              The file was checked for its stamp; nothing in it was drawn or decoded.
+            </p>
+          )}
 
           {reading !== null && (
             <>
@@ -203,6 +280,15 @@ export function ReadPage({
         </div>
       </Card>
 
+      {/* Above the codes: what the file says about itself comes before what is in it. */}
+      {stamp !== null && (
+        <StampCard
+          key={`${stamp.kind}-${stamp.decoder}-${stamp.verifiedAt}-${stamp.codeId}`}
+          check={stamp}
+          onOpen={onOpen}
+        />
+      )}
+
       {reading?.codes.map((code, index) => (
         // Keyed by the reading as well as the slot, so a card from the last image is never
         // reused for this one — a revealed password does not survive into another picture.
@@ -210,11 +296,150 @@ export function ReadPage({
           key={`${reading.decodeMs}-${reading.width}-${reading.height}-${index}`}
           index={index + 1}
           code={code}
+          library={library}
           onMake={onMake}
+          onOpen={onOpen}
         />
       ))}
     </div>
   );
+}
+
+/**
+ * What a file's stamp says (P2): exactly one sentence, in the tone it deserves, and — when this
+ * workspace verified it from a saved code still in the library — that code's name and a way to
+ * open it.
+ *
+ * The date and the name are the workspace's, never the file's: the host fills them only when its
+ * own row matches the stamp, so a stamp copied from elsewhere cannot bring a date with it.
+ */
+function StampCard({ check, onOpen }: { check: StampCheck; onOpen: OpenSaved }) {
+  const said = stampSentence(check);
+  const saved =
+    check.intact && check.matchesRecord && check.codeId !== null && check.codeName !== null
+      ? { id: check.codeId, name: check.codeName }
+      : null;
+
+  return (
+    <Card label="Stamp" title="Stamp">
+      <InfoBar severity={said.severity} title={said.sentence}>
+        {said.detail ??
+          (saved === null ? null : <SavedAs id={saved.id} name={saved.name} onOpen={onOpen} />)}
+      </InfoBar>
+    </Card>
+  );
+}
+
+/**
+ * `Saved as Menu.` and an Open button that opens it — through the Library's own path, so a code
+ * opened from here lands in Create exactly as one opened from the Library does.
+ *
+ * The code is fetched as the card appears, the way a Library row fetches it, and Open waits for
+ * it: opening a code needs the code.
+ */
+function SavedAs({ id, name, onOpen }: { id: string; name: string; onOpen: OpenSaved }) {
+  const code = useCode(id);
+  return (
+    <div className="flex flex-col gap-2">
+      <OpenRow lead={`Saved as ${name}.`} name={name} saved={code.data} onOpen={onOpen} />
+      {code.isError && (
+        <p className="text-caption">{`This code could not be read. ${describeError(code.error)}`}</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A saved code's name, when the line needs it, and the Open button that opens it — the one
+ * button the Stamp card and a matched code card share, so both open a code the way the Library
+ * does: through `onOpen`, announced the same way, refused in the same sentence.
+ *
+ * `saved` is undefined while the code is still on its way; Open waits for it, because opening a
+ * code needs the code.
+ */
+function OpenRow({
+  lead,
+  name,
+  saved,
+  onOpen,
+}: {
+  lead?: string;
+  name: string;
+  saved: SavedCode | undefined;
+  onOpen: OpenSaved;
+}) {
+  const [opening, setOpening] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const openIt = async () => {
+    if (saved === undefined) return;
+    setProblem(null);
+    setOpening(true);
+    const answer = await onOpen(saved);
+    setOpening(false);
+    if (answer.ok) {
+      announce(`${saved.name} is open in Create; it is being checked again.`);
+    } else {
+      setProblem(answer.reason);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        {lead !== undefined && <span>{lead}</span>}
+        <Button
+          aria-label={`Open ${name}`}
+          disabled={saved === undefined || opening}
+          onClick={() => void openIt()}
+        >
+          Open
+        </Button>
+      </div>
+      {problem !== null && <p className="text-caption">{problem}</p>}
+    </div>
+  );
+}
+
+/**
+ * What a read code is in this library (P6): the saved codes that carry exactly its bytes, by
+ * name, each with its own Open. Information, not success — a match says which saved code this
+ * print is, and nothing about whether it would scan at a size; the card's own answer says that.
+ *
+ * Only the names are shown. What matched is the whole payload, a Wi-Fi password included, and
+ * the password stays where the Reveal button keeps it.
+ */
+function SavedMatch({ matches, onOpen }: { matches: SavedCode[]; onOpen: OpenSaved }) {
+  const [only] = matches;
+  return (
+    <InfoBar severity="info" title={describeMatch(matches.map((saved) => saved.name))}>
+      {matches.length === 1 && only !== undefined ? (
+        <OpenRow name={only.name} saved={only} onOpen={onOpen} />
+      ) : (
+        <ul aria-label="Saved codes it matches" className="flex flex-col gap-2">
+          {matches.map((saved) => (
+            <li key={saved.id}>
+              <OpenRow lead={saved.name} name={saved.name} saved={saved} onOpen={onOpen} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </InfoBar>
+  );
+}
+
+/**
+ * What the card says when the library could not be compared in full — silence would read as
+ * "this is not one of yours" (DESIGN_SYSTEM §10).
+ */
+function notCompared(library: SavedCodesInFull): string | null {
+  if (library.listFailed) {
+    return 'The library could not be read, so this code was not compared with your saved codes.';
+  }
+  if (library.unread === 0) return null;
+  return library.unread === 1
+    ? '1 saved code could not be read, so this code was not compared with it.'
+    : `${library.unread} saved codes could not be read, so this code was not compared with them.`;
 }
 
 /**
@@ -311,11 +536,16 @@ function maskSecret(content: string): string {
 function CodeCard({
   index,
   code,
+  library,
   onMake,
+  onOpen,
 }: {
   index: number;
   code: ReadCode;
+  /** The saved codes in full, fetched once for the whole screen — never once per card. */
+  library: SavedCodesInFull;
   onMake: (made: MadeFromRead) => void;
+  onOpen: OpenSaved;
 }) {
   const [revealed, setRevealed] = useState(false);
   const [width, setWidth] = useState('25');
@@ -324,6 +554,11 @@ function CodeCard({
   // The bytes are described once per code: the sentences are the domain's, and they are the same
   // ones the Create screen says about a code being made.
   const description = useMemo(() => describeBytes(code.bytes), [code.bytes]);
+
+  // Matched by the bytes, never by the lossy text beside them: the domain compares byte for byte.
+  // Above the early return, because a hook that is sometimes called is the crash the lint rule
+  // exists for; a pattern that did not decode carries no bytes and matches nothing.
+  const matches = useMemo(() => matchSaved(code.bytes, library.codes), [code.bytes, library.codes]);
 
   const name = `Code ${index}`;
 
@@ -347,6 +582,9 @@ function CodeCard({
   const shown =
     description.sensitive && !revealed ? maskSecret(description.content) : description.content;
 
+  // Said only when it could matter: a code that already matched has its answer.
+  const unmatched = matches.length === 0 ? notCompared(library) : null;
+
   // Only the two kinds whose whole payload is a single field go back to Create as themselves. A
   // contact or a Wi-Fi is a form with parts, and filling one from bytes is its own slice.
   const makeKind: MadeFromRead['kind'] | null =
@@ -356,6 +594,20 @@ function CodeCard({
     <Card label={name} title={name}>
       <div className="flex flex-col gap-4">
         <p className="text-body-lg text-fg">{description.summary}</p>
+
+        {/* Above the facts, because it is the one worth reading before anybody follows the
+            address: a look-alike, a shortener, a raw IP (ADR-034). It says, and never refuses —
+            "Make a code like this" stays where it was. */}
+        {description.warnings.length > 0 && (
+          <InfoBar severity="caution" title="Check this address before you open it">
+            <AddressSentences sentences={description.warnings} />
+          </InfoBar>
+        )}
+
+        {/* Which saved code this print is (P6), under the caution rather than above it: what is
+            worth reading before following the address comes first, on every card. */}
+        {matches.length > 0 && <SavedMatch matches={matches} onOpen={onOpen} />}
+        {unmatched !== null && <p className="text-caption text-fg-secondary">{unmatched}</p>}
 
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-body">
           <dt className="text-fg-secondary">Kind</dt>

@@ -1,12 +1,12 @@
 [package]
 name = "signatum"
-version = "1.0.0"
+version = "1.1.0"
 description = "A code you can hold up to a phone, proven readable before it is saved"
 authors = ["Alex Justino"]
 license = "Apache-2.0"
 repository = "https://github.com/alexjustino/signatum"
 edition = "2021"
-rust-version = "1.80"
+rust-version = "1.90"
 
 [lib]
 # The `_lib` suffix keeps the library name distinct from the binary on Windows.
@@ -23,27 +23,34 @@ tauri-plugin-log = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.42", features = ["bundled"] }
 log = "0.4"
-uuid = { version = "1", features = ["v7"] }
+# v7 for row identifiers (time-ordered); v4 for the stamp reference, which must carry no time.
+uuid = { version = "1", features = ["v4", "v7"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
 # The scan gate (ADR-010): render, decode, compare.
 #
 # `resvg` re-exports the exact `usvg` and `tiny_skia` it was built against
-# (`resvg::usvg`, `resvg::tiny_skia`), so neither is declared here: a second
+# (`resvg::usvg`, `resvg::tiny_skia`), and the code uses those paths: a second
 # copy of `tiny-skia` at a different version would be two incompatible `Pixmap`
-# types, and the compiler would be right to say so.
+# types, and the compiler would be right to say so. `usvg` is declared below
+# only to turn a feature on, at resvg's own version.
 #
-# Default features off on purpose. They are text (fontdb, rustybuzz), system
+# Default features off on purpose. They are text (fontdb and a shaper), system
 # fonts, memory-mapped fonts and raster images (gif, jpeg, webp) — none of which
 # a code we drew ourselves needs, and every one of which is a decoder that would
 # be reachable from a file. The SVG this host renders is one background rect and
 # one path (spec §3).
-resvg = { version = "0.45", default-features = false }
+resvg = { version = "0.48", default-features = false }
+# Declared for one feature and nothing else. A logo's SVG is re-serialised from
+# the parsed tree, never stored as it came (ADR-016), and from 0.48 that writer
+# is a feature of its own, off along with resvg's defaults. The version is the
+# one resvg pins, so Cargo builds a single `usvg` and `resvg::usvg` is this one.
+usvg = { version = "0.48", default-features = false, features = ["writer"] }
 # The decoder. Independent of the encoder by design: nothing on this side of the
 # gate shares a line of code with what drew the code (ADR-011).
-rqrr = "0.10"
+rqrr = "0.11"
 # Two jobs: turn the PNG this host just encoded back into the grey pixels
 # `rqrr` reads, and decode a logo somebody else's file brought in. Default
 # features stay off — the four formats a logo may arrive as are named one by
@@ -63,12 +70,12 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 # The logo importer and Read's file door still pick their decoder from the magic
 # bytes against a closed list, so a `.bmp` somebody was sent is one sentence and
 # no decode (ADR-016).
-sha2 = "0.10"
+sha2 = "0.11"
 hex = "0.4"
 # The normalised logo reaches the screen as a `data:` URL, because the interface
 # cannot read a file and the host will not hand it a path. Already in the tree
 # for the corpus test; declared here so a release build links it too.
-base64 = "0.22"
+base64 = "0.23"
 
 # The PNG encoder the exports use, rather than tiny-skia's, for one reason: it
 # can write the `pHYs` chunk, which is where a printed code's physical size
@@ -89,7 +96,7 @@ pdf-writer = "0.15"
 arboard = { version = "3.6", default-features = false, features = ["image-data"] }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.58", features = ["UI_ViewManagement", "Foundation"] }
+windows = { version = "0.61", features = ["UI_ViewManagement", "Foundation", "Win32_Storage_FileSystem"] }
 
 [profile.release]
 codegen-units = 1
@@ -111,7 +118,8 @@ strip = true
 #   uuid                          Apache-2.0 OR MIT
 #   chrono                        MIT OR Apache-2.0
 #   resvg                         Apache-2.0 OR MIT
-#     └ usvg                      Apache-2.0 OR MIT   (re-exported as resvg::usvg)
+#     └ usvg                      Apache-2.0 OR MIT   (re-exported as resvg::usvg; declared for its writer)
+#       └ kurbo, polycool         Apache-2.0 OR MIT / MIT OR Apache-2.0
 #     └ tiny-skia                 BSD-3-Clause        (re-exported as resvg::tiny_skia)
 #   rqrr                          (MIT OR Apache-2.0) AND ISC
 #   image                         MIT OR Apache-2.0

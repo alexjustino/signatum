@@ -15,3 +15,4 @@
 
 pub mod accent;
 pub mod clipboard;
+pub mod paths;

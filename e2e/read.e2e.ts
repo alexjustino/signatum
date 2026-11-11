@@ -108,10 +108,7 @@ describe('read', () => {
 
   async function typeInto(label: string, value: string): Promise<void> {
     const field = await session.driver.waitForElement(`input[aria-label="${label}"]`);
-    await field.clear();
-    await field.sendKeys(' ');
-    await field.sendKeys(Keys.BACKSPACE);
-    await field.sendKeys(value);
+    await field.fill(value);
   }
 
   /** A PNG of the payload's code at a pixel size, optionally rotated, with a border. */
@@ -187,10 +184,7 @@ describe('read', () => {
     // 25 mm is the default: a short link at version 2 or 3 reads comfortably.
     await driver.waitForText('most cameras read that from 30 cm');
     const width = await driver.waitForElement('input[aria-label="Printed width"]');
-    await width.clear();
-    await width.sendKeys(' ');
-    await width.sendKeys(Keys.BACKSPACE);
-    await width.sendKeys('8');
+    await width.fill('8');
     await driver.waitForText('too small for most cameras');
     await width.sendKeys(Keys.BACKSPACE);
     await width.sendKeys('60');

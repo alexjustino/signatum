@@ -12,10 +12,19 @@
  * nobody looks up.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
 
 import { cancelBatch, readTextFile, runBatch, writeBatchReport } from './batch';
-import { copyPng, exportPdf, exportPng, exportSvg, scanMargin, verifyCode } from './codes';
+import {
+  copyPng,
+  damageTest,
+  exportPdf,
+  exportPng,
+  exportSvg,
+  scanMargin,
+  verifyCode,
+} from './codes';
 import {
   deleteBrandKit,
   deleteCode,
@@ -25,9 +34,11 @@ import {
   renameCode,
   saveBrandKit,
   saveCode,
+  type SavedCode,
 } from './library';
 import { deleteLogo, importLogo, listLogos, logoDataUrl } from './logos';
-import { readClipboard, readImage } from './read';
+import { exportProofSheet } from './proof';
+import { checkFile, readClipboard, readImage } from './read';
 import { fetchSettings, writeSetting, type SettingKey } from './settings';
 import { fetchAccentRamp, fetchSystemInfo } from './system';
 
@@ -102,6 +113,14 @@ export function useExportPdf() {
   return useMutation({ mutationFn: exportPdf });
 }
 
+/**
+ * The same code at the sizes people print, each one read back before it is drawn (P1). A
+ * mutation for the reason every export is: a file written at a moment a person chose.
+ */
+export function useExportProofSheet() {
+  return useMutation({ mutationFn: exportProofSheet });
+}
+
 /** The verified picture on the clipboard — the image, never the payload text. */
 export function useCopyPng() {
   return useMutation({ mutationFn: copyPng });
@@ -117,6 +136,16 @@ export function useCopyPng() {
  */
 export function useScanMargin() {
   return useMutation({ mutationFn: scanMargin });
+}
+
+/**
+ * Whether the code still reads with somebody's smudge on it (P9).
+ *
+ * A mutation for the reason the margin is one: a question about a picture that exists only in
+ * this window, asked when a person pressed a button, and never read back by anything else.
+ */
+export function useDamageTest() {
+  return useMutation({ mutationFn: damageTest });
 }
 
 /**
@@ -193,6 +222,71 @@ export function useCodes() {
 /** One saved code in full: the fields a row draws its preview from, and Open loads. */
 export function useCode(id: string) {
   return useQuery({ queryKey: keys.code(id), queryFn: () => getCode(id) });
+}
+
+/** Every saved code in full, in the list's order, and how many of them could not be read. */
+export interface SavedCodesInFull {
+  codes: SavedCode[];
+  /** Saved codes the host would not give back: they were not compared, and the screen says so. */
+  unread: number;
+  /** The list itself could not be read: nothing was compared, and the screen says that too. */
+  listFailed: boolean;
+}
+
+/**
+ * Every saved code in full (P6), for matching a code Read found against the library.
+ *
+ * The list is `useCodes()`'s and carries no fields — `list_codes` returns a row without its
+ * `payload_json` — so each code is fetched once, under the same key a Library row and `useCode`
+ * read from: the window's cache holds it after that (it is never stale on its own), whichever
+ * screen asked first, and saving, renaming or forgetting a code invalidates it with the list.
+ *
+ * `enabled` is false until there is something to match: a Read screen with nothing read on it
+ * does not ask the host for every saved code.
+ */
+export function useSavedCodesInFull(enabled: boolean): SavedCodesInFull {
+  const list = useCodes();
+  const fetched = useQueries({
+    queries: (list.data ?? []).map((summary) => ({
+      queryKey: keys.code(summary.id),
+      queryFn: () => getCode(summary.id),
+      enabled,
+    })),
+    combine: inFull,
+  });
+  const listFailed = list.isError;
+  return useMemo(() => ({ ...fetched, listFailed }), [fetched, listFailed]);
+}
+
+/**
+ * The fetched codes as one answer. A function of the module rather than of the render, so the
+ * query library can keep the same answer while nothing changed — a screen that memoises on it
+ * would otherwise recompute on every render.
+ */
+function inFull(
+  results: ReadonlyArray<{ data: SavedCode | undefined; isError: boolean }>,
+): Omit<SavedCodesInFull, 'listFailed'> {
+  return {
+    codes: results.flatMap((result) => (result.data === undefined ? [] : [result.data])),
+    unread: results.filter((result) => result.isError).length,
+  };
+}
+
+/**
+ * Fetch one saved code now, through the same cache key a row reads from (P5).
+ *
+ * A function rather than a query because the library's check asks for the codes one after the
+ * other, at the moment a person pressed the button, and has to wait for each: a hook per row
+ * cannot be awaited in order. It asks the host every time — a check that trusted a copy from
+ * earlier would be checking the copy — and what it gets back is what the row then shows.
+ */
+export function useFetchCode() {
+  const client = useQueryClient();
+  return useCallback(
+    (id: string) =>
+      client.fetchQuery({ queryKey: keys.code(id), queryFn: () => getCode(id), staleTime: 0 }),
+    [client],
+  );
 }
 
 /** Keep the code on screen. The list says so without being asked again. */
@@ -280,7 +374,7 @@ export function useWriteBatchReport() {
 }
 
 /**
- * The two doors into Read (F10), both mutations and neither cached.
+ * The doors into Read (F10, P2), all mutations and none cached.
  *
  * A reading is an answer about one image a person put in front of the product at one moment, and
  * nothing else ever wants to read it back — the same reason the scan-gate commands are mutations.
@@ -296,4 +390,12 @@ export function useReadImage() {
 /** Read whatever image is on the clipboard — the door a screenshot arrives through. */
 export function useReadClipboard() {
   return useMutation({ mutationFn: readClipboard });
+}
+
+/**
+ * Check the stamp of an exported file (P2) — a mutation for the reason the other two doors are:
+ * an answer about one file at one moment, which nothing else wants to read back.
+ */
+export function useCheckFile() {
+  return useMutation({ mutationFn: checkFile });
 }
