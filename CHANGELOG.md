@@ -22,7 +22,8 @@ says in a sentence when an address is not what it looks like, before it is print
 followed. The library can be checked again in one press, and a code photographed off a wall can be
 traced back to the saved code it came from. And a new card says where a code breaks: how small a
 smudge, in the right place, can stop this code, in millimetres at the printed size, with the
-decoder's own answer beside the arithmetic.
+decoder's own answer beside the arithmetic, and lists the ways to make the code tougher, each with
+what it gives up.
 
 Nothing in the scan gate was weakened. A code is still read back byte for byte before it can leave,
 a code that does not read back is still refused and still leaves no file, and the print conditions,
@@ -146,6 +147,22 @@ downloaded, and download only from this repository's Releases page.
   is counted as lost, so a code past its guarantee may still read, and only a decoder can say. A
   smudge on a finder or in the quiet zone is named and left to the decoder. It is a report and
   never a gate: nothing is disabled, the verdict does not change, and nothing is recorded (ADR-037).
+- **Ways to make it tougher, each with what it gives up.** Once a code passes, **Where it breaks**
+  ends with the changes this screen can make that ask for a larger smudge, toughest first: the link
+  without its tracking parameters, a smaller logo, a higher level when there is no logo, and the
+  next printed width. Each is planned by the same engine and measured the way the card measures, and
+  is offered only when the smudge it asks for is at least 0.1 mm larger; two changes that end in the
+  same code are one row. Each row says what it gives up — telling which campaign a scan came from,
+  how much narrower the mark prints, how much smaller the modules, how much more paper — and
+  **Use** changes the same control a person would, so the gate asks again and the card measures the
+  new code. A campaign link to a menu with a logo is version 9; without `utm_source`, `utm_medium`
+  and `utm_campaign` it is version 4, and the smudge that can stop it at 25 mm grows from 5.3 mm to
+  6.7 mm. Tracking parameters are a fixed list of names whose only job is attribution — the `utm_`
+  family and click identifiers such as `fbclid` and `gclid` — and the rest of the link is kept byte
+  for byte; the list will miss names, and the link is never changed unless the person presses
+  **Use**. On a short link with a logo a larger print is sometimes the only row, which is the true
+  answer. It is a report with shortcuts: nothing is disabled and the verdict does not change
+  (ADR-038).
 
 ### Changed
 
