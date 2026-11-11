@@ -567,7 +567,7 @@ real cost, and it comes due the day one of these crates fixes something that mat
 the answer then is to raise the MSRV across the family deliberately, in its own record, not to
 raise it quietly here for one crate.
 
-**From 1.1, the floor is 1.88 ([ADR-036](#adr-036)).** The tree Tauri brought in had already passed
+**From 1.1, the floor is 1.90 ([ADR-036](#adr-036)): 1.88 at first, then 1.90 with Tauri 2.12.** The tree Tauri brought in had already passed
 1.80 without anybody raising it; the declaration now says what the tree needs, and a gate checks it.
 
 ## ADR-020 — The matrix is proven against the standard, and the corpus is a proof, not a gate {#adr-020}
@@ -1987,6 +1987,10 @@ stronger proof — it would also catch a language feature used before its time �
 toolchain download and a full build on every run. The gate costs one `cargo metadata`. What went
 wrong here was a claim the tree contradicted, and that is the part the gate checks; the compiler a
 contributor actually uses is the newest stable one, as CI's is.
+
+**From the November round, 1.90.** Tauri 2.12, brought in with `tauri-plugin-log` 2.10, declares
+Rust 1.90; the gate failed that update's pull request, as it was built to, and the floor moved
+with it in the same change.
 
 **Cost accepted: the family drifts apart.** The siblings declare their own floors, and they are no
 longer one number. The reason ADR-019 gave — one toolchain builds everything — still holds, because
