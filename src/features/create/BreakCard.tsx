@@ -14,6 +14,8 @@ import {
   headline,
   predictionLine,
 } from './breakSentences';
+import type { Toughness, ToughnessChoice } from './toughness';
+import { TougherList } from './TougherList';
 import type { Brush, BreakTest } from './useBreakTest';
 import { WeakSpotOverlay } from './WeakSpotOverlay';
 
@@ -51,6 +53,8 @@ export function BreakCard({
   widthMm,
   size,
   quietZone,
+  toughness,
+  onTougher,
 }: {
   test: BreakTest;
   /** The scene the gate verified, drawn again here as the surface to break. */
@@ -66,6 +70,9 @@ export function BreakCard({
   /** Modules per side of the symbol, quiet zone excluded. */
   size: number;
   quietZone: number;
+  /** The changes that make it tougher (P10), or null while there is nothing to measure. */
+  toughness: Toughness | null;
+  onTougher: (choice: ToughnessChoice) => void;
 }) {
   const { analysis, blocks, prediction, answer, cells } = test;
   // Create renders the card only once there is an analysis; this is for the type.
@@ -193,6 +200,8 @@ export function BreakCard({
         <span>{predicted}</span>
         {decoder !== null && <span>{` ${decoder}`}</span>}
       </p>
+
+      {toughness !== null && <TougherList toughness={toughness} onUse={onTougher} />}
     </Card>
   );
 }

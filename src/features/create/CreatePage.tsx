@@ -53,6 +53,7 @@ import type { Style } from '@/domain/scene';
 import {
   checkPrintSize,
   formatMillimetres,
+  MM_PER_INCH,
   pixelsFor,
   sizedSvg,
   toMillimetres,
@@ -79,6 +80,7 @@ import { LookCard, type EclFloor } from './LookCard';
 import { PLATE_PADDING, planFor, sceneFor } from './plan';
 import { ScanMarginCard } from './ScanMarginCard';
 import { SizeCard } from './SizeCard';
+import { toughnessOptions, type ToughnessChoice } from './toughness';
 import { useBreakTest } from './useBreakTest';
 
 /**
@@ -582,6 +584,50 @@ export function CreatePage({
         ? { svg, payload, pixelSize: pixels, logo: placement, modules }
         : null,
   });
+
+  /**
+   * The changes this screen can make that ask for a larger smudge (P10): each planned and measured
+   * the way the card measures, and only once the code on screen has passed — like the card, a report
+   * about a code that reads. Several plans and weakest spots, a few tens of milliseconds, so it is
+   * worked out once per code and size rather than on every render.
+   */
+  const toughness = useMemo(
+    () =>
+      verified && payload !== null
+        ? toughnessOptions({
+            payload,
+            link: form.kind === 'link' ? form.url : null,
+            logoSize: logo?.size ?? null,
+            quietZone: style.quietZone,
+            ecl,
+            widthMm: toMillimetres(printSize),
+          })
+        : null,
+    [verified, payload, form, logo?.size, style.quietZone, ecl, printSize],
+  );
+
+  /**
+   * One row of "Make it tougher", used: it changes the control a person would have changed — the
+   * logo's size, the level, the link or the printed width — so the gate asks again and everything
+   * downstream follows from that control, as if the person had changed it by hand.
+   */
+  const applyTougher = (choice: ToughnessChoice) => {
+    if ('logoSize' in choice) {
+      if (logo !== null) onLogo({ ...logo, size: choice.logoSize });
+    } else if ('ecl' in choice) {
+      onEcl(choice.ecl);
+    } else if ('url' in choice) {
+      if (form.kind === 'link') onForm({ ...form, url: choice.url });
+    } else {
+      onPrintSize({
+        ...printSize,
+        value:
+          printSize.unit === 'mm'
+            ? choice.widthMm
+            : Number((choice.widthMm / MM_PER_INCH).toFixed(3)),
+      });
+    }
+  };
 
   /**
    * How far this code can be degraded and still read, asked for once it reads at
@@ -1194,6 +1240,8 @@ export function CreatePage({
                 widthMm={toMillimetres(printSize)}
                 size={matrix.size}
                 quietZone={style.quietZone}
+                toughness={toughness}
+                onTougher={applyTougher}
               />
             )}
         </div>
