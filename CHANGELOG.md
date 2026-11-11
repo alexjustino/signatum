@@ -154,6 +154,8 @@ downloaded, and download only from this repository's Releases page.
   byte for byte, with nothing lost. A verification names the decoder that made it, so a code
   verified by 1.0.0 keeps saying `rqrr 0.10.1`, and **Check all again** on the Library asks the new
   one.
+- **Tauri 2.12.** The application framework and its dialog and log plugins move to their current
+  releases, with the interface's packages alongside so the two halves are the same version.
 - **Building from source needs Rust 1.90.** The manifest said 1.80, but the libraries Tauri brings
   in already needed 1.88, so 1.0.0 could not have been built by the compiler it named. A gate now
   fails when a dependency needs more than the manifest declares, and it moved the floor once more
@@ -161,6 +163,12 @@ downloaded, and download only from this repository's Releases page.
 
 ### Fixed
 
+- **The workspace's SQLite is past a published vulnerability.** The SQLite compiled into the
+  product, the one that keeps the workspace, was a version with a published flaw
+  (CVE-2026-119375, RUSTSEC-2026-0459). It is now a patched release, and the workspace file is
+  opened, migrated and read exactly as before — including one written by 1.0.0, which the
+  end-to-end suite opens on every run. 1.0.0 carries the affected version; updating to 1.1.0 is
+  the fix.
 - **A network path is refused in every spelling.** Every door that reads or writes a file a person
   chose refused a path beginning with `\\` or `//`; Windows also reads `\/server/share` as a network
   path, and that spelling passed. The check now asks Windows how it parses the path, accepts only a
