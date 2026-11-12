@@ -1,7 +1,7 @@
 /**
  * How much damage a code can take, and where it is weakest (ADR-037).
  *
- * "Level H survives 30 % damage" is what every QR tool says, and it is true only of damage spread
+ * "Level H survives 30 % damage" is the usual way to say it, and it is true only of damage spread
  * perfectly evenly. Reed–Solomon corrects each error-correction block on its own: a code fails
  * the moment any one block loses more codewords than half its error-correction codewords, and a
  * logo has already spent part of every block it sits on. So a code has a weakest place, and a

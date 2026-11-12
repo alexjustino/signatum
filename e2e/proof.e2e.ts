@@ -10,7 +10,6 @@ import { proofSizes, type ProofSize } from '../src/domain/proof';
 import { encodeText } from '../src/domain/qr/encode';
 import { renderScene } from '../src/domain/scene';
 import { startSession, type Session } from './session';
-import { Keys } from './webdriver';
 
 /**
  * P1's proof of done, against the real binary: one A4 PDF with the code at 15, 20, 25 and 30 mm
@@ -159,10 +158,7 @@ describe('proof sheet', () => {
       await driver.findByXPath('//nav[@aria-label="Main"]//button[normalize-space(.)="Create"]')
     ).click();
     const field = await driver.waitForElement('input[aria-label="Link"]');
-    await field.clear();
-    await field.sendKeys(' ');
-    await field.sendKeys(Keys.BACKSPACE);
-    await field.sendKeys(LINK);
+    await field.fill(LINK);
     await driver.waitForText(VERIFIED);
     await driver.waitFor('the proof sheet enabled', async () => !(await proofButtonDisabled()));
     await showExports('proof-create-light');

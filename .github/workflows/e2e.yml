@@ -2,13 +2,14 @@ name: End-to-end
 
 # The real binary, driven through WebDriver (ADR-016). Not a pull-request gate:
 # it needs a debug build and a driver that matches the runner's WebView2, and
-# it takes minutes. Run it by hand before a release, or let the weekly run
-# catch a seam that the unit suites cannot see.
+# it takes minutes. It does not yet start on a hosted runner (see the last
+# step), so it is dispatched by hand rather than scheduled: a weekly run that
+# fails the same way every Monday says nothing, and teaches everybody to ignore
+# a red mark. The suite's verdict comes from a real Windows desktop, before
+# every release (docs/RELEASE.md).
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 6 * * 1'
 
 permissions:
   contents: read

@@ -516,6 +516,28 @@ before** — a primitive built ahead of the screen that needs it is a guess with
   the card disables anything outside it** or changes the verdict: its own buttons rest only when
   they have nothing to do — no weakest spot to smudge, an answer already being asked for, nothing
   to clear — and the export beside it does not hear about any of it. Nothing on it is saved.
+- **The ways to make it tougher are a list of shortcuts to controls the screen already has** (P10)
+  — not a primitive: the last section of `Where it breaks` (ADR-038), under the live line and in
+  the same shape as the card's other sections. A small heading, _"Ways to make it tougher"_, over a
+  `ul` whose `aria-label` is that heading, as the blocks list and the margin's groups are. Under the
+  heading, before the list, **one line says what the code is now** — _"Now: version 9, level H — a
+  smudge 5.3 mm across can stop it."_ — in the words every row uses, so each row is read against
+  the line above it. A row is the change in the screen's own words over one caption that says what
+  the code becomes and what the change gives up — _"A small logo"_ over _"Version 9, level H — a
+  smudge 8.6 mm across can stop it; the mark prints 2.9 mm wide instead of 6.1 mm."_ — and a
+  `Button` beside it. **Only changes that ask for a larger smudge are listed**, toughest first, and
+  two changes that end in the same code are one row: a row that would not move the number is not a
+  way to make it tougher. With nothing to offer, the section says _"Nothing on this screen makes it
+  tougher."_ rather than vanishing. **Every button reads "Use"**, and it is named for its row —
+  _"Use: A small logo"_ — so the visible word starts the accessible name and a run of buttons is
+  still a run of different things; the row's caption is the button's description, so a person
+  moving from button to button hears the cost before pressing, not only the change. **Using a row
+  changes the control a person would have changed** — the logo's size, the level, the link or the
+  printed width — and nothing else: the gate asks again, the card measures the new code, and
+  everything downstream follows from that control, as if it had been changed by hand. There is no
+  second way of making a code here. The sentences are the domain's (`toughness.ts`), shown as
+  given, for the reason a verdict's sentence is. And, under the card's rule, **nothing in it
+  disables anything or changes the verdict**: it is a report with shortcuts, never a gate.
 
 ### Asking "are you sure"
 

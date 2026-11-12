@@ -3,11 +3,13 @@ name: CI
 # Every pull request runs the same script a developer runs locally
 # (`npm run gates`), so "green on my machine" and "green in CI" cannot drift.
 
+# A release branch is gated like the other two: what reaches a release candidate is what the
+# owner tests, so it is never less checked than develop.
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, 'release/**']
   pull_request:
-    branches: [main, develop]
+    branches: [main, develop, 'release/**']
 
 concurrency:
   group: ci-${{ github.ref }}

@@ -7,7 +7,6 @@ import { PNG } from 'pngjs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { startSession, type Session } from './session';
-import { Keys } from './webdriver';
 
 /**
  * F5's proof of done, against the real binary: the placement engine sizes the logo from the
@@ -80,10 +79,7 @@ describe('placement', () => {
 
   async function setLink(text: string): Promise<void> {
     const input = await session.driver.waitForElement('input[aria-label="Link"]');
-    await input.clear();
-    await input.sendKeys(' ');
-    await input.sendKeys(Keys.BACKSPACE);
-    await input.sendKeys(text);
+    await input.fill(text);
   }
 
   async function chooseSize(label: string): Promise<void> {

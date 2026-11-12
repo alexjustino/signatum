@@ -1,17 +1,18 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { startSession, type Session } from './session';
-import { Keys } from './webdriver';
 
 /**
  * P5's proof of done, against the real binary: one press rebuilds every saved code, compares it
  * with the scene it was saved as and verifies it again, with progress; a code that rebuilds
- * differently is named, and so is a Wi-Fi code that cannot be rebuilt because it was saved
- * without its password.
+ * differently is named, so is one that no longer reads, and so is a Wi-Fi code that cannot be
+ * rebuilt because it was saved without its password.
  *
  * The drifted code is made with the product's own `save_code`, from the fields of a code the
  * screen saved, with a scene digest that is not the one those fields make — what a newer renderer
- * drawing the same fields differently would leave behind.
+ * drawing the same fields differently would leave behind. The one that no longer reads is made the
+ * same way, with a link the rules no longer accept: what a saved code would become if a later
+ * version tightened them.
  */
 
 const VERIFIED = 'read it back byte for byte';
@@ -75,17 +76,14 @@ describe('library, checked again', () => {
 
   async function typeInto(label: string, value: string): Promise<void> {
     const field = await session.driver.waitForElement(`input[aria-label="${label}"]`);
-    await field.clear();
-    await field.sendKeys(' ');
-    await field.sendKeys(Keys.BACKSPACE);
-    await field.sendKeys(value);
+    await field.fill(value);
   }
 
   const clickText = async (text: string) => {
     await (await session.driver.findByXPath(`//button[normalize-space(.)="${text}"]`)).click();
   };
 
-  it('saves a code from the screen, and leaves a drifted copy and a Wi-Fi code without its password', async () => {
+  it('saves a code from the screen, and leaves a drifted copy, an unreadable one and a Wi-Fi code without its password', async () => {
     const { driver } = session;
     await theme('Light');
     await go('Create');
@@ -126,6 +124,17 @@ describe('library, checked again', () => {
       scene_sha256: menu.scene_sha256,
     });
     expect(office, JSON.stringify(office)).not.toHaveProperty('__error');
+    const broken = await invoke('save_code', {
+      name: 'Broken',
+      kind: menu.kind,
+      payload_json: menu.payload_json.replace('https://example.com/menu', 'javascript:alert(1)'),
+      style_json: menu.style_json,
+      size_json: menu.size_json,
+      logo_id: null,
+      logo_json: null,
+      scene_sha256: menu.scene_sha256,
+    });
+    expect(broken, JSON.stringify(broken)).not.toHaveProperty('__error');
   });
 
   it('checks every saved code again, with progress, and names the one that drifted', async () => {
@@ -139,6 +148,8 @@ describe('library, checked again', () => {
       'Rebuilds differently from when it was saved, and still reads — check it before you print.',
     );
     await driver.waitForText('saved without its Wi-Fi password');
+    await driver.waitForText('No longer reads. Open it to see why.');
+    await driver.waitForText('1 no longer reads');
     await session.screenshot('recheck-light');
   });
 

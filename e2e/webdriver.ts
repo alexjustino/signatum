@@ -66,6 +66,27 @@ export class Element {
     return call('POST', this.url('/clear'), {});
   }
 
+  /**
+   * Replace a field's text with real key presses, and check that it took.
+   *
+   * WebDriver's clear reaches the DOM but not React, so the space and the backspace are what tell
+   * React the field is empty. A render arriving between those steps — a verdict coming back, a
+   * name being prefilled — puts the old value back, and the typing lands after it: "Office-5GOffice"
+   * instead of "Office". So the field is read back after a moment, and the whole thing done again
+   * if it does not say what was typed.
+   */
+  async fill(text: string): Promise<void> {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      await this.clear();
+      await this.sendKeys(' ');
+      await this.sendKeys(Keys.BACKSPACE);
+      if (text !== '') await this.sendKeys(text);
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      if ((await this.property('value')) === text) return;
+    }
+    throw new Error(`the field would not hold ${JSON.stringify(text)}`);
+  }
+
   text(): Promise<string> {
     return call('GET', this.url('/text'));
   }

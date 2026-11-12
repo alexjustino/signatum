@@ -44,16 +44,20 @@ can reason about afterwards.
    npm run e2e:only
    ```
 
-6. **The phone matrix.** A person, with two phones, scans printed codes: the
+6. **Keep the upgrade working.** That suite includes `e2e/upgrade.e2e.ts`, which
+   opens a workspace written by the real previous release. When a release
+   changes the schema, keep that fixture path working: the test names the schema
+   version it expects.
+7. **The phone matrix.** A person, with two phones, scans printed codes: the
    **iOS default camera and the Android default camera**, at the printed size,
    from 30 cm, over every payload kind with a logo. Not simulated, not a
    screenshot, not a decoder in a test process — a camera in a room. A release
    ships only when the whole matrix reads back what was encoded.
-7. **The name sweep, repeated.** Re-run the collision check behind
+8. **The name sweep, repeated.** Re-run the collision check behind
    [`SPEC.md`](SPEC.md) §0 — GitHub, npm, crates.io, the domains, the Microsoft
    Store, USPTO and INPI — and record what changed since the decision. Risk R8
    is the reason: a name is only clear on the day somebody looked.
-8. **Install the MSI and use it.** The suite cannot judge how a print looks,
+9. **Install the MSI and use it.** The suite cannot judge how a print looks,
    cannot hold a card at arm's length, and cannot hear a screen reader. A
    person does:
    - install, launch, and make a code from a typed link;
@@ -66,9 +70,9 @@ can reason about afterwards.
 
 ## The tag
 
-9. **Open a pull request from `release/vX.Y` into `main`.** `main` is always
-   releasable; it receives releases and nothing else.
-10. **Merge it, then tag `main`:**
+10. **Open a pull request from `release/vX.Y` into `main`.** `main` is always
+    releasable; it receives releases and nothing else.
+11. **Merge it, then tag `main`:**
 
     ```bash
     git checkout main && git pull
@@ -78,16 +82,16 @@ can reason about afterwards.
 
     An annotated tag, so the tag carries who made it, when, and the theme.
 
-11. The **Release workflow** runs on the tag: it refuses a tag that does not
+12. The **Release workflow** runs on the tag: it refuses a tag that does not
     name the version the tree declares or that is not on `main`, then gates,
     build, bundle check, and a **draft** GitHub Release with the MSI and the
     NSIS installer attached — the very files the bundle check approved, built
     once — and the SHA-256 of each written into the notes by the same job. It
     is a draft on purpose — somebody reads the notes before the world does.
-12. **Edit the draft release notes** from the changelog. Check the two SHA-256
+13. **Edit the draft release notes** from the changelog. Check the two SHA-256
     values against the downloaded assets (`Get-FileHash -Algorithm SHA256`),
     then publish.
-13. **Merge `main` back into `develop`** so the release commits are not stranded.
+14. **Merge `main` back into `develop`** so the release commits are not stranded.
 
 ## After
 

@@ -1,12 +1,12 @@
 [package]
 name = "signatum"
-version = "1.0.0"
+version = "1.1.0"
 description = "A code you can hold up to a phone, proven readable before it is saved"
 authors = ["Alex Justino"]
 license = "Apache-2.0"
 repository = "https://github.com/alexjustino/signatum"
 edition = "2021"
-rust-version = "1.88"
+rust-version = "1.90"
 
 [lib]
 # The `_lib` suffix keeps the library name distinct from the binary on Windows.
@@ -23,7 +23,7 @@ tauri-plugin-log = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
-rusqlite = { version = "0.32", features = ["bundled"] }
+rusqlite = { version = "0.42", features = ["bundled"] }
 log = "0.4"
 # v7 for row identifiers (time-ordered); v4 for the stamp reference, which must carry no time.
 uuid = { version = "1", features = ["v4", "v7"] }

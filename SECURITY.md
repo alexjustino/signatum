@@ -266,7 +266,8 @@ single path segment. The same
 interface could ask the host to read any one file on a local drive — as a logo, as the text of a
 CSV, or as an image to look for a code in — because the open dialog hands it a path and the host
 reads the path it is given: it is read once, under the cap for that door, and what comes back is a
-normalised image, at most 2 MiB of UTF-8 text, what a decoder found in the pixels, or a sentence.
+normalised image, at most 2 MiB of UTF-8 text, what a decoder found in the pixels and, for a PNG,
+what its stamp says, or a sentence.
 Nothing read through the third door is written down, so a file read that way leaves no trace in the
 workspace. The fourth door can be asked about any `.png`, `.svg` or `.pdf` on a local drive, under
 its 20 MiB cap; what comes back is whether the file carries a stamp, whether it matches it, and
@@ -280,6 +281,6 @@ Every release, from the first one, is built by the release workflow on GitHub-ho
 from a tagged commit, and attached to the GitHub Release. The SHA-256 of each installer is published in the release notes.
 Verify what you install came from this repository's Releases page, and that its hash matches.
 
-Installers are **not** code-signed in 1.0.0: Windows SmartScreen will warn on first run. That is
-expected, and is a cost decision rather than a security posture — it is recorded in the project's
-architecture decisions.
+Installers are **not** code-signed in 1.0.0 or in 1.1.0: Windows SmartScreen will warn on first
+run. That is expected, and is a cost decision rather than a security posture — it is recorded in
+the project's architecture decisions.
