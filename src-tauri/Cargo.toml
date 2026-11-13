@@ -47,7 +47,7 @@ resvg = { version = "0.48", default-features = false }
 # the parsed tree, never stored as it came (ADR-016), and from 0.48 that writer
 # is a feature of its own, off along with resvg's defaults. The version is the
 # one resvg pins, so Cargo builds a single `usvg` and `resvg::usvg` is this one.
-usvg = { version = "0.48", default-features = false, features = ["writer"] }
+usvg = { version = "0.49", default-features = false, features = ["writer"] }
 # The decoder. Independent of the encoder by design: nothing on this side of the
 # gate shares a line of code with what drew the code (ADR-011).
 rqrr = "0.11"
